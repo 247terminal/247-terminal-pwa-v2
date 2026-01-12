@@ -43,7 +43,7 @@ interface ExchangesProps {
 
 export function Exchanges({ exchanges, on_exchange_click }: ExchangesProps) {
     return (
-        <div class="flex items-center gap-1 px-1.5 h-7 bg-base-300/50 rounded">
+        <div class="flex items-center gap-1 px-1.5 h-7">
             {exchanges.map((exchange) => (
                 <ExchangeButton
                     key={exchange.id}

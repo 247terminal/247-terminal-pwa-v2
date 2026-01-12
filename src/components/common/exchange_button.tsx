@@ -12,8 +12,8 @@ export function ExchangeButton({ connected, on_click, children }: ExchangeButton
             onClick={on_click}
             class={`flex items-center justify-center px-1 py-0 rounded transition-colors ${
                 connected
-                    ? 'text-primary hover:text-primary/80'
-                    : 'text-base-content/40 hover:text-base-content/60'
+                    ? 'text-primary/60 hover:text-primary/80'
+                    : 'text-base-content/25 hover:text-base-content/40'
             }`}
         >
             {children}

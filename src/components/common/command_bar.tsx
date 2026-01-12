@@ -1,20 +1,6 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { Icon } from './icon';
-
-interface Command {
-    name: string;
-    params: string[];
-    selected?: boolean;
-}
-
-const AVAILABLE_COMMANDS: Command[] = [
-    { name: 'SEARCH', params: ['[EXCHANGE]', '[TICKER]'] },
-    { name: 'OPEN', params: ['[MODULE NAME]'] },
-    { name: 'BUY', params: ['[SYMBOL]', '[SIZE]', '[LEV]'] },
-    { name: 'SELL', params: ['[SYMBOL]', '[SIZE]', '[LEV]'] },
-    { name: 'CLOSE', params: ['[SYMBOL]'] },
-    { name: 'SHARE', params: ['[SYMBOL]'] },
-];
+import { AVAILABLE_COMMANDS, type Command } from '../../config/commands';
 
 interface CommandBarProps {
     on_submit?: (command: string) => void;
