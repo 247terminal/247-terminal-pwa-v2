@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+@plugin "daisyui";
+
+@plugin "daisyui/theme" {
+  name: "terminal-dark";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #09090b;
+  --color-base-200: #18181b;
+  --color-base-300: #27272a;
+  --color-base-content: #fafafa;
+
+  --color-primary: #ef4444;
+  --color-primary-content: #ffffff;
+
+  --color-secondary: #27272a;
+  --color-secondary-content: #fafafa;
+
+  --color-accent: #f87171;
+  --color-accent-content: #000000;
+
+  --color-neutral: #18181b;
+  --color-neutral-content: #a1a1aa;
+
+  --color-info: #3b82f6;
+  --color-info-content: #ffffff;
+
+  --color-success: #22c55e;
+  --color-success-content: #000000;
+
+  --color-warning: #f59e0b;
+  --color-warning-content: #000000;
+
+  --color-error: #ef4444;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "terminal-light";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #ffffff;
+  --color-base-200: #f4f4f5;
+  --color-base-300: #e4e4e7;
+  --color-base-content: #09090b;
+
+  --color-primary: #dc2626;
+  --color-primary-content: #ffffff;
+
+  --color-secondary: #e4e4e7;
+  --color-secondary-content: #09090b;
+
+  --color-accent: #ef4444;
+  --color-accent-content: #ffffff;
+
+  --color-neutral: #f4f4f5;
+  --color-neutral-content: #71717a;
+
+  --color-info: #2563eb;
+  --color-info-content: #ffffff;
+
+  --color-success: #16a34a;
+  --color-success-content: #ffffff;
+
+  --color-warning: #ca8a04;
+  --color-warning-content: #ffffff;
+
+  --color-error: #dc2626;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.text-muted {
+  color: #71717a;
+}
+
+.border-subtle {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.border-subtle-light {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+}
+
+.glow-accent-strong {
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.3);
+}
