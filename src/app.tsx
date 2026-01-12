@@ -1,5 +1,7 @@
 import { LocationProvider, Router, Route } from 'preact-iso';
+import { AuthGuard } from './components/auth/auth_guard';
 import { TradingPage } from './pages/trading';
+
 import { ThemeToggle } from './components/common/theme_toggle';
 
 function HomePage() {
@@ -11,6 +13,12 @@ function HomePage() {
             <h1 class="text-4xl font-bold text-base-content">247 Terminal</h1>
             <p class="text-base-content/70">Welcome to 247 Terminal v2</p>
             <a href="/trading" class="btn btn-primary">Open Trading View</a>
+            <button
+                class="btn btn-ghost btn-sm text-base-content/50"
+                onClick={() => { localStorage.clear(); location.reload(); }}
+            >
+                Clear Local Storage
+            </button>
         </div>
     );
 }
@@ -27,12 +35,14 @@ function NotFound() {
 
 export function App() {
     return (
-        <LocationProvider>
-            <Router>
-                <Route path="/" component={HomePage} />
-                <Route path="/trading" component={TradingPage} />
-                <Route default component={NotFound} />
-            </Router>
-        </LocationProvider>
+        <AuthGuard>
+            <LocationProvider>
+                <Router>
+                    <Route path="/" component={HomePage} />
+                    <Route path="/trading" component={TradingPage} />
+                    <Route default component={NotFound} />
+                </Router>
+            </LocationProvider>
+        </AuthGuard>
     );
 }

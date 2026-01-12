@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { LicenseInput } from './license_input';
+import { Logo } from '../common/logo';
 
 interface LicenseModalProps {
     on_submit: (license_key: string) => Promise<boolean>;
@@ -22,10 +23,7 @@ export function LicenseModal({ on_submit, error, is_loading }: LicenseModalProps
 
             <div class="relative bg-base-100 rounded-lg shadow-xl w-full max-w-md mx-4 p-8">
                 <div class="flex flex-col items-center gap-6">
-                    <h1 class="text-2xl font-bold text-base-content">247 Terminal</h1>
-                    <p class="text-base-content/70 text-center">
-                        Enter your license key to continue
-                    </p>
+                    <Logo class="h-12" />
 
                     <form onSubmit={handle_submit} class="w-full flex flex-col gap-4">
                         <LicenseInput

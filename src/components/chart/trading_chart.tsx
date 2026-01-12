@@ -10,13 +10,25 @@ import {
     type Time,
 } from 'lightweight-charts';
 
-const CHART_COLORS = {
-    background: 'rgb(28, 29, 31)',
-    text: '#91969e',
-    grid: 'rgba(40, 41, 45, 0.5)',
+const THEMES = {
+    dark: {
+        background: 'rgb(28, 29, 31)',
+        text: '#91969e',
+        grid: 'rgba(40, 41, 45, 0.5)',
+    },
+    light: {
+        background: '#ffffff',
+        text: '#333333',
+        grid: 'rgba(200, 200, 200, 0.5)',
+    },
     up: 'rgb(0, 200, 114)',
     down: 'rgb(255, 107, 59)',
 };
+
+function get_theme_colors() {
+    const is_dark = document.documentElement.getAttribute('data-theme')?.includes('dark');
+    return is_dark ? THEMES.dark : THEMES.light;
+}
 
 function generate_sample_data(): CandlestickData<Time>[] {
     const data: CandlestickData<Time>[] = [];
@@ -47,28 +59,29 @@ export function TradingChart() {
     useEffect(() => {
         if (!container_ref.current) return;
 
+        const colors = get_theme_colors();
         const chart = createChart(container_ref.current, {
             layout: {
-                background: { type: ColorType.Solid, color: CHART_COLORS.background },
-                textColor: CHART_COLORS.text,
+                background: { type: ColorType.Solid, color: colors.background },
+                textColor: colors.text,
                 attributionLogo: false,
             },
             grid: {
-                vertLines: { color: CHART_COLORS.grid },
-                horzLines: { color: CHART_COLORS.grid },
+                vertLines: { color: colors.grid },
+                horzLines: { color: colors.grid },
             },
             crosshair: {
                 mode: CrosshairMode.Normal,
             },
             rightPriceScale: {
-                borderColor: CHART_COLORS.grid,
+                borderColor: colors.grid,
                 scaleMargins: {
                     top: 0.1,
                     bottom: 0.1,
                 },
             },
             timeScale: {
-                borderColor: CHART_COLORS.grid,
+                borderColor: colors.grid,
                 timeVisible: true,
                 secondsVisible: false,
             },
@@ -84,12 +97,25 @@ export function TradingChart() {
         });
 
         const candle_series = chart.addSeries(CandlestickSeries, {
-            upColor: CHART_COLORS.up,
-            downColor: CHART_COLORS.down,
-            wickUpColor: CHART_COLORS.up,
-            wickDownColor: CHART_COLORS.down,
+            upColor: THEMES.up,
+            downColor: THEMES.down,
+            wickUpColor: THEMES.up,
+            wickDownColor: THEMES.down,
             borderVisible: false,
         });
+
+        const apply_theme = () => {
+            const c = get_theme_colors();
+            chart.applyOptions({
+                layout: { background: { type: ColorType.Solid, color: c.background }, textColor: c.text },
+                grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
+                rightPriceScale: { borderColor: c.grid },
+                timeScale: { borderColor: c.grid },
+            });
+        };
+
+        const observer = new MutationObserver(apply_theme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
         candle_series.setData(generate_sample_data());
         chart.timeScale().fitContent();
@@ -111,6 +137,7 @@ export function TradingChart() {
         handle_resize();
 
         return () => {
+            observer.disconnect();
             resize_observer.disconnect();
             chart.remove();
             chart_ref.current = null;
