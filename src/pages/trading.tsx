@@ -7,7 +7,8 @@ import {
 } from 'react-grid-layout';
 import { TradingChart } from '../components/chart/trading_chart';
 import { ChartToolbar, type Timeframe } from '../components/chart/chart_toolbar';
-import { ThemeToggle } from '../components/common/theme_toggle';
+import { Header } from '../components/layout/header';
+import { Footer } from '../components/layout/footer';
 import 'react-grid-layout/css/styles.css';
 
 const DEFAULT_LAYOUTS: ResponsiveLayouts = {
@@ -15,28 +16,6 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts = {
         { i: 'chart', x: 0, y: 0, w: 12, h: 10, minW: 4, minH: 4 },
     ],
 };
-
-function Header() {
-    return (
-        <header class="h-10 bg-base-200 border-b border-base-300 flex items-center px-3 shrink-0">
-            <img src="/logo.svg" alt="247" class="h-5 w-5 rounded self-center" />
-            <div class="ml-auto scale-75">
-                <ThemeToggle />
-            </div>
-        </header>
-    );
-}
-
-function Footer() {
-    return (
-        <footer class="h-8 bg-base-200 border-t border-base-300 flex items-center px-4 shrink-0">
-            <span class="text-xs text-base-content/50">v2.0.0</span>
-            <div class="ml-auto flex items-center gap-4 text-xs text-base-content/50">
-                <span>Latency: 24ms</span>
-            </div>
-        </footer>
-    );
-}
 
 export function TradingPage() {
     const { width, containerRef, mounted } = useContainerWidth();
