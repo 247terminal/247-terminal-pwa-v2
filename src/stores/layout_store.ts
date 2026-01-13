@@ -68,11 +68,11 @@ function create_double_chart_rig(): Rig {
         ],
         layouts: {
             lg: [
-                { i: chart1_id, x: 0, y: 0, w: 4, h: 10, minW: 3, minH: 4 },
-                { i: chart2_id, x: 4, y: 0, w: 4, h: 10, minW: 3, minH: 4 },
+                { i: chart1_id, x: 0, y: 0, w: 4, h: 8, minW: 3, minH: 4 },
+                { i: chart2_id, x: 4, y: 0, w: 4, h: 8, minW: 3, minH: 4 },
                 { i: news_id, x: 8, y: 0, w: 4, h: 16, minW: 2, minH: 3 },
-                { i: positions_id, x: 0, y: 10, w: 4, h: 6, minW: 3, minH: 3 },
-                { i: trade_id, x: 4, y: 10, w: 4, h: 6, minW: 2, minH: 4 },
+                { i: positions_id, x: 0, y: 8, w: 4, h: 8, minW: 3, minH: 3 },
+                { i: trade_id, x: 4, y: 8, w: 4, h: 8, minW: 2, minH: 4 },
             ],
         },
         created_at: Date.now() + 1,
