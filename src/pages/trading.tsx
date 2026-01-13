@@ -32,9 +32,37 @@ function render_block(type: BlockType, on_remove: () => void) {
     }
 }
 
+const GRID_COLS = 12;
+
+function GridOverlay({ row_height, width }: { row_height: number; width: number }) {
+    const col_width = (width - MARGIN * 2 - MARGIN * (GRID_COLS - 1)) / GRID_COLS;
+
+    return (
+        <div class="absolute inset-0 pointer-events-none z-10" style={{ padding: MARGIN }}>
+            <div class="relative w-full h-full">
+                {Array.from({ length: GRID_ROWS }).map((_, row) =>
+                    Array.from({ length: GRID_COLS }).map((_, col) => (
+                        <div
+                            key={`${row}-${col}`}
+                            class="absolute rounded bg-primary/10"
+                            style={{
+                                left: col * (col_width + MARGIN),
+                                top: row * (row_height + MARGIN),
+                                width: col_width,
+                                height: row_height,
+                            }}
+                        />
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
+
 export function TradingPage() {
     const { width, containerRef, mounted } = useContainerWidth();
     const [row_height, set_row_height] = useState(50);
+    const [is_adjusting, set_is_adjusting] = useState(false);
 
     useEffect(() => {
         const calculate_row_height = () => {
@@ -54,13 +82,19 @@ export function TradingPage() {
         update_layouts({ lg: lg_layouts });
     }, []);
 
+    const handle_drag_start = useCallback(() => set_is_adjusting(true), []);
+    const handle_drag_stop = useCallback(() => set_is_adjusting(false), []);
+    const handle_resize_start = useCallback(() => set_is_adjusting(true), []);
+    const handle_resize_stop = useCallback(() => set_is_adjusting(false), []);
+
     const current_blocks = blocks.value;
     const current_layouts = layouts.value;
 
     return (
         <div class="h-screen flex flex-col bg-base-100">
             <Header />
-            <main ref={containerRef as React.RefObject<HTMLDivElement>} class="flex-1 overflow-auto min-h-0">
+            <main ref={containerRef as React.RefObject<HTMLDivElement>} class="flex-1 overflow-auto min-h-0 relative">
+                {is_adjusting && mounted && <GridOverlay row_height={row_height} width={width} />}
                 {mounted && current_blocks.length > 0 && (
                     <ResponsiveGridLayout
                         className="layout"
@@ -72,6 +106,10 @@ export function TradingPage() {
                         margin={[MARGIN, MARGIN]}
                         containerPadding={[MARGIN, MARGIN]}
                         onLayoutChange={handle_layout_change}
+                        onDragStart={handle_drag_start}
+                        onDragStop={handle_drag_stop}
+                        onResizeStart={handle_resize_start}
+                        onResizeStop={handle_resize_stop}
                         resizeConfig={{ enabled: true }}
                     >
                         {current_blocks.map((block) => (
