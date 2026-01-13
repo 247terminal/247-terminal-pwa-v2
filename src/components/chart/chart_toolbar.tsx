@@ -19,7 +19,7 @@ const TIMEFRAMES: Timeframe[] = ['1', '5', '15', '60', '240', 'D'];
 
 export function ChartToolbar({ symbol, timeframe, on_timeframe_change }: ChartToolbarProps) {
     return (
-        <div class="flex items-center justify-between px-3 py-1.5 bg-base-300 border-b border-base-100">
+        <div class="flex items-center justify-between px-3 py-1.5 bg-theme-header border-b border-base-300">
             <div class="flex items-center gap-3">
                 <span class="text-sm font-medium text-base-content">{symbol}</span>
                 <div class="flex items-center gap-0.5">

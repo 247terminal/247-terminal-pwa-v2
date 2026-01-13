@@ -41,7 +41,7 @@ export function LicenseModal({ on_submit, error, is_loading }: LicenseModalProps
                             {is_loading ? (
                                 <span class="loading loading-spinner loading-sm"></span>
                             ) : (
-                                'Activate'
+                                'ACTIVATE'
                             )}
                         </button>
                     </form>

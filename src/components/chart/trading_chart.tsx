@@ -10,24 +10,24 @@ import {
     type Time,
 } from 'lightweight-charts';
 
-const THEMES = {
-    dark: {
-        background: 'rgb(28, 29, 31)',
-        text: '#91969e',
-        grid: 'rgba(40, 41, 45, 0.5)',
-    },
-    light: {
-        background: '#ffffff',
-        text: '#333333',
-        grid: 'rgba(200, 200, 200, 0.5)',
-    },
-    up: 'rgb(0, 200, 114)',
-    down: 'rgb(255, 107, 59)',
-};
+function get_css_variable(name: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 
 function get_theme_colors() {
-    const is_dark = document.documentElement.getAttribute('data-theme')?.includes('dark');
-    return is_dark ? THEMES.dark : THEMES.light;
+    const base_100 = get_css_variable('--color-base-100');
+    const base_content = get_css_variable('--color-base-content');
+    const base_300 = get_css_variable('--color-base-300');
+    const success = get_css_variable('--color-success');
+    const error = get_css_variable('--color-error');
+
+    return {
+        background: base_100 || '#09090b',
+        text: base_content || '#fafafa',
+        grid: base_300 ? `color-mix(in oklch, ${base_300}, transparent 50%)` : 'rgba(40, 41, 45, 0.5)',
+        up: success || 'rgb(0, 200, 114)',
+        down: error || 'rgb(255, 107, 59)',
+    };
 }
 
 function generate_sample_data(): CandlestickData<Time>[] {
@@ -97,10 +97,10 @@ export function TradingChart() {
         });
 
         const candle_series = chart.addSeries(CandlestickSeries, {
-            upColor: THEMES.up,
-            downColor: THEMES.down,
-            wickUpColor: THEMES.up,
-            wickDownColor: THEMES.down,
+            upColor: colors.up,
+            downColor: colors.down,
+            wickUpColor: colors.up,
+            wickDownColor: colors.down,
             borderVisible: false,
         });
 
@@ -111,6 +111,12 @@ export function TradingChart() {
                 grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
                 rightPriceScale: { borderColor: c.grid },
                 timeScale: { borderColor: c.grid },
+            });
+            candle_series.applyOptions({
+                upColor: c.up,
+                downColor: c.down,
+                wickUpColor: c.up,
+                wickDownColor: c.down,
             });
         };
 

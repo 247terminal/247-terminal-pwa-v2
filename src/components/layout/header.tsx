@@ -26,13 +26,15 @@ export function Header() {
     };
 
     return (
-        <header class="h-10 bg-neutral border-b border-base-300 flex items-center px-3 shrink-0">
+        <header class="h-10 bg-theme-header border-b border-base-300 flex items-center px-3 shrink-0">
             <div class="flex-1 flex items-center">
                 <Exchanges exchanges={exchanges} on_exchange_click={handle_exchange_click} />
             </div>
-            <CommandBar on_submit={handle_command} />
-            <div class="flex-1 flex items-center justify-end gap-2">
+            <div class="flex items-center gap-2">
+                <CommandBar on_submit={handle_command} />
                 <SettingsButton on_click={() => console.log('Settings clicked')} />
+            </div>
+            <div class="flex-1 flex items-center justify-end gap-2">
                 <BlocksButton on_click={() => console.log('Blocks clicked')} />
                 <RigSelector rig_name="DEFAULT" on_click={() => console.log('Rig selector clicked')} />
             </div>
