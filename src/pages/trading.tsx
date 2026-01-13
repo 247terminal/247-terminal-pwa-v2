@@ -1,4 +1,4 @@
-import { useCallback } from 'preact/hooks';
+import { useCallback, useState, useEffect } from 'preact/hooks';
 import {
     ResponsiveGridLayout,
     useContainerWidth,
@@ -10,6 +10,10 @@ import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock, TradeBlock } from '..
 import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_store';
 import type { BlockType } from '../types/layout';
 import 'react-grid-layout/css/styles.css';
+
+const GRID_ROWS = 16;
+const MARGIN = 8;
+const HEADER_HEIGHT = 40;
 
 function render_block(type: BlockType, on_remove: () => void) {
     switch (type) {
@@ -30,6 +34,20 @@ function render_block(type: BlockType, on_remove: () => void) {
 
 export function TradingPage() {
     const { width, containerRef, mounted } = useContainerWidth();
+    const [row_height, set_row_height] = useState(50);
+
+    useEffect(() => {
+        const calculate_row_height = () => {
+            const available_height = window.innerHeight - HEADER_HEIGHT - (MARGIN * 2);
+            const total_margins = (GRID_ROWS - 1) * MARGIN;
+            const height = Math.floor((available_height - total_margins) / GRID_ROWS);
+            set_row_height(Math.max(30, height));
+        };
+
+        calculate_row_height();
+        window.addEventListener('resize', calculate_row_height);
+        return () => window.removeEventListener('resize', calculate_row_height);
+    }, []);
 
     const handle_layout_change = useCallback((_layout: Layout, all_layouts: ResponsiveLayouts) => {
         const lg_layouts = all_layouts.lg ? [...all_layouts.lg] : [];
@@ -50,9 +68,9 @@ export function TradingPage() {
                         layouts={current_layouts}
                         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
                         cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
-                        rowHeight={50}
-                        margin={[8, 8]}
-                        containerPadding={[8, 8]}
+                        rowHeight={row_height}
+                        margin={[MARGIN, MARGIN]}
+                        containerPadding={[MARGIN, MARGIN]}
                         onLayoutChange={handle_layout_change}
                         resizeConfig={{ enabled: true }}
                     >

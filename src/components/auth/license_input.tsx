@@ -18,7 +18,7 @@ export function LicenseInput({ value, on_change, error, disabled }: LicenseInput
                 name="license_key"
                 autocomplete="current-password"
                 placeholder="YOUR LICENSE KEY HERE"
-                class={`input input-bordered w-full font-mono text-center ${error ? 'input-error' : ''}`}
+                class={`input w-full font-mono text-center bg-base-300/50 ${error ? 'input-error' : ''}`}
                 value={value}
                 onInput={handle_change}
                 disabled={disabled}

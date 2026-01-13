@@ -8,17 +8,95 @@ function generate_id(): string {
     return `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }
 
-function create_default_rig(name: string): Rig {
-    const chart_id = `chart_${generate_id()}`;
+function create_empty_rig(name: string): Rig {
     return {
         id: generate_id(),
         name,
-        blocks: [{ id: chart_id, type: 'chart' }],
+        blocks: [],
         layouts: {
-            lg: [{ i: chart_id, x: 0, y: 0, w: 6, h: 6, minW: 4, minH: 4 }],
+            lg: [],
         },
         created_at: Date.now(),
     };
+}
+
+export type DefaultRigTemplate = 'single_chart' | 'double_chart';
+
+function create_single_chart_rig(): Rig {
+    const chart_id = `chart_${generate_id()}`;
+    const news_id = `news_${generate_id()}`;
+    const positions_id = `positions_${generate_id()}`;
+    const trade_id = `trade_${generate_id()}`;
+
+    return {
+        id: generate_id(),
+        name: 'SINGLE CHART',
+        blocks: [
+            { id: chart_id, type: 'chart' },
+            { id: news_id, type: 'news' },
+            { id: positions_id, type: 'positions' },
+            { id: trade_id, type: 'trade' },
+        ],
+        layouts: {
+            lg: [
+                { i: chart_id, x: 0, y: 0, w: 9, h: 10, minW: 4, minH: 4 },
+                { i: news_id, x: 9, y: 0, w: 3, h: 16, minW: 2, minH: 3 },
+                { i: positions_id, x: 0, y: 10, w: 5, h: 6, minW: 3, minH: 3 },
+                { i: trade_id, x: 5, y: 10, w: 4, h: 6, minW: 2, minH: 4 },
+            ],
+        },
+        created_at: Date.now(),
+    };
+}
+
+function create_double_chart_rig(): Rig {
+    const chart1_id = `chart_${generate_id()}`;
+    const chart2_id = `chart_${generate_id()}`;
+    const news_id = `news_${generate_id()}`;
+    const positions_id = `positions_${generate_id()}`;
+    const trade_id = `trade_${generate_id()}`;
+
+    return {
+        id: generate_id(),
+        name: 'DOUBLE CHART',
+        blocks: [
+            { id: chart1_id, type: 'chart' },
+            { id: chart2_id, type: 'chart' },
+            { id: news_id, type: 'news' },
+            { id: positions_id, type: 'positions' },
+            { id: trade_id, type: 'trade' },
+        ],
+        layouts: {
+            lg: [
+                { i: chart1_id, x: 0, y: 0, w: 4, h: 10, minW: 3, minH: 4 },
+                { i: chart2_id, x: 4, y: 0, w: 4, h: 10, minW: 3, minH: 4 },
+                { i: news_id, x: 8, y: 0, w: 4, h: 16, minW: 2, minH: 3 },
+                { i: positions_id, x: 0, y: 10, w: 4, h: 6, minW: 3, minH: 3 },
+                { i: trade_id, x: 4, y: 10, w: 4, h: 6, minW: 2, minH: 4 },
+            ],
+        },
+        created_at: Date.now() + 1,
+    };
+}
+
+export function create_rig_from_template(template: DefaultRigTemplate): string {
+    const new_rig = template === 'single_chart'
+        ? create_single_chart_rig()
+        : create_double_chart_rig();
+
+    const state = rigs_state.value;
+    const new_state: RigsState = {
+        rigs: {
+            ...state.rigs,
+            [new_rig.id]: new_rig,
+        },
+        active_rig_id: new_rig.id,
+    };
+
+    rigs_state.value = new_state;
+    save_to_storage(new_state);
+
+    return new_rig.id;
 }
 
 function load_from_storage(): RigsState | null {
@@ -42,10 +120,14 @@ function save_to_storage(state: RigsState): void {
 }
 
 function get_default_state(): RigsState {
-    const default_rig = create_default_rig('DEFAULT');
+    const single_chart = create_single_chart_rig();
+    const double_chart = create_double_chart_rig();
     return {
-        rigs: { [default_rig.id]: default_rig },
-        active_rig_id: default_rig.id,
+        rigs: {
+            [single_chart.id]: single_chart,
+            [double_chart.id]: double_chart,
+        },
+        active_rig_id: single_chart.id,
     };
 }
 
@@ -190,7 +272,7 @@ export function update_layouts(new_layouts: { lg: BlockLayout[] }): void {
 }
 
 export function create_rig(name: string): string {
-    const new_rig = create_default_rig(name);
+    const new_rig = create_empty_rig(name);
     const state = rigs_state.value;
 
     const new_state: RigsState = {

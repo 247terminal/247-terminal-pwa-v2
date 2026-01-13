@@ -19,7 +19,7 @@ export function LicenseModal({ on_submit, error, is_loading }: LicenseModalProps
 
     return (
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-theme-header">
-            <div class="relative bg-theme-header border border-base-300 rounded-lg shadow-xl w-full max-w-md mx-4 p-8">
+            <div class="relative bg-theme-header rounded-lg shadow-xl w-full max-w-md mx-4 p-8">
                 <div class="flex flex-col items-center gap-6">
                     <Logo class="h-12" />
 
