@@ -5,6 +5,7 @@ import { Exchanges, get_exchange_icon } from '../common/exchanges';
 import { SettingsButton } from '../common/settings_button';
 import { BlocksMenu } from '../common/blocks_menu';
 import { ThemeToggle } from '../common/theme_toggle';
+import { ConnectionStatus } from '../common/connection_status';
 
 export function Header() {
     const handle_command = (command: string) => {
@@ -31,7 +32,8 @@ export function Header() {
             <div class="flex-1 flex items-center">
                 <Exchanges exchanges={exchanges} on_exchange_click={handle_exchange_click} />
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3">
+                <ConnectionStatus />
                 <CommandBar on_submit={handle_command} />
                 <SettingsButton on_click={() => console.log('Settings clicked')} />
             </div>
