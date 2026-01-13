@@ -53,6 +53,20 @@ const BLOCK_OPTIONS: BlockOption[] = [
             </svg>
         ),
     },
+    {
+        id: 'trade',
+        name: 'TRADE',
+        icon: (
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 7l-10 0"/>
+                <path d="M7 7l3-3"/>
+                <path d="M7 7l3 3"/>
+                <path d="M7 17l10 0"/>
+                <path d="M17 17l-3-3"/>
+                <path d="M17 17l-3 3"/>
+            </svg>
+        ),
+    },
 ];
 
 export function BlocksMenu() {

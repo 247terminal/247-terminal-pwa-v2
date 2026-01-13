@@ -7,7 +7,7 @@ import {
 } from 'react-grid-layout';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
-import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock } from '../components/blocks';
+import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock, TradeBlock } from '../components/blocks';
 import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_store';
 import type { BlockType } from '../types/layout';
 import 'react-grid-layout/css/styles.css';
@@ -22,6 +22,8 @@ function render_block(type: BlockType, on_remove: () => void) {
             return <PositionsBlock on_remove={on_remove} />;
         case 'chat':
             return <ChatBlock on_remove={on_remove} />;
+        case 'trade':
+            return <TradeBlock on_remove={on_remove} />;
         default:
             return null;
     }

@@ -1,4 +1,4 @@
-export type BlockType = 'chart' | 'news' | 'positions' | 'chat';
+export type BlockType = 'chart' | 'news' | 'positions' | 'chat' | 'trade';
 
 export interface Block {
     id: string;
@@ -31,4 +31,5 @@ export const BLOCK_DEFAULTS: Record<BlockType, { w: number; h: number; minW: num
     news: { w: 3, h: 6, minW: 2, minH: 3 },
     positions: { w: 4, h: 5, minW: 3, minH: 3 },
     chat: { w: 3, h: 6, minW: 2, minH: 4 },
+    trade: { w: 3, h: 6, minW: 2, minH: 4 },
 };
