@@ -3,8 +3,9 @@ import { EXCHANGE_IDS, type ExchangeId } from '../../services/exchange/types';
 import { get_exchange_icon } from '../common/exchanges';
 
 function format_symbol(symbol: string): string {
-    const base = symbol.split('/')[0] || symbol;
-    const quote = symbol.split('/')[1]?.split(':')[0] || '';
+    const parts = symbol.split('/');
+    const base = parts[0] || symbol;
+    const quote = parts[1]?.split(':')[0] || '';
     return `${base}${quote}`.toUpperCase();
 }
 

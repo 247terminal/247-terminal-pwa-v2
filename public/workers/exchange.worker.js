@@ -110,8 +110,8 @@ async function startOHLCVStream(exchangeId, symbol, timeframe, streamId) {
         while (activeStreams.get(streamId)) {
             try {
                 if (!exchange.has['watchOHLCV']) {
-                    await new Promise((r) => setTimeout(r, 5000));
-                    continue;
+                    console.error('exchange does not support watchohlcv:', exchangeId);
+                    break;
                 }
 
                 const ohlcv = await exchange.watchOHLCV(symbol, ccxtTimeframe);

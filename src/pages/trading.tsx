@@ -131,7 +131,11 @@ export function TradingPage() {
                         onResizeStart={handle_resize_start}
                         onResizeStop={handle_resize_stop}
                         resizeConfig={{ enabled: !is_locked }}
-                        dragConfig={{ enabled: !is_locked, handle: '.drag-handle', cancel: 'button, input, .no-drag' }}
+                        dragConfig={{
+                            enabled: !is_locked,
+                            handle: '.drag-handle',
+                            cancel: 'button, input, .no-drag',
+                        }}
                     >
                         {current_blocks.map((block) => (
                             <div

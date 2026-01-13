@@ -4,7 +4,7 @@ export const EXCHANGE_IDS: ExchangeId[] = ['binance', 'blofin', 'hyperliquid', '
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
-export interface MarketInfo {
+export interface SymbolData {
     symbol: string;
     base: string;
     quote: string;
@@ -17,18 +17,14 @@ export interface MarketInfo {
     qty_step: number;
     contract_size: number;
     max_leverage: number | null;
-}
-
-export interface TickerData {
-    symbol: string;
-    last_price: number;
+    last_price: number | null;
     price_1m_ago: number | null;
-    best_bid: number;
-    best_ask: number;
+    best_bid: number | null;
+    best_ask: number | null;
     funding_rate: number | null;
     next_funding_time: number | null;
     price_24h: number | null;
-    timestamp: number;
+    last_updated: number | null;
 }
 
 export interface ExchangeState {

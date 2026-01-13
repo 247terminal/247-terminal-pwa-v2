@@ -1,4 +1,19 @@
-import type { ExchangeId, MarketInfo } from './types';
+import type { ExchangeId } from './types';
+
+export interface MarketData {
+    symbol: string;
+    base: string;
+    quote: string;
+    settle: string;
+    active: boolean;
+    type: string;
+    tick_size: number;
+    min_qty: number;
+    max_qty: number;
+    qty_step: number;
+    contract_size: number;
+    max_leverage: number | null;
+}
 
 export interface OHLCV {
     time: number;
@@ -82,36 +97,52 @@ function sendRequest<T>(
         }
 
         const id = ++requestId;
+        let onAbort: (() => void) | null = null;
+
+        const cleanup = () => {
+            if (onAbort && signal) {
+                signal.removeEventListener('abort', onAbort);
+            }
+        };
 
         const timeoutId = setTimeout(() => {
             if (pendingRequests.has(id)) {
                 pendingRequests.delete(id);
+                cleanup();
                 reject(new Error('request timeout'));
             }
         }, 30000);
 
         const pending: PendingRequest = {
-            resolve: resolve as (value: unknown) => void,
-            reject,
+            resolve: (value: unknown) => {
+                cleanup();
+                resolve(value as T);
+            },
+            reject: (err: Error) => {
+                cleanup();
+                reject(err);
+            },
             timeoutId,
         };
         pendingRequests.set(id, pending);
 
-        const onAbort = () => {
-            if (pendingRequests.has(id)) {
-                clearTimeout(timeoutId);
-                pendingRequests.delete(id);
-                reject(new Error('request aborted'));
-            }
-        };
-        signal?.addEventListener('abort', onAbort, { once: true });
+        if (signal) {
+            onAbort = () => {
+                if (pendingRequests.has(id)) {
+                    clearTimeout(timeoutId);
+                    pendingRequests.delete(id);
+                    reject(new Error('request aborted'));
+                }
+            };
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
 
         getWorker().postMessage({ type, payload, requestId: id });
     });
 }
 
-export function fetch_markets(exchangeId: ExchangeId, signal?: AbortSignal): Promise<MarketInfo[]> {
-    return sendRequest<MarketInfo[]>('FETCH_MARKETS', { exchangeId }, signal);
+export function fetch_markets(exchangeId: ExchangeId, signal?: AbortSignal): Promise<MarketData[]> {
+    return sendRequest<MarketData[]>('FETCH_MARKETS', { exchangeId }, signal);
 }
 
 export function fetch_ohlcv(

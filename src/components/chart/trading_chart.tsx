@@ -161,7 +161,7 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
             chart_ref.current = null;
             series_ref.current = null;
         };
-    }, [precision, tick_size]);
+    }, [tick_size]);
 
     const prev_data_length = useRef(0);
 
@@ -180,16 +180,6 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
 
         prev_data_length.current = data.length;
     }, [data]);
-
-    const latest_candle = useMemo(() => {
-        if (data.length === 0) return null;
-        return data[data.length - 1];
-    }, [data]);
-
-    useEffect(() => {
-        if (!series_ref.current || !latest_candle) return;
-        series_ref.current.update(ohlcv_to_candle(latest_candle));
-    }, [latest_candle]);
 
     return (
         <div class="absolute inset-0">

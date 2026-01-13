@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
-import { useSignal } from '@preact/signals';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
 import { EXCHANGE_IDS, type ExchangeId } from '../../services/exchange/types';
@@ -22,7 +21,6 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
     const [timeframe, set_timeframe] = useState<Timeframe>('1');
     const [data, set_data] = useState<OHLCV[]>([]);
     const [loading, set_loading] = useState(true);
-    const has_data = useSignal(false);
 
     const current_markets = markets.value;
 
@@ -64,11 +62,9 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
             const chart_tf = toolbar_to_chart_timeframe(timeframe);
             const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
             set_data(ohlcv);
-            has_data.value = ohlcv.length > 0;
         } catch (err) {
             console.error('failed to load chart data:', err);
             set_data([]);
-            has_data.value = false;
         } finally {
             set_loading(false);
         }
@@ -84,8 +80,10 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         }
     }, [symbol, timeframe, has_any_markets, load_chart_data]);
 
+    const has_data = data.length > 0;
+
     useEffect(() => {
-        if (!symbol || !has_data.value) return;
+        if (!symbol || !has_data) return;
 
         const chart_tf = toolbar_to_chart_timeframe(timeframe);
         const cleanup = watch_ohlcv(exchange, symbol, chart_tf, (candle) => {
@@ -102,7 +100,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         });
 
         return cleanup;
-    }, [exchange, symbol, timeframe, has_data.value]);
+    }, [exchange, symbol, timeframe, has_data]);
 
     const handle_symbol_change = (ex: ExchangeId, s: string) => {
         set_exchange(ex);
