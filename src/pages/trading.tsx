@@ -8,6 +8,7 @@ import {
 import { Header } from '../components/layout/header';
 import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock, TradeBlock } from '../components/blocks';
 import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_store';
+import { get_block_icon } from '../components/common/block_icons';
 import type { BlockType } from '../types/layout';
 import 'react-grid-layout/css/styles.css';
 
@@ -118,6 +119,11 @@ export function TradingPage() {
                                 class="bg-base-200 rounded border border-base-300/50 overflow-hidden flex flex-col"
                             >
                                 {render_block(block.type, () => remove_block(block.id))}
+                                <div class="block-type-icon absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <span class="text-primary-content">
+                                        {get_block_icon(block.type, 'w-12 h-12')}
+                                    </span>
+                                </div>
                             </div>
                         ))}
                     </ResponsiveGridLayout>

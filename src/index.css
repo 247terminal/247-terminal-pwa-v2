@@ -145,3 +145,23 @@
 .animate-pulse-once {
   animation: pulse-once 0.3s ease-in-out;
 }
+
+.react-grid-item.react-draggable-dragging,
+.react-grid-item.resizing {
+  background-color: oklch(from var(--color-primary) calc(l + 0.3) calc(c * 0.5) h / 0.4) !important;
+  border-color: oklch(from var(--color-primary) calc(l + 0.3) calc(c * 0.5) h / 0.4) !important;
+}
+
+.react-grid-item .block-type-icon {
+  opacity: 0;
+}
+
+.react-grid-item.react-draggable-dragging > *:not(.block-type-icon),
+.react-grid-item.resizing > *:not(.block-type-icon) {
+  opacity: 0;
+}
+
+.react-grid-item.react-draggable-dragging .block-type-icon,
+.react-grid-item.resizing .block-type-icon {
+  opacity: 1;
+}
