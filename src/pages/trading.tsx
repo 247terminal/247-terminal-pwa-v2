@@ -8,6 +8,7 @@ import {
 import { Header } from '../components/layout/header';
 import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock, TradeBlock } from '../components/blocks';
 import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_store';
+import { layout_locked, trigger_lock_shake } from '../stores/layout_lock_store';
 import { get_block_icon } from '../components/common/block_icons';
 import type { BlockType } from '../types/layout';
 import 'react-grid-layout/css/styles.css';
@@ -16,18 +17,19 @@ const GRID_ROWS = 16;
 const MARGIN = 8;
 const HEADER_HEIGHT = 40;
 
-function render_block(type: BlockType, on_remove: () => void) {
+function render_block(type: BlockType, on_remove: () => void, locked: boolean) {
+    const remove_handler = locked ? undefined : on_remove;
     switch (type) {
         case 'chart':
-            return <ChartBlock on_remove={on_remove} />;
+            return <ChartBlock on_remove={remove_handler} />;
         case 'news':
-            return <NewsBlock on_remove={on_remove} />;
+            return <NewsBlock on_remove={remove_handler} />;
         case 'positions':
-            return <PositionsBlock on_remove={on_remove} />;
+            return <PositionsBlock on_remove={remove_handler} />;
         case 'chat':
-            return <ChatBlock on_remove={on_remove} />;
+            return <ChatBlock on_remove={remove_handler} />;
         case 'trade':
-            return <TradeBlock on_remove={on_remove} />;
+            return <TradeBlock on_remove={remove_handler} />;
         default:
             return null;
     }
@@ -88,8 +90,21 @@ export function TradingPage() {
     const handle_resize_start = useCallback(() => set_is_adjusting(true), []);
     const handle_resize_stop = useCallback(() => set_is_adjusting(false), []);
 
+    const handle_locked_interaction = useCallback((e: MouseEvent) => {
+        if (!layout_locked.value) return;
+
+        const target = e.target as HTMLElement;
+        const is_drag_handle = target.closest('.drag-handle');
+        const is_resize_handle = target.closest('.react-resizable-handle');
+
+        if (is_drag_handle || is_resize_handle) {
+            trigger_lock_shake();
+        }
+    }, []);
+
     const current_blocks = blocks.value;
     const current_layouts = layouts.value;
+    const is_locked = layout_locked.value;
 
     return (
         <div class="h-screen flex flex-col bg-base-100">
@@ -97,6 +112,7 @@ export function TradingPage() {
             <main
                 ref={containerRef as React.RefObject<HTMLDivElement>}
                 class="flex-1 overflow-auto min-h-0 relative"
+                onMouseDown={handle_locked_interaction}
             >
                 {is_adjusting && mounted && <GridOverlay row_height={row_height} width={width} />}
                 {mounted && current_blocks.length > 0 && (
@@ -114,15 +130,15 @@ export function TradingPage() {
                         onDragStop={handle_drag_stop}
                         onResizeStart={handle_resize_start}
                         onResizeStop={handle_resize_stop}
-                        resizeConfig={{ enabled: true }}
-                        dragConfig={{ handle: '.drag-handle', cancel: 'button, input, .no-drag' }}
+                        resizeConfig={{ enabled: !is_locked }}
+                        dragConfig={{ enabled: !is_locked, handle: '.drag-handle', cancel: 'button, input, .no-drag' }}
                     >
                         {current_blocks.map((block) => (
                             <div
                                 key={block.id}
                                 class="bg-base-200 rounded border border-base-300/50 overflow-hidden flex flex-col"
                             >
-                                {render_block(block.type, () => remove_block(block.id))}
+                                {render_block(block.type, () => remove_block(block.id), is_locked)}
                                 <div class="block-type-icon absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <span class="text-primary-content">
                                         {get_block_icon(block.type, 'w-12 h-12')}

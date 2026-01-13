@@ -6,6 +6,7 @@ import { SettingsButton } from '../common/settings_button';
 import { BlocksMenu } from '../common/blocks_menu';
 import { ThemeToggle } from '../common/theme_toggle';
 import { ConnectionStatus } from '../common/connection_status';
+import { LayoutLockToggle } from '../common/layout_lock_toggle';
 
 export function Header() {
     const handle_command = (command: string) => {
@@ -38,6 +39,7 @@ export function Header() {
                 <SettingsButton on_click={() => console.log('Settings clicked')} />
             </div>
             <div class="flex-1 flex items-center justify-end gap-2">
+                <LayoutLockToggle />
                 <ThemeToggle />
                 <BlocksMenu />
                 <RigSelector />
