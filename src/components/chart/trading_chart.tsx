@@ -14,6 +14,7 @@ import type { OHLCV } from '../../services/exchange/chart_data';
 interface TradingChartProps {
     data: OHLCV[];
     loading?: boolean;
+    tick_size?: number;
 }
 
 function get_css_variable(name: string): string {
@@ -48,10 +49,16 @@ function ohlcv_to_candle(ohlcv: OHLCV): CandlestickData<Time> {
     };
 }
 
-export function TradingChart({ data, loading }: TradingChartProps) {
+function tick_size_to_precision(tick_size: number): number {
+    if (tick_size >= 1) return 0;
+    return Math.max(0, Math.ceil(-Math.log10(tick_size)));
+}
+
+export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartProps) {
     const container_ref = useRef<HTMLDivElement>(null);
     const chart_ref = useRef<IChartApi | null>(null);
     const series_ref = useRef<ISeriesApi<'Candlestick'> | null>(null);
+    const precision = useMemo(() => tick_size_to_precision(tick_size), [tick_size]);
 
     useEffect(() => {
         if (!container_ref.current) return;
@@ -99,6 +106,11 @@ export function TradingChart({ data, loading }: TradingChartProps) {
             wickUpColor: colors.up,
             wickDownColor: colors.down,
             borderVisible: false,
+            priceFormat: {
+                type: 'price',
+                precision: precision,
+                minMove: tick_size,
+            },
         });
 
         const apply_theme = () => {
@@ -149,7 +161,7 @@ export function TradingChart({ data, loading }: TradingChartProps) {
             chart_ref.current = null;
             series_ref.current = null;
         };
-    }, []);
+    }, [precision, tick_size]);
 
     const prev_data_length = useRef(0);
 

@@ -10,7 +10,7 @@ import {
     toolbar_to_chart_timeframe,
     type OHLCV,
 } from '../../services/exchange/chart_data';
-import { markets, set_markets, has_markets } from '../../stores/exchange_store';
+import { markets, set_markets, has_markets, get_market } from '../../stores/exchange_store';
 
 interface ChartBlockProps {
     on_remove?: () => void;
@@ -38,6 +38,11 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         () => Object.values(current_markets).some((m) => Object.keys(m).length > 0),
         [current_markets]
     );
+
+    const tick_size = useMemo(() => {
+        const market = get_market(exchange, symbol);
+        return market?.tick_size ?? 0.01;
+    }, [exchange, symbol, current_markets]);
 
     const load_all_markets = useCallback(() => {
         for (const ex of EXCHANGE_IDS) {
@@ -136,7 +141,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                 )}
             </div>
             <div class="flex-1 relative min-h-0 overflow-hidden">
-                <TradingChart data={data} loading={loading} />
+                <TradingChart data={data} loading={loading} tick_size={tick_size} />
             </div>
         </div>
     );
