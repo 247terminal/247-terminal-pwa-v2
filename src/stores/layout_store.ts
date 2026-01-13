@@ -1,44 +1,106 @@
 import { signal, computed } from '@preact/signals';
-import type { Block, BlockType, BlockLayout, LayoutState } from '../types/layout';
+import type { Block, BlockType, BlockLayout, Rig, RigsState } from '../types/layout';
 import { BLOCK_DEFAULTS } from '../types/layout';
 
-const STORAGE_KEY = '247terminal_layout';
+const STORAGE_KEY = '247terminal_rigs';
 
 function generate_id(): string {
-    return `block_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    return `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }
 
-function load_from_storage(): LayoutState | null {
+function create_default_rig(name: string): Rig {
+    const chart_id = `chart_${generate_id()}`;
+    return {
+        id: generate_id(),
+        name,
+        blocks: [{ id: chart_id, type: 'chart' }],
+        layouts: {
+            lg: [{ i: chart_id, x: 0, y: 0, w: 6, h: 6, minW: 4, minH: 4 }],
+        },
+        created_at: Date.now(),
+    };
+}
+
+function load_from_storage(): RigsState | null {
     try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
             return JSON.parse(stored);
         }
     } catch (e) {
-        console.error('Failed to load layout from storage:', e);
+        console.error('Failed to load rigs from storage:', e);
     }
     return null;
 }
 
-function save_to_storage(state: LayoutState): void {
+function save_to_storage(state: RigsState): void {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
-        console.error('Failed to save layout to storage:', e);
+        console.error('Failed to save rigs to storage:', e);
     }
 }
 
-function get_default_state(): LayoutState {
-    const chart_id = 'chart_default';
+function get_default_state(): RigsState {
+    const default_rig = create_default_rig('DEFAULT');
     return {
-        blocks: [{ id: chart_id, type: 'chart' }],
-        layouts: {
-            lg: [{ i: chart_id, x: 0, y: 0, w: 6, h: 6, minW: 4, minH: 4 }],
-        },
+        rigs: { [default_rig.id]: default_rig },
+        active_rig_id: default_rig.id,
     };
 }
 
-function find_next_position(layouts: BlockLayout[]): { x: number; y: number } {
+function migrate_old_layout(): RigsState | null {
+    try {
+        const old_stored = localStorage.getItem('247terminal_layout');
+        if (old_stored) {
+            const old_state = JSON.parse(old_stored);
+            const migrated_rig: Rig = {
+                id: generate_id(),
+                name: 'DEFAULT',
+                blocks: old_state.blocks || [],
+                layouts: { lg: old_state.layouts?.lg || [] },
+                created_at: Date.now(),
+            };
+            localStorage.removeItem('247terminal_layout');
+            return {
+                rigs: { [migrated_rig.id]: migrated_rig },
+                active_rig_id: migrated_rig.id,
+            };
+        }
+    } catch (e) {
+        console.error('Failed to migrate old layout:', e);
+    }
+    return null;
+}
+
+const initial_state = load_from_storage() || migrate_old_layout() || get_default_state();
+
+export const rigs_state = signal<RigsState>(initial_state);
+
+export const active_rig = computed(() => {
+    const state = rigs_state.value;
+    return state.rigs[state.active_rig_id];
+});
+
+export const all_rigs = computed(() => {
+    return Object.values(rigs_state.value.rigs).sort((a, b) => a.created_at - b.created_at);
+});
+
+export const blocks = computed(() => active_rig.value?.blocks || []);
+export const layouts = computed(() => active_rig.value?.layouts || { lg: [] });
+
+function check_overlap(x: number, y: number, w: number, h: number, layouts: BlockLayout[]): boolean {
+    for (const item of layouts) {
+        const overlaps_x = x < item.x + item.w && x + w > item.x;
+        const overlaps_y = y < item.y + item.h && y + h > item.y;
+        if (overlaps_x && overlaps_y) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function find_next_position(layouts: BlockLayout[], block_w: number, block_h: number, cols: number = 12): { x: number; y: number } {
     if (layouts.length === 0) {
         return { x: 0, y: 0 };
     }
@@ -51,21 +113,40 @@ function find_next_position(layouts: BlockLayout[]): { x: number; y: number } {
         }
     }
 
+    for (let y = 0; y <= max_bottom; y++) {
+        for (let x = 0; x <= cols - block_w; x++) {
+            if (!check_overlap(x, y, block_w, block_h, layouts)) {
+                return { x, y };
+            }
+        }
+    }
+
     return { x: 0, y: max_bottom };
 }
 
-const initial_state = load_from_storage() || get_default_state();
+function update_active_rig(updater: (rig: Rig) => Rig): void {
+    const state = rigs_state.value;
+    const active = state.rigs[state.active_rig_id];
+    if (!active) return;
 
-export const layout_state = signal<LayoutState>(initial_state);
+    const updated_rig = updater(active);
+    const new_state: RigsState = {
+        ...state,
+        rigs: {
+            ...state.rigs,
+            [state.active_rig_id]: updated_rig,
+        },
+    };
 
-export const blocks = computed(() => layout_state.value.blocks);
-export const layouts = computed(() => layout_state.value.layouts);
+    rigs_state.value = new_state;
+    save_to_storage(new_state);
+}
 
 export function add_block(type: BlockType): string {
-    const id = generate_id();
+    const id = `block_${generate_id()}`;
     const defaults = BLOCK_DEFAULTS[type];
-    const current_layouts = layout_state.value.layouts.lg || [];
-    const position = find_next_position(current_layouts);
+    const current_layouts = active_rig.value?.layouts.lg || [];
+    const position = find_next_position(current_layouts, defaults.w, defaults.h);
 
     const new_block: Block = { id, type };
     const new_layout: BlockLayout = {
@@ -78,45 +159,130 @@ export function add_block(type: BlockType): string {
         minH: defaults.minH,
     };
 
-    const new_state: LayoutState = {
-        blocks: [...layout_state.value.blocks, new_block],
+    update_active_rig((rig) => ({
+        ...rig,
+        blocks: [...rig.blocks, new_block],
         layouts: {
-            ...layout_state.value.layouts,
-            lg: [...current_layouts, new_layout],
+            ...rig.layouts,
+            lg: [...rig.layouts.lg, new_layout],
         },
-    };
-
-    layout_state.value = new_state;
-    save_to_storage(new_state);
+    }));
 
     return id;
 }
 
 export function remove_block(id: string): void {
-    const new_state: LayoutState = {
-        blocks: layout_state.value.blocks.filter(b => b.id !== id),
+    update_active_rig((rig) => ({
+        ...rig,
+        blocks: rig.blocks.filter(b => b.id !== id),
         layouts: {
-            ...layout_state.value.layouts,
-            lg: (layout_state.value.layouts.lg || []).filter(l => l.i !== id),
+            ...rig.layouts,
+            lg: rig.layouts.lg.filter(l => l.i !== id),
         },
-    };
-
-    layout_state.value = new_state;
-    save_to_storage(new_state);
+    }));
 }
 
 export function update_layouts(new_layouts: { lg: BlockLayout[] }): void {
-    const new_state: LayoutState = {
-        ...layout_state.value,
+    update_active_rig((rig) => ({
+        ...rig,
         layouts: new_layouts,
+    }));
+}
+
+export function create_rig(name: string): string {
+    const new_rig = create_default_rig(name);
+    const state = rigs_state.value;
+
+    const new_state: RigsState = {
+        rigs: {
+            ...state.rigs,
+            [new_rig.id]: new_rig,
+        },
+        active_rig_id: new_rig.id,
     };
 
-    layout_state.value = new_state;
+    rigs_state.value = new_state;
+    save_to_storage(new_state);
+
+    return new_rig.id;
+}
+
+export function delete_rig(id: string): boolean {
+    const state = rigs_state.value;
+    const rig_ids = Object.keys(state.rigs);
+
+    if (rig_ids.length <= 1) {
+        return false;
+    }
+
+    const { [id]: removed, ...remaining_rigs } = state.rigs;
+    const new_active_id = id === state.active_rig_id
+        ? Object.keys(remaining_rigs)[0]
+        : state.active_rig_id;
+
+    const new_state: RigsState = {
+        rigs: remaining_rigs,
+        active_rig_id: new_active_id,
+    };
+
+    rigs_state.value = new_state;
+    save_to_storage(new_state);
+
+    return true;
+}
+
+export function rename_rig(id: string, new_name: string): void {
+    const state = rigs_state.value;
+    const rig = state.rigs[id];
+    if (!rig) return;
+
+    const new_state: RigsState = {
+        ...state,
+        rigs: {
+            ...state.rigs,
+            [id]: { ...rig, name: new_name },
+        },
+    };
+
+    rigs_state.value = new_state;
     save_to_storage(new_state);
 }
 
-export function reset_layout(): void {
-    const default_state = get_default_state();
-    layout_state.value = default_state;
-    save_to_storage(default_state);
+export function switch_rig(id: string): void {
+    const state = rigs_state.value;
+    if (!state.rigs[id]) return;
+
+    const new_state: RigsState = {
+        ...state,
+        active_rig_id: id,
+    };
+
+    rigs_state.value = new_state;
+    save_to_storage(new_state);
+}
+
+export function duplicate_rig(id: string): string | null {
+    const state = rigs_state.value;
+    const source_rig = state.rigs[id];
+    if (!source_rig) return null;
+
+    const new_rig: Rig = {
+        ...source_rig,
+        id: generate_id(),
+        name: `${source_rig.name} (Copy)`,
+        created_at: Date.now(),
+    };
+
+    const new_state: RigsState = {
+        rigs: {
+            ...state.rigs,
+            [new_rig.id]: new_rig,
+        },
+        active_rig_id: new_rig.id,
+    };
+
+    rigs_state.value = new_state;
+    save_to_storage(new_state);
+
+    return new_rig.id;
 }

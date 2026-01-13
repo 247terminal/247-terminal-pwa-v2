@@ -26,6 +26,21 @@ export interface LayoutState {
     };
 }
 
+export interface Rig {
+    id: string;
+    name: string;
+    blocks: Block[];
+    layouts: {
+        lg: BlockLayout[];
+    };
+    created_at: number;
+}
+
+export interface RigsState {
+    rigs: Record<string, Rig>;
+    active_rig_id: string;
+}
+
 export const BLOCK_DEFAULTS: Record<BlockType, { w: number; h: number; minW: number; minH: number }> = {
     chart: { w: 6, h: 8, minW: 4, minH: 4 },
     news: { w: 3, h: 6, minW: 2, minH: 3 },

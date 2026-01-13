@@ -32,13 +32,13 @@ export function Header() {
                 <Exchanges exchanges={exchanges} on_exchange_click={handle_exchange_click} />
             </div>
             <div class="flex items-center gap-2">
-                <ThemeToggle />
                 <CommandBar on_submit={handle_command} />
                 <SettingsButton on_click={() => console.log('Settings clicked')} />
             </div>
             <div class="flex-1 flex items-center justify-end gap-2">
+                <ThemeToggle />
                 <BlocksMenu />
-                <RigSelector rig_name="DEFAULT" on_click={() => console.log('Rig selector clicked')} />
+                <RigSelector />
             </div>
         </header>
     );
