@@ -6,6 +6,7 @@ import {
     create_rig,
     delete_rig,
     rename_rig,
+    reset_to_default_rigs,
 } from '../../stores/layout_store';
 
 export function RigSelector() {
@@ -68,7 +69,6 @@ export function RigSelector() {
 
     const handle_switch = (id: string) => {
         switch_rig(id);
-        set_is_open(false);
     };
 
     const handle_delete = (e: Event, id: string) => {
@@ -88,6 +88,10 @@ export function RigSelector() {
         }
         set_editing_id(null);
         set_edit_name('');
+    };
+
+    const handle_reset = () => {
+        reset_to_default_rigs();
     };
 
     return (
@@ -155,7 +159,7 @@ export function RigSelector() {
                         ))}
                     </div>
 
-                    <div class="border-t border-base-300">
+                    <div>
                         {is_creating ? (
                             <div class="p-2">
                                 <input
@@ -167,7 +171,7 @@ export function RigSelector() {
                                         if (e.key === 'Enter') handle_create();
                                         if (e.key === 'Escape') set_is_creating(false);
                                     }}
-                                    placeholder="Enter rig name..."
+                                    placeholder="ENTER RIG NAME..."
                                     class="w-full bg-base-300 px-3 py-1.5 rounded text-xs text-base-content placeholder:text-base-content/40 outline-none"
                                 />
                             </div>
@@ -182,6 +186,15 @@ export function RigSelector() {
                                 <span>NEW RIG</span>
                             </button>
                         )}
+                    </div>
+
+                    <div>
+                        <button
+                            onClick={handle_reset}
+                            class="w-full px-3 py-2 text-xs text-center text-base-content/50 bg-base-200/50 hover:bg-base-200 hover:text-base-content transition-colors"
+                        >
+                            RESET DEFAULT RIGS
+                        </button>
                     </div>
                 </div>
             )}

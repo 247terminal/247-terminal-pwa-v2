@@ -343,6 +343,12 @@ export function switch_rig(id: string): void {
     save_to_storage(new_state);
 }
 
+export function reset_to_default_rigs(): void {
+    const new_state = get_default_state();
+    rigs_state.value = new_state;
+    save_to_storage(new_state);
+}
+
 export function duplicate_rig(id: string): string | null {
     const state = rigs_state.value;
     const source_rig = state.rigs[id];
