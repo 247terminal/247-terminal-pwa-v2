@@ -33,7 +33,7 @@ function render_block(type: BlockType, on_remove: () => void) {
     }
 }
 
-const GRID_COLS = 12;
+const GRID_COLS = 16;
 
 function GridOverlay({ row_height, width }: { row_height: number; width: number }) {
     const col_width = (width - MARGIN * 2 - MARGIN * (GRID_COLS - 1)) / GRID_COLS;
@@ -102,7 +102,7 @@ export function TradingPage() {
                         width={width}
                         layouts={current_layouts}
                         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-                        cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+                        cols={{ lg: 16, md: 12, sm: 8, xs: 4, xxs: 2 }}
                         rowHeight={row_height}
                         margin={[MARGIN, MARGIN]}
                         containerPadding={[MARGIN, MARGIN]}
