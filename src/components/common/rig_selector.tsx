@@ -103,7 +103,7 @@ export function RigSelector() {
             </button>
 
             {is_open && (
-                <div class="absolute top-full right-0 mt-1 w-56 bg-base-100 border border-base-300 rounded shadow-lg z-50">
+                <div class="absolute top-full right-0 mt-1 w-56 bg-base-100 rounded shadow-lg z-50">
                     <div class="py-1">
                         {rigs.map((rig) => (
                             <div
