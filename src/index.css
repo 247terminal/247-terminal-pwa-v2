@@ -125,3 +125,23 @@
 [data-theme="terminal-light"] .bg-theme-header {
   background-color: oklch(100% 0 0);
 }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes pulse-once {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; background-color: oklch(from var(--color-primary) l c h / 0.2); }
+  100% { opacity: 1; }
+}
+
+.animate-pulse-once {
+  animation: pulse-once 0.3s ease-in-out;
+}

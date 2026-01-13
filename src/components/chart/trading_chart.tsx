@@ -15,14 +15,14 @@ function get_css_variable(name: string): string {
 }
 
 function get_theme_colors() {
-    const base_100 = get_css_variable('--color-base-100');
+    const is_dark = document.documentElement.getAttribute('data-theme') === 'terminal-dark';
     const base_content = get_css_variable('--color-base-content');
     const base_300 = get_css_variable('--color-base-300');
     const success = get_css_variable('--color-success');
     const error = get_css_variable('--color-error');
 
     return {
-        background: base_100 || '#09090b',
+        background: is_dark ? '#000000' : '#ffffff',
         text: base_content || '#fafafa',
         grid: base_300 ? `color-mix(in oklch, ${base_300}, transparent 50%)` : 'rgba(40, 41, 45, 0.5)',
         up: success || 'rgb(0, 200, 114)',

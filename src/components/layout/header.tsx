@@ -3,7 +3,7 @@ import { CommandBar } from '../common/command_bar';
 import { RigSelector } from '../common/rig_selector';
 import { Exchanges, get_exchange_icon } from '../common/exchanges';
 import { SettingsButton } from '../common/settings_button';
-import { BlocksButton } from '../common/blocks_button';
+import { BlocksMenu } from '../common/blocks_menu';
 
 export function Header() {
     const handle_command = (command: string) => {
@@ -12,7 +12,7 @@ export function Header() {
 
     const [exchanges, set_exchanges] = useState([
         { id: 'blofin', name: 'Blofin', connected: false, icon: get_exchange_icon('blofin') },
-        { id: 'binance', name: 'Binance', connected: true, icon: get_exchange_icon('binance') },
+        { id: 'binance', name: 'Binance', connected: false, icon: get_exchange_icon('binance') },
         { id: 'hyperliquid', name: 'Hyperliquid', connected: false, icon: get_exchange_icon('hyperliquid') },
         { id: 'bybit', name: 'Bybit', connected: false, icon: get_exchange_icon('bybit') },
     ]);
@@ -26,7 +26,7 @@ export function Header() {
     };
 
     return (
-        <header class="h-10 bg-theme-header border-b border-base-300 flex items-center px-3 shrink-0">
+        <header class="h-10 bg-theme-header flex items-center px-3 shrink-0">
             <div class="flex-1 flex items-center">
                 <Exchanges exchanges={exchanges} on_exchange_click={handle_exchange_click} />
             </div>
@@ -35,7 +35,7 @@ export function Header() {
                 <SettingsButton on_click={() => console.log('Settings clicked')} />
             </div>
             <div class="flex-1 flex items-center justify-end gap-2">
-                <BlocksButton on_click={() => console.log('Blocks clicked')} />
+                <BlocksMenu />
                 <RigSelector rig_name="DEFAULT" on_click={() => console.log('Rig selector clicked')} />
             </div>
         </header>

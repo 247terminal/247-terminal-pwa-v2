@@ -1,59 +1,77 @@
-import { useState, useCallback } from 'preact/hooks';
+import { useCallback } from 'preact/hooks';
 import {
     ResponsiveGridLayout,
     useContainerWidth,
     type Layout,
     type ResponsiveLayouts,
 } from 'react-grid-layout';
-import { TradingChart } from '../components/chart/trading_chart';
-import { ChartToolbar, type Timeframe } from '../components/chart/chart_toolbar';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
+import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock } from '../components/blocks';
+import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_store';
+import type { BlockType } from '../types/layout';
 import 'react-grid-layout/css/styles.css';
 
-const DEFAULT_LAYOUTS: ResponsiveLayouts = {
-    lg: [
-        { i: 'chart', x: 0, y: 0, w: 12, h: 10, minW: 4, minH: 4 },
-    ],
-};
+function render_block(type: BlockType, on_remove: () => void) {
+    switch (type) {
+        case 'chart':
+            return <ChartBlock on_remove={on_remove} />;
+        case 'news':
+            return <NewsBlock on_remove={on_remove} />;
+        case 'positions':
+            return <PositionsBlock on_remove={on_remove} />;
+        case 'chat':
+            return <ChatBlock on_remove={on_remove} />;
+        default:
+            return null;
+    }
+}
 
 export function TradingPage() {
     const { width, containerRef, mounted } = useContainerWidth();
-    const [timeframe, set_timeframe] = useState<Timeframe>('15');
 
-    const handle_layout_change = useCallback((layout: Layout, layouts: ResponsiveLayouts) => {
-        console.log('Layout changed:', layout, layouts);
+    const handle_layout_change = useCallback((_layout: Layout, all_layouts: ResponsiveLayouts) => {
+        const lg_layouts = all_layouts.lg ? [...all_layouts.lg] : [];
+        update_layouts({ lg: lg_layouts });
     }, []);
+
+    const current_blocks = blocks.value;
+    const current_layouts = layouts.value;
 
     return (
         <div class="h-screen flex flex-col bg-base-100">
             <Header />
             <main ref={containerRef as React.RefObject<HTMLDivElement>} class="flex-1 overflow-auto min-h-0">
-                {mounted && (
+                {mounted && current_blocks.length > 0 && (
                     <ResponsiveGridLayout
                         className="layout"
                         width={width}
-                        layouts={DEFAULT_LAYOUTS}
+                        layouts={current_layouts}
                         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
                         cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
                         rowHeight={50}
                         margin={[8, 8]}
                         containerPadding={[8, 8]}
                         onLayoutChange={handle_layout_change}
-                        dragConfig={{ enabled: false }}
                         resizeConfig={{ enabled: true }}
                     >
-                        <div key="chart" class="bg-base-200 rounded border border-base-300 overflow-hidden flex flex-col">
-                            <ChartToolbar
-                                symbol="BTCUSDT"
-                                timeframe={timeframe}
-                                on_timeframe_change={set_timeframe}
-                            />
-                            <div class="flex-1 relative min-h-0">
-                                <TradingChart />
+                        {current_blocks.map((block) => (
+                            <div
+                                key={block.id}
+                                class="bg-base-200 rounded border border-base-300/50 overflow-hidden flex flex-col"
+                            >
+                                {render_block(block.type, () => remove_block(block.id))}
                             </div>
-                        </div>
+                        ))}
                     </ResponsiveGridLayout>
+                )}
+                {mounted && current_blocks.length === 0 && (
+                    <div class="flex items-center justify-center h-full">
+                        <div class="text-center">
+                            <p class="text-base-content/50 text-sm">No blocks added</p>
+                            <p class="text-base-content/30 text-xs mt-1">Click the blocks button to add modules</p>
+                        </div>
+                    </div>
                 )}
             </main>
             <Footer />
