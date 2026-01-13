@@ -165,3 +165,18 @@
 .react-grid-item.resizing .block-type-icon {
   opacity: 1;
 }
+
+.react-grid-layout:has(.react-draggable-dragging) .react-grid-item:not(.react-draggable-dragging),
+.react-grid-layout:has(.resizing) .react-grid-item:not(.resizing) {
+  background-color: var(--color-base-300) !important;
+}
+
+.react-grid-layout:has(.react-draggable-dragging) .react-grid-item:not(.react-draggable-dragging) > *:not(.block-type-icon),
+.react-grid-layout:has(.resizing) .react-grid-item:not(.resizing) > *:not(.block-type-icon) {
+  opacity: 0;
+}
+
+.react-grid-layout:has(.react-draggable-dragging) .react-grid-item .block-type-icon,
+.react-grid-layout:has(.resizing) .react-grid-item .block-type-icon {
+  opacity: 1;
+}

@@ -45,7 +45,7 @@ function GridOverlay({ row_height, width }: { row_height: number; width: number 
                     Array.from({ length: GRID_COLS }).map((_, col) => (
                         <div
                             key={`${row}-${col}`}
-                            class="absolute rounded bg-primary/10"
+                            class="absolute rounded border border-base-content/10"
                             style={{
                                 left: col * (col_width + MARGIN),
                                 top: row * (row_height + MARGIN),
