@@ -2,6 +2,12 @@ import { useState, useMemo, useCallback } from 'preact/hooks';
 import { EXCHANGE_IDS, type ExchangeId } from '../../services/exchange/types';
 import { get_exchange_icon } from '../common/exchanges';
 
+function format_symbol(symbol: string): string {
+    const base = symbol.split('/')[0] || symbol;
+    const quote = symbol.split('/')[1]?.split(':')[0] || '';
+    return `${base}${quote}`.toUpperCase();
+}
+
 export type Timeframe =
     | 'S1'
     | 'S5'
@@ -82,13 +88,17 @@ export function ChartToolbar({
                 result.push({ exchange: ex, symbol: s });
             }
         }
-        return result;
+        return result.sort((a, b) => a.symbol.localeCompare(b.symbol));
     }, [exchange_symbols]);
 
     const filtered_symbols = useMemo(() => {
         if (!symbol_search) return all_symbols;
         const search = symbol_search.toLowerCase();
-        return all_symbols.filter((item) => item.symbol.toLowerCase().includes(search));
+        return all_symbols.filter(
+            (item) =>
+                item.symbol.toLowerCase().includes(search) ||
+                format_symbol(item.symbol).toLowerCase().includes(search)
+        );
     }, [all_symbols, symbol_search]);
 
     const handle_symbol_select = useCallback(
@@ -140,7 +150,7 @@ export function ChartToolbar({
                     ) : symbol ? (
                         <>
                             <span class="text-base-content/30">{get_exchange_icon(exchange)}</span>
-                            <span>{symbol}</span>
+                            <span>{format_symbol(symbol)}</span>
                         </>
                     ) : (
                         'Select symbol'
@@ -165,7 +175,7 @@ export function ChartToolbar({
                                 />
                             </div>
                             <div class="max-h-[300px] overflow-y-auto p-1">
-                                {filtered_symbols.slice(0, 100).map((item) => (
+                                {filtered_symbols.map((item) => (
                                     <button
                                         type="button"
                                         key={`${item.exchange}-${item.symbol}`}
@@ -179,7 +189,7 @@ export function ChartToolbar({
                                         <span class="flex-shrink-0 text-base-content/30">
                                             {get_exchange_icon(item.exchange)}
                                         </span>
-                                        <span class="truncate">{item.symbol}</span>
+                                        <span class="truncate">{format_symbol(item.symbol)}</span>
                                     </button>
                                 ))}
                                 {filtered_symbols.length === 0 && (

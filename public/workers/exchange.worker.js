@@ -64,7 +64,7 @@ async function loadMarkets(exchangeId) {
 async function fetchMarkets(exchangeId) {
     const markets = await loadMarkets(exchangeId);
     return Object.values(markets)
-        .filter((market) => market.active && (market.type === 'swap' || market.type === 'future'))
+        .filter((market) => market.active && market.type === 'swap')
         .map((market) => ({
             symbol: market.symbol,
             base: market.base || '',
