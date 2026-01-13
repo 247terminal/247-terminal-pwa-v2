@@ -11,6 +11,9 @@ import {
 } from 'lightweight-charts';
 import type { OHLCV } from '../../services/exchange/chart_data';
 
+const VISIBLE_CANDLES = 100;
+const RIGHT_OFFSET = 20;
+
 interface TradingChartProps {
     data: OHLCV[];
     loading?: boolean;
@@ -88,6 +91,7 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
                 borderColor: colors.grid,
                 timeVisible: true,
                 secondsVisible: false,
+                rightOffset: RIGHT_OFFSET,
             },
             handleScale: {
                 axisPressedMouseMove: true,
@@ -166,7 +170,10 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
     const prev_data_length = useRef(0);
 
     useEffect(() => {
-        if (!series_ref.current || data.length === 0) return;
+        if (!series_ref.current || data.length === 0) {
+            prev_data_length.current = 0;
+            return;
+        }
 
         const is_new_data =
             prev_data_length.current === 0 || Math.abs(data.length - prev_data_length.current) > 10;
@@ -174,8 +181,10 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
         const candles = data.map(ohlcv_to_candle);
         series_ref.current.setData(candles);
 
-        if (is_new_data) {
-            chart_ref.current?.timeScale().fitContent();
+        if (is_new_data && chart_ref.current) {
+            const from = Math.max(0, data.length - VISIBLE_CANDLES);
+            const to = data.length - 1 + RIGHT_OFFSET;
+            chart_ref.current.timeScale().setVisibleLogicalRange({ from, to });
         }
 
         prev_data_length.current = data.length;
