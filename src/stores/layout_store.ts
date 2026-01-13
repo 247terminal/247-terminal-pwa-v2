@@ -38,30 +38,20 @@ function get_default_state(): LayoutState {
     };
 }
 
-function find_next_position(layouts: BlockLayout[], cols: number = 12): { x: number; y: number } {
+function find_next_position(layouts: BlockLayout[]): { x: number; y: number } {
     if (layouts.length === 0) {
         return { x: 0, y: 0 };
     }
 
-    let max_y = 0;
-    let max_y_item: BlockLayout | null = null;
-
+    let max_bottom = 0;
     for (const item of layouts) {
         const bottom = item.y + item.h;
-        if (bottom > max_y) {
-            max_y = bottom;
-            max_y_item = item;
+        if (bottom > max_bottom) {
+            max_bottom = bottom;
         }
     }
 
-    if (max_y_item) {
-        const next_x = max_y_item.x + max_y_item.w;
-        if (next_x < cols) {
-            return { x: next_x, y: max_y_item.y };
-        }
-    }
-
-    return { x: 0, y: max_y };
+    return { x: 0, y: max_bottom };
 }
 
 const initial_state = load_from_storage() || get_default_state();

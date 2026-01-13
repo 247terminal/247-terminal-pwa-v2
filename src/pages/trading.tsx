@@ -6,7 +6,6 @@ import {
     type ResponsiveLayouts,
 } from 'react-grid-layout';
 import { Header } from '../components/layout/header';
-import { Footer } from '../components/layout/footer';
 import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock, TradeBlock } from '../components/blocks';
 import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_store';
 import type { BlockType } from '../types/layout';
@@ -76,7 +75,6 @@ export function TradingPage() {
                     </div>
                 )}
             </main>
-            <Footer />
         </div>
     );
 }
