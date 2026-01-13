@@ -4,24 +4,21 @@ import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [
-    preact(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, './src'),
+    plugins: [preact(), tailwindcss()],
+    resolve: {
+        alias: {
+            '@': resolve(__dirname, './src'),
+        },
     },
-  },
-  server: {
-    port: 3000,
-    host: true,
-  },
-  build: {
-    target: 'es2020',
-    sourcemap: true,
-  },
-  worker: {
-    format: 'es',
-  },
+    server: {
+        port: 3000,
+        host: true,
+    },
+    build: {
+        target: 'es2020',
+        sourcemap: true,
+    },
+    worker: {
+        format: 'es',
+    },
 });

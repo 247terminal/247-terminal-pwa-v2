@@ -5,7 +5,7 @@ interface PositionsBlockProps {
 export function PositionsBlock({ on_remove }: PositionsBlockProps) {
     return (
         <div class="h-full flex flex-col group">
-            <div class="flex items-center justify-between px-3 py-2 bg-theme-header border-b border-base-300/50">
+            <div class="drag-handle flex items-center justify-between px-3 py-2 bg-theme-header border-b border-base-300/50 cursor-move">
                 <span class="text-xs font-medium text-base-content tracking-wide">POSITIONS</span>
                 {on_remove && (
                     <button
@@ -13,16 +13,20 @@ export function PositionsBlock({ on_remove }: PositionsBlockProps) {
                         onClick={on_remove}
                         class="text-base-content/40 hover:text-base-content transition-all opacity-0 group-hover:opacity-100"
                     >
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg
+                            class="w-4 h-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
                             <path d="M18 6L6 18M6 6l12 12" />
                         </svg>
                     </button>
                 )}
             </div>
             <div class="flex-1 p-3 overflow-auto">
-                <div class="text-xs text-base-content/50 text-center py-8">
-                    No open positions
-                </div>
+                <div class="text-xs text-base-content/50 text-center py-8">No open positions</div>
             </div>
         </div>
     );

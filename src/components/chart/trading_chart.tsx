@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'preact/hooks';
+import { useRef, useEffect, useMemo } from 'preact/hooks';
 import {
     createChart,
     CandlestickSeries,
@@ -9,6 +9,12 @@ import {
     type CandlestickData,
     type Time,
 } from 'lightweight-charts';
+import type { OHLCV } from '../../services/exchange/chart_data';
+
+interface TradingChartProps {
+    data: OHLCV[];
+    loading?: boolean;
+}
 
 function get_css_variable(name: string): string {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -24,34 +30,25 @@ function get_theme_colors() {
     return {
         background: is_dark ? '#000000' : '#ffffff',
         text: base_content || '#fafafa',
-        grid: base_300 ? `color-mix(in oklch, ${base_300}, transparent 50%)` : 'rgba(40, 41, 45, 0.5)',
+        grid: base_300
+            ? `color-mix(in oklch, ${base_300}, transparent 50%)`
+            : 'rgba(40, 41, 45, 0.5)',
         up: success || 'rgb(0, 200, 114)',
         down: error || 'rgb(255, 107, 59)',
     };
 }
 
-function generate_sample_data(): CandlestickData<Time>[] {
-    const data: CandlestickData<Time>[] = [];
-    const base_price = 42000;
-    const now = Math.floor(Date.now() / 1000);
-    const interval = 3600;
-
-    for (let i = 200; i >= 0; i--) {
-        const time = (now - i * interval) as Time;
-        const volatility = Math.random() * 500;
-        const trend = Math.sin(i / 20) * 1000;
-        const open = base_price + trend + (Math.random() - 0.5) * volatility;
-        const close = open + (Math.random() - 0.5) * volatility;
-        const high = Math.max(open, close) + Math.random() * volatility * 0.5;
-        const low = Math.min(open, close) - Math.random() * volatility * 0.5;
-
-        data.push({ time, open, high, low, close });
-    }
-
-    return data;
+function ohlcv_to_candle(ohlcv: OHLCV): CandlestickData<Time> {
+    return {
+        time: ohlcv.time as Time,
+        open: ohlcv.open,
+        high: ohlcv.high,
+        low: ohlcv.low,
+        close: ohlcv.close,
+    };
 }
 
-export function TradingChart() {
+export function TradingChart({ data, loading }: TradingChartProps) {
     const container_ref = useRef<HTMLDivElement>(null);
     const chart_ref = useRef<IChartApi | null>(null);
     const series_ref = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -107,7 +104,10 @@ export function TradingChart() {
         const apply_theme = () => {
             const c = get_theme_colors();
             chart.applyOptions({
-                layout: { background: { type: ColorType.Solid, color: c.background }, textColor: c.text },
+                layout: {
+                    background: { type: ColorType.Solid, color: c.background },
+                    textColor: c.text,
+                },
                 grid: { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
                 rightPriceScale: { borderColor: c.grid },
                 timeScale: { borderColor: c.grid },
@@ -121,10 +121,10 @@ export function TradingChart() {
         };
 
         const observer = new MutationObserver(apply_theme);
-        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
-        candle_series.setData(generate_sample_data());
-        chart.timeScale().fitContent();
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['data-theme'],
+        });
 
         chart_ref.current = chart;
         series_ref.current = candle_series;
@@ -151,5 +151,42 @@ export function TradingChart() {
         };
     }, []);
 
-    return <div ref={container_ref} class="absolute inset-0" />;
+    const prev_data_length = useRef(0);
+
+    useEffect(() => {
+        if (!series_ref.current || data.length === 0) return;
+
+        const is_new_data =
+            prev_data_length.current === 0 || Math.abs(data.length - prev_data_length.current) > 10;
+
+        const candles = data.map(ohlcv_to_candle);
+        series_ref.current.setData(candles);
+
+        if (is_new_data) {
+            chart_ref.current?.timeScale().fitContent();
+        }
+
+        prev_data_length.current = data.length;
+    }, [data]);
+
+    const latest_candle = useMemo(() => {
+        if (data.length === 0) return null;
+        return data[data.length - 1];
+    }, [data]);
+
+    useEffect(() => {
+        if (!series_ref.current || !latest_candle) return;
+        series_ref.current.update(ohlcv_to_candle(latest_candle));
+    }, [latest_candle]);
+
+    return (
+        <div class="absolute inset-0">
+            <div ref={container_ref} class="absolute inset-0" />
+            {loading && (
+                <div class="absolute inset-0 flex items-center justify-center bg-base-100/50">
+                    <span class="text-xs text-base-content/50">Loading chart...</span>
+                </div>
+            )}
+        </div>
+    );
 }

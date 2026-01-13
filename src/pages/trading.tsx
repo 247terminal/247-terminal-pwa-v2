@@ -67,7 +67,7 @@ export function TradingPage() {
 
     useEffect(() => {
         const calculate_row_height = () => {
-            const available_height = window.innerHeight - HEADER_HEIGHT - (MARGIN * 2);
+            const available_height = window.innerHeight - HEADER_HEIGHT - MARGIN * 2;
             const total_margins = (GRID_ROWS - 1) * MARGIN;
             const height = Math.floor((available_height - total_margins) / GRID_ROWS);
             set_row_height(Math.max(30, height));
@@ -94,7 +94,10 @@ export function TradingPage() {
     return (
         <div class="h-screen flex flex-col bg-base-100">
             <Header />
-            <main ref={containerRef as React.RefObject<HTMLDivElement>} class="flex-1 overflow-auto min-h-0 relative">
+            <main
+                ref={containerRef as React.RefObject<HTMLDivElement>}
+                class="flex-1 overflow-auto min-h-0 relative"
+            >
                 {is_adjusting && mounted && <GridOverlay row_height={row_height} width={width} />}
                 {mounted && current_blocks.length > 0 && (
                     <ResponsiveGridLayout
@@ -112,6 +115,7 @@ export function TradingPage() {
                         onResizeStart={handle_resize_start}
                         onResizeStop={handle_resize_stop}
                         resizeConfig={{ enabled: true }}
+                        dragConfig={{ handle: '.drag-handle', cancel: 'button, input, .no-drag' }}
                     >
                         {current_blocks.map((block) => (
                             <div
@@ -132,7 +136,9 @@ export function TradingPage() {
                     <div class="flex items-center justify-center h-full">
                         <div class="text-center">
                             <p class="text-base-content/50 text-sm">No blocks added</p>
-                            <p class="text-base-content/30 text-xs mt-1">Click the blocks button to add modules</p>
+                            <p class="text-base-content/30 text-xs mt-1">
+                                Click the blocks button to add modules
+                            </p>
                         </div>
                     </div>
                 )}
