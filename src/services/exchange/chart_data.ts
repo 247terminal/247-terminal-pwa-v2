@@ -1,4 +1,12 @@
 import type { ExchangeId } from './types';
+import {
+    update_ticker_stream_batch,
+    update_bidask_batch,
+    update_price_batch,
+    type StreamTickerUpdate,
+    type BidAskUpdate,
+    type PriceUpdate,
+} from '../../stores/exchange_store';
 
 export interface MarketData {
     symbol: string;
@@ -63,7 +71,7 @@ function getWorker(): Worker {
     worker = new Worker('/workers/exchange.worker.js');
 
     worker.onmessage = (event) => {
-        const { type, requestId: resId, result, error, streamId, data } = event.data;
+        const { type, requestId: resId, result, error, streamId, data, exchangeId } = event.data;
 
         if (type === 'RESPONSE') {
             const pending = pendingRequests.get(resId);
@@ -81,6 +89,12 @@ function getWorker(): Worker {
             if (callback) {
                 callback(data);
             }
+        } else if (type === 'TICKER_UPDATE') {
+            update_ticker_stream_batch(exchangeId, data as StreamTickerUpdate[]);
+        } else if (type === 'BIDASK_UPDATE') {
+            update_bidask_batch(exchangeId, data as BidAskUpdate[]);
+        } else if (type === 'KLINE_UPDATE') {
+            update_price_batch(exchangeId, data as PriceUpdate[]);
         }
     };
 
@@ -206,4 +220,28 @@ export function toolbar_to_chart_timeframe(tf: string): ChartTimeframe {
         'M',
     ];
     return valid.includes(tf as ChartTimeframe) ? (tf as ChartTimeframe) : '1';
+}
+
+export function start_ticker_stream(exchangeId: ExchangeId): void {
+    sendRequest('START_TICKER_STREAM', { exchangeId });
+}
+
+export function stop_ticker_stream(exchangeId: ExchangeId): void {
+    sendRequest('STOP_TICKER_STREAM', { exchangeId });
+}
+
+export function start_bidask_stream(exchangeId: ExchangeId): void {
+    sendRequest('START_BIDASK_STREAM', { exchangeId });
+}
+
+export function stop_bidask_stream(exchangeId: ExchangeId): void {
+    sendRequest('STOP_BIDASK_STREAM', { exchangeId });
+}
+
+export function start_kline_stream(exchangeId: ExchangeId): void {
+    sendRequest('START_KLINE_STREAM', { exchangeId });
+}
+
+export function stop_kline_stream(exchangeId: ExchangeId): void {
+    sendRequest('STOP_KLINE_STREAM', { exchangeId });
 }

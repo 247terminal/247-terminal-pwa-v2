@@ -1,5 +1,5 @@
 import { EXCHANGE_IDS, type ExchangeId } from './types';
-import { fetch_markets, fetch_tickers } from './chart_data';
+import { fetch_markets, fetch_tickers, start_ticker_stream } from './chart_data';
 import { set_markets, has_markets, set_initial_tickers } from '../../stores/exchange_store';
 
 let initialized = false;
@@ -14,6 +14,7 @@ async function load_exchange(ex: ExchangeId): Promise<void> {
         } catch (err) {
             console.error(`failed to load ${ex} tickers:`, err);
         }
+        start_ticker_stream(ex);
     } catch (err) {
         console.error(`failed to load ${ex} markets:`, err);
         set_markets(ex, []);

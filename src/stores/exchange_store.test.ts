@@ -41,6 +41,7 @@ const mock_ticker = {
     funding_rate: 0.0001,
     next_funding_time: Date.now() + 3600000,
     price_24h: 49000,
+    volume_24h: 1000000000,
 };
 
 function reset_store() {

@@ -31,6 +31,26 @@ export interface TickerUpdate {
     volume_24h: number | null;
 }
 
+export interface StreamTickerUpdate {
+    symbol: string;
+    last_price: number;
+    best_bid: number;
+    best_ask: number;
+    price_24h: number | null;
+    volume_24h: number | null;
+}
+
+export interface BidAskUpdate {
+    symbol: string;
+    best_bid: number;
+    best_ask: number;
+}
+
+export interface PriceUpdate {
+    symbol: string;
+    last_price: number;
+}
+
 type MarketMap = Record<ExchangeId, Record<string, MarketData>>;
 
 function create_initial_connections(): Record<ExchangeId, ExchangeState> {
@@ -133,6 +153,56 @@ export function update_tickers_batch(exchange_id: ExchangeId, ticker_list: Ticke
             next_funding_time: ticker.next_funding_time,
             price_24h: ticker.price_24h,
             volume_24h: ticker.volume_24h,
+            last_updated: now,
+        };
+    }
+}
+
+export function update_ticker_stream_batch(
+    exchange_id: ExchangeId,
+    ticker_list: StreamTickerUpdate[]
+) {
+    const now = Date.now();
+    for (const ticker of ticker_list) {
+        const sig = get_ticker_signal(exchange_id, ticker.symbol);
+        const current = sig.value;
+        const last_price = ticker.last_price ?? current?.last_price ?? 0;
+        sig.value = {
+            last_price,
+            price_1m_ago: current?.price_1m_ago ?? last_price,
+            best_bid: ticker.best_bid ?? current?.best_bid ?? 0,
+            best_ask: ticker.best_ask ?? current?.best_ask ?? 0,
+            funding_rate: current?.funding_rate ?? null,
+            next_funding_time: current?.next_funding_time ?? null,
+            price_24h: ticker.price_24h ?? current?.price_24h ?? null,
+            volume_24h: ticker.volume_24h ?? current?.volume_24h ?? null,
+            last_updated: now,
+        };
+    }
+}
+
+export function update_bidask_batch(exchange_id: ExchangeId, bidask_list: BidAskUpdate[]) {
+    for (const bidask of bidask_list) {
+        const sig = get_ticker_signal(exchange_id, bidask.symbol);
+        const current = sig.value;
+        if (!current) continue;
+        sig.value = {
+            ...current,
+            best_bid: bidask.best_bid,
+            best_ask: bidask.best_ask,
+        };
+    }
+}
+
+export function update_price_batch(exchange_id: ExchangeId, price_list: PriceUpdate[]) {
+    const now = Date.now();
+    for (const price of price_list) {
+        const sig = get_ticker_signal(exchange_id, price.symbol);
+        const current = sig.value;
+        if (!current) continue;
+        sig.value = {
+            ...current,
+            last_price: price.last_price,
             last_updated: now,
         };
     }
