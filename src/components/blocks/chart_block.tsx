@@ -4,12 +4,11 @@ import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/cha
 import { EXCHANGE_IDS, type ExchangeId } from '../../services/exchange/types';
 import {
     fetch_ohlcv,
-    fetch_markets,
     watch_ohlcv,
     toolbar_to_chart_timeframe,
     type OHLCV,
 } from '../../services/exchange/chart_data';
-import { markets, set_markets, has_markets, get_market } from '../../stores/exchange_store';
+import { markets, get_market } from '../../stores/exchange_store';
 
 interface ChartBlockProps {
     on_remove?: () => void;
@@ -37,22 +36,12 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         [current_markets]
     );
 
-    const tick_size = useMemo(() => {
+    const next_tick_size = useMemo(() => {
         const market = get_market(exchange, symbol);
         return market?.tick_size ?? 0.01;
     }, [exchange, symbol, current_markets]);
 
-    const load_all_markets = useCallback(() => {
-        for (const ex of EXCHANGE_IDS) {
-            if (has_markets(ex)) continue;
-            fetch_markets(ex)
-                .then((market_list) => set_markets(ex, market_list))
-                .catch((err) => {
-                    console.error(`failed to load ${ex} markets:`, err);
-                    set_markets(ex, []);
-                });
-        }
-    }, []);
+    const [chart_tick_size, set_chart_tick_size] = useState(next_tick_size);
 
     const load_chart_data = useCallback(async () => {
         if (!symbol) return;
@@ -61,6 +50,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         try {
             const chart_tf = toolbar_to_chart_timeframe(timeframe);
             const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
+            set_chart_tick_size(next_tick_size);
             set_data(ohlcv);
         } catch (err) {
             console.error('failed to load chart data:', err);
@@ -68,17 +58,13 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         } finally {
             set_loading(false);
         }
-    }, [exchange, symbol, timeframe]);
+    }, [exchange, symbol, timeframe, next_tick_size]);
 
     useEffect(() => {
-        load_all_markets();
-    }, []);
-
-    useEffect(() => {
-        if (symbol && has_any_markets) {
+        if (symbol) {
             load_chart_data();
         }
-    }, [symbol, timeframe, has_any_markets, load_chart_data]);
+    }, [symbol, timeframe, load_chart_data]);
 
     const has_data = data.length > 0;
 
@@ -103,9 +89,9 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
     }, [exchange, symbol, timeframe, has_data]);
 
     const handle_symbol_change = (ex: ExchangeId, s: string) => {
+        set_loading(true);
         set_exchange(ex);
         set_symbol(s);
-        set_data([]);
     };
 
     return (
@@ -139,7 +125,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                 )}
             </div>
             <div class="flex-1 relative min-h-0 overflow-hidden">
-                <TradingChart data={data} loading={loading} tick_size={tick_size} />
+                <TradingChart data={data} loading={loading} tick_size={chart_tick_size} />
             </div>
         </div>
     );

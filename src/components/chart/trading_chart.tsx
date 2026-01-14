@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'preact/hooks';
+import { useRef, useEffect } from 'preact/hooks';
 import {
     createChart,
     CandlestickSeries,
@@ -10,6 +10,7 @@ import {
     type Time,
 } from 'lightweight-charts';
 import type { OHLCV } from '../../services/exchange/chart_data';
+import { tick_size_to_precision } from '../../utils/format';
 
 const VISIBLE_CANDLES = 100;
 const RIGHT_OFFSET = 20;
@@ -52,16 +53,10 @@ function ohlcv_to_candle(ohlcv: OHLCV): CandlestickData<Time> {
     };
 }
 
-function tick_size_to_precision(tick_size: number): number {
-    if (tick_size >= 1) return 0;
-    return Math.max(0, Math.ceil(-Math.log10(tick_size)));
-}
-
 export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartProps) {
     const container_ref = useRef<HTMLDivElement>(null);
     const chart_ref = useRef<IChartApi | null>(null);
     const series_ref = useRef<ISeriesApi<'Candlestick'> | null>(null);
-    const precision = useMemo(() => tick_size_to_precision(tick_size), [tick_size]);
 
     useEffect(() => {
         if (!container_ref.current) return;
@@ -112,8 +107,8 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
             borderVisible: false,
             priceFormat: {
                 type: 'price',
-                precision: precision,
-                minMove: tick_size,
+                precision: 2,
+                minMove: 0.01,
             },
         });
 
@@ -165,37 +160,55 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
             chart_ref.current = null;
             series_ref.current = null;
         };
-    }, [tick_size]);
+    }, []);
 
-    const prev_data_length = useRef(0);
+    const prev_first_time = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!series_ref.current || data.length === 0) {
-            prev_data_length.current = 0;
+        if (!series_ref.current || !chart_ref.current || data.length === 0 || loading) {
             return;
         }
 
-        const is_new_data =
-            prev_data_length.current === 0 || Math.abs(data.length - prev_data_length.current) > 10;
+        const precision = tick_size_to_precision(tick_size);
+        series_ref.current.applyOptions({
+            priceFormat: {
+                type: 'price',
+                precision,
+                minMove: tick_size,
+            },
+        });
 
         const candles = data.map(ohlcv_to_candle);
         series_ref.current.setData(candles);
 
-        if (is_new_data && chart_ref.current) {
+        const first_time = data[0].time;
+        const is_new_symbol =
+            prev_first_time.current === null || prev_first_time.current !== first_time;
+
+        if (is_new_symbol) {
             const from = Math.max(0, data.length - VISIBLE_CANDLES);
             const to = data.length - 1 + RIGHT_OFFSET;
             chart_ref.current.timeScale().setVisibleLogicalRange({ from, to });
         }
 
-        prev_data_length.current = data.length;
-    }, [data]);
+        prev_first_time.current = first_time;
+    }, [data, tick_size, loading]);
+
+    const has_data = data.length > 0;
+    const show_spinner = loading && !has_data;
+    const show_dimmed = loading && has_data;
 
     return (
         <div class="absolute inset-0">
-            <div ref={container_ref} class="absolute inset-0" />
-            {loading && (
-                <div class="absolute inset-0 flex items-center justify-center bg-base-100/50">
-                    <span class="text-xs text-base-content/50">Loading chart...</span>
+            <div
+                ref={container_ref}
+                class={`absolute inset-0 transition-opacity duration-200 ${
+                    show_dimmed ? 'opacity-40' : has_data ? 'opacity-100' : 'opacity-0'
+                }`}
+            />
+            {show_spinner && (
+                <div class="absolute inset-0 flex items-center justify-center bg-base-100">
+                    <div class="w-8 h-8 border-2 border-base-content/20 border-t-primary rounded-full animate-spin" />
                 </div>
             )}
         </div>

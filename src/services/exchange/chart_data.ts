@@ -15,6 +15,12 @@ export interface MarketData {
     max_leverage: number | null;
 }
 
+export interface TickerInfo {
+    last_price: number;
+    price_24h: number | null;
+    volume_24h: number | null;
+}
+
 export interface OHLCV {
     time: number;
     open: number;
@@ -143,6 +149,13 @@ function sendRequest<T>(
 
 export function fetch_markets(exchangeId: ExchangeId, signal?: AbortSignal): Promise<MarketData[]> {
     return sendRequest<MarketData[]>('FETCH_MARKETS', { exchangeId }, signal);
+}
+
+export function fetch_tickers(
+    exchangeId: ExchangeId,
+    signal?: AbortSignal
+): Promise<Record<string, TickerInfo>> {
+    return sendRequest<Record<string, TickerInfo>>('FETCH_TICKERS', { exchangeId }, signal);
 }
 
 export function fetch_ohlcv(
