@@ -24,6 +24,7 @@ export interface SymbolData {
     funding_rate: number | null;
     next_funding_time: number | null;
     price_24h: number | null;
+    volume_24h: number | null;
     last_updated: number | null;
 }
 

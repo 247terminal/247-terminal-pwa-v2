@@ -7,7 +7,12 @@ const activeStreams = new Map();
 
 const EXCHANGE_CONFIG = {
     binance: { ccxtClass: 'binanceusdm', defaultType: 'swap' },
-    blofin: { ccxtClass: 'blofin', defaultType: 'swap' },
+    blofin: {
+        ccxtClass: 'blofin',
+        defaultType: 'swap',
+        proxy: 'https://proxy2.247terminal.com/',
+        headers: { 'x-proxy-auth': '5cbb9da977ea3740b4dcdfeea9b020c8f6de45c2d0314f549723e8a4207c288a' },
+    },
     hyperliquid: { ccxtClass: 'hyperliquid', defaultType: 'swap' },
     bybit: { ccxtClass: 'bybit', defaultType: 'swap' },
 };
@@ -42,12 +47,22 @@ function getExchange(exchangeId) {
         throw new Error(`ccxt class not found: ${config.ccxtClass}`);
     }
 
-    const exchange = new ExchangeClass({
+    const exchangeOptions = {
         enableRateLimit: true,
         options: {
             defaultType: config.defaultType,
         },
-    });
+    };
+
+    if (config.proxy) {
+        exchangeOptions.proxy = config.proxy;
+    }
+
+    if (config.headers) {
+        exchangeOptions.headers = config.headers;
+    }
+
+    const exchange = new ExchangeClass(exchangeOptions);
 
     exchanges[exchangeId] = exchange;
     return exchange;
@@ -80,6 +95,27 @@ async function fetchMarkets(exchangeId) {
             max_leverage: market.limits?.leverage?.max || null,
         }))
         .sort((a, b) => a.symbol.localeCompare(b.symbol));
+}
+
+async function fetchTickers(exchangeId) {
+    const exchange = getExchange(exchangeId);
+    await loadMarkets(exchangeId);
+
+    const tickers = await exchange.fetchTickers();
+    const result = {};
+
+    for (const [symbol, ticker] of Object.entries(tickers)) {
+        const market = exchange.markets[symbol];
+        if (!market || !market.active || market.type !== 'swap') continue;
+
+        result[symbol] = {
+            last_price: ticker.last || 0,
+            price_24h: ticker.open || ticker.previousClose || null,
+            volume_24h: ticker.quoteVolume || ticker.baseVolume || null,
+        };
+    }
+
+    return result;
 }
 
 async function fetchOHLCV(exchangeId, symbol, timeframe, limit = 500) {
@@ -158,6 +194,10 @@ self.onmessage = async (event) => {
         switch (type) {
             case 'FETCH_MARKETS':
                 result = await fetchMarkets(payload.exchangeId);
+                break;
+
+            case 'FETCH_TICKERS':
+                result = await fetchTickers(payload.exchangeId);
                 break;
 
             case 'FETCH_OHLCV':

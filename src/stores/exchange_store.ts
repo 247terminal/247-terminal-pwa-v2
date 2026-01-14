@@ -16,6 +16,7 @@ export interface TickerData {
     funding_rate: number | null;
     next_funding_time: number | null;
     price_24h: number | null;
+    volume_24h: number | null;
     last_updated: number;
 }
 
@@ -27,6 +28,7 @@ export interface TickerUpdate {
     funding_rate: number | null;
     next_funding_time: number | null;
     price_24h: number | null;
+    volume_24h: number | null;
 }
 
 type MarketMap = Record<ExchangeId, Record<string, MarketData>>;
@@ -112,6 +114,7 @@ export function update_ticker(exchange_id: ExchangeId, ticker: TickerUpdate) {
         funding_rate: ticker.funding_rate,
         next_funding_time: ticker.next_funding_time,
         price_24h: ticker.price_24h,
+        volume_24h: ticker.volume_24h,
         last_updated: Date.now(),
     };
 }
@@ -129,6 +132,31 @@ export function update_tickers_batch(exchange_id: ExchangeId, ticker_list: Ticke
             funding_rate: ticker.funding_rate,
             next_funding_time: ticker.next_funding_time,
             price_24h: ticker.price_24h,
+            volume_24h: ticker.volume_24h,
+            last_updated: now,
+        };
+    }
+}
+
+export function set_initial_tickers(
+    exchange_id: ExchangeId,
+    tickers: Record<
+        string,
+        { last_price: number; price_24h: number | null; volume_24h: number | null }
+    >
+): void {
+    const now = Date.now();
+    for (const [symbol, ticker] of Object.entries(tickers)) {
+        const sig = get_ticker_signal(exchange_id, symbol);
+        sig.value = {
+            last_price: ticker.last_price,
+            price_1m_ago: ticker.last_price,
+            best_bid: 0,
+            best_ask: 0,
+            funding_rate: null,
+            next_funding_time: null,
+            price_24h: ticker.price_24h,
+            volume_24h: ticker.volume_24h,
             last_updated: now,
         };
     }
@@ -160,6 +188,7 @@ export function get_symbol(exchange_id: ExchangeId, symbol: string): SymbolData 
         funding_rate: ticker?.funding_rate ?? null,
         next_funding_time: ticker?.next_funding_time ?? null,
         price_24h: ticker?.price_24h ?? null,
+        volume_24h: ticker?.volume_24h ?? null,
         last_updated: ticker?.last_updated ?? null,
     };
 }
