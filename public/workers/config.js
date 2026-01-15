@@ -31,6 +31,7 @@ const EXCHANGE_CONFIG = {
         },
         wsUrl: 'wss://openapi.blofin.com/ws/public',
         subscribeBatch: 100,
+        pingInterval: 25000,
         poolKey: 'blofin',
     },
     hyperliquid: {

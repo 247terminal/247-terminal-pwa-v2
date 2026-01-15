@@ -45,7 +45,7 @@ function getExchange(exchangeId) {
     if (!ExchangeClass) throw new Error(`ccxt class not found: ${config.ccxtClass}`);
 
     const exchangeOptions = {
-        enableRateLimit: true,
+        enableRateLimit: false,
         options: { defaultType: config.defaultType },
     };
 

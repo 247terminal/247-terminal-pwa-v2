@@ -4,3 +4,8 @@ function isDexSymbol(symbol) {
     const prefix = symbol.substring(0, dashIndex);
     return /^[A-Z]+$/.test(prefix);
 }
+
+function getNextHourTimestamp() {
+    const now = Date.now();
+    return Math.ceil(now / 3600000) * 3600000;
+}

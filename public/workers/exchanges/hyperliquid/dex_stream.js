@@ -1,14 +1,6 @@
-function getNextHourTimestamp() {
-    const now = Date.now();
-    return Math.ceil(now / 3600000) * 3600000;
-}
-
 const dexStreams = {
     ws: null,
     state: 'disconnected',
-    exchangeId: null,
-    exchange: null,
-    isLinearSwap: null,
     markets: {},
     assetMaps: {},
     baseIds: {},
@@ -29,9 +21,6 @@ function startDexStream(exchangeId, exchange, isLinearSwap, batchInterval, postU
     if (!config?.dexWsUrl) return;
 
     dexStreams.state = self.streamUtils.StreamState.CONNECTING;
-    dexStreams.exchangeId = exchangeId;
-    dexStreams.exchange = exchange;
-    dexStreams.isLinearSwap = isLinearSwap;
     dexStreams.batchInterval = batchInterval;
     dexStreams.postUpdate = postUpdate;
     dexStreams.reconnectAttempt = 0;
@@ -185,15 +174,25 @@ function handleDexAssetCtxs(data) {
             if (ctx.funding != null) {
                 existing.funding_rate = parseFloat(ctx.funding);
             }
+            if (!existing.last_price || existing.last_price <= 0) {
+                if (ctx.markPx != null) {
+                    const markPrice = parseFloat(ctx.markPx);
+                    if (markPrice > 0) existing.last_price = markPrice;
+                } else if (ctx.midPx != null) {
+                    const midPrice = parseFloat(ctx.midPx);
+                    if (midPrice > 0) existing.last_price = midPrice;
+                }
+            }
 
             dexStreams.tickerData.set(symbol, existing);
 
-            if (existing.last_price && existing.last_price > 0) {
+            const price = existing.last_price || 0;
+            if (price > 0) {
                 dexStreams.pending.set(symbol, {
                     symbol,
-                    last_price: existing.last_price,
-                    best_bid: existing.best_bid ?? existing.last_price,
-                    best_ask: existing.best_ask ?? existing.last_price,
+                    last_price: price,
+                    best_bid: existing.best_bid ?? price,
+                    best_ask: existing.best_ask ?? price,
                     price_24h: existing.price_24h ?? null,
                     volume_24h: existing.volume_24h ?? null,
                     funding_rate: existing.funding_rate ?? null,
