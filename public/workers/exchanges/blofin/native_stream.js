@@ -7,8 +7,6 @@ const blofinStreams = {
     flushTimeout: null,
     reconnectAttempt: 0,
     reconnectTimeout: null,
-    pingInterval: null,
-    pongMonitor: null,
     postUpdate: null,
     batchInterval: 200,
 };
@@ -28,7 +26,6 @@ function startBlofinNativeStream(symbols, batchInterval, postUpdate) {
 function connectBlofinStream() {
     const config = EXCHANGE_CONFIG.blofin;
     self.streamUtils.safeClose(blofinStreams.ws);
-    stopBlofinPing();
 
     const ws = self.streamUtils.createWebSocket(config.wsUrl);
     if (!ws) {
@@ -42,17 +39,13 @@ function connectBlofinStream() {
         blofinStreams.reconnectAttempt = 0;
         blofinStreams.state = self.streamUtils.StreamState.CONNECTED;
         subscribeBlofinSymbols();
-        startBlofinPing();
     };
 
     ws.onmessage = (event) => {
         if (blofinStreams.state === 'disconnected') return;
 
         try {
-            if (event.data === 'pong') {
-                blofinStreams.pongMonitor?.receivedPong();
-                return;
-            }
+            if (event.data === 'pong') return;
 
             const msg = JSON.parse(event.data);
             if (msg.event === 'subscribe') return;
@@ -104,7 +97,6 @@ function connectBlofinStream() {
     };
 
     ws.onclose = (event) => {
-        stopBlofinPing();
         if (blofinStreams.state === 'disconnected') return;
         console.error('blofin closed:', event.code, event.reason);
         scheduleBlofinReconnect();
@@ -143,34 +135,6 @@ function convertBlofinSymbol(instId) {
     const quote = parts[1];
     if (!VALID_QUOTES.has(quote)) return null;
     return `${base}/${quote}:${quote}`;
-}
-
-function startBlofinPing() {
-    const config = EXCHANGE_CONFIG.blofin;
-    stopBlofinPing();
-
-    blofinStreams.pongMonitor = self.streamUtils.createPongMonitor(() => {
-        console.error('blofin pong timeout, reconnecting');
-        connectBlofinStream();
-    });
-    blofinStreams.pongMonitor.start();
-
-    blofinStreams.pingInterval = setInterval(() => {
-        if (blofinStreams.ws?.readyState === WebSocket.OPEN) {
-            blofinStreams.ws.send('ping');
-        }
-    }, config.pingInterval);
-}
-
-function stopBlofinPing() {
-    if (blofinStreams.pingInterval) {
-        clearInterval(blofinStreams.pingInterval);
-        blofinStreams.pingInterval = null;
-    }
-    if (blofinStreams.pongMonitor) {
-        blofinStreams.pongMonitor.stop();
-        blofinStreams.pongMonitor = null;
-    }
 }
 
 function scheduleBlofinReconnect() {
@@ -226,8 +190,6 @@ function flushBlofinBatch() {
 
 function stopBlofinNativeStream() {
     blofinStreams.state = self.streamUtils.StreamState.DISCONNECTED;
-
-    stopBlofinPing();
 
     if (blofinStreams.reconnectTimeout) {
         clearTimeout(blofinStreams.reconnectTimeout);

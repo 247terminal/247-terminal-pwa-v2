@@ -5,7 +5,6 @@ const BATCH_INTERVALS = {
 const WS_STREAM_LIMIT = 200;
 const WS_RECONNECT_DELAY = 5000;
 const OHLCV_RETRY_DELAY = 2000;
-const PONG_TIMEOUT_MS = 10000;
 
 const VALID_SETTLE = new Set(['USDT', 'USDC', 'USDH', 'USDE']);
 const VALID_QUOTES = new Set(['USDT', 'USDC']);
@@ -20,7 +19,6 @@ const EXCHANGE_CONFIG = {
             markPrice: 'wss://fstream.binance.com/ws/!markPrice@arr@1s',
             klineBase: 'wss://fstream.binance.com/stream?streams=',
         },
-        pingInterval: 30000,
         klineStreamsPerConnection: 200,
         poolKey: 'binance',
     },
@@ -32,7 +30,6 @@ const EXCHANGE_CONFIG = {
             'x-proxy-auth': '5cbb9da977ea3740b4dcdfeea9b020c8f6de45c2d0314f549723e8a4207c288a',
         },
         wsUrl: 'wss://openapi.blofin.com/ws/public',
-        pingInterval: 25000,
         subscribeBatch: 100,
         poolKey: 'blofin',
     },
@@ -50,7 +47,6 @@ const EXCHANGE_CONFIG = {
         ccxtClass: 'bybit',
         defaultType: 'swap',
         wsUrl: 'wss://stream.bybit.com/v5/public/linear',
-        pingInterval: 20000,
         maxSubsPerConnection: 500,
         poolKey: 'bybit',
     },

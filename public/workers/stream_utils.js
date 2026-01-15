@@ -90,33 +90,6 @@ function safeSend(ws, data) {
     }
 }
 
-function createPongMonitor(onTimeout) {
-    let lastPong = Date.now();
-    let checkInterval = null;
-
-    return {
-        start(checkMs = 5000) {
-            lastPong = Date.now();
-            if (checkInterval) clearInterval(checkInterval);
-            checkInterval = setInterval(() => {
-                if (Date.now() - lastPong > PONG_TIMEOUT_MS) {
-                    console.error('pong timeout detected');
-                    onTimeout();
-                }
-            }, checkMs);
-        },
-        receivedPong() {
-            lastPong = Date.now();
-        },
-        stop() {
-            if (checkInterval) {
-                clearInterval(checkInterval);
-                checkInterval = null;
-            }
-        },
-    };
-}
-
 self.streamUtils = {
     StreamState,
     calculateBackoff,
@@ -125,5 +98,4 @@ self.streamUtils = {
     createWebSocket,
     safeClose,
     safeSend,
-    createPongMonitor,
 };

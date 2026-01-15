@@ -7,8 +7,6 @@ const bybitStreams = {
     flushTimeout: null,
     reconnectAttempts: new Map(),
     reconnectTimeouts: new Map(),
-    pingIntervals: new Map(),
-    pongMonitors: new Map(),
     postUpdate: null,
     batchInterval: 200,
     marketBatches: [],
@@ -54,7 +52,6 @@ function isBybitLinearSwap(market) {
 function connectBybitStream(connIndex, marketIds) {
     const config = EXCHANGE_CONFIG.bybit;
     self.streamUtils.safeClose(bybitStreams.connections[connIndex]);
-    stopBybitPing(connIndex);
 
     const ws = self.streamUtils.createWebSocket(config.wsUrl);
     if (!ws) {
@@ -67,7 +64,6 @@ function connectBybitStream(connIndex, marketIds) {
     ws.onopen = () => {
         bybitStreams.reconnectAttempts.set(connIndex, 0);
         subscribeBybitSymbols(ws, marketIds);
-        startBybitPing(connIndex, ws);
         updateBybitState();
     };
 
@@ -77,10 +73,7 @@ function connectBybitStream(connIndex, marketIds) {
         try {
             const msg = JSON.parse(event.data);
 
-            if (msg.op === 'pong') {
-                bybitStreams.pongMonitors.get(connIndex)?.receivedPong();
-                return;
-            }
+            if (msg.ret_msg === 'pong' || msg.op === 'pong') return;
 
             if (msg.success === false) {
                 console.error('bybit subscribe error:', msg.ret_msg);
@@ -126,7 +119,6 @@ function connectBybitStream(connIndex, marketIds) {
     };
 
     ws.onclose = (event) => {
-        stopBybitPing(connIndex);
         if (bybitStreams.state === 'disconnected') return;
         console.error('bybit connection', connIndex, 'closed:', event.code, event.reason);
         scheduleBybitReconnect(connIndex);
@@ -143,36 +135,6 @@ function subscribeBybitSymbols(ws, marketIds) {
     for (let i = 0; i < topics.length; i += 100) {
         const batch = topics.slice(i, i + 100);
         self.streamUtils.safeSend(ws, { op: 'subscribe', args: batch });
-    }
-}
-
-function startBybitPing(connIndex, ws) {
-    const config = EXCHANGE_CONFIG.bybit;
-    stopBybitPing(connIndex);
-
-    const pongMonitor = self.streamUtils.createPongMonitor(() => {
-        console.error('bybit connection', connIndex, 'pong timeout, reconnecting');
-        connectBybitStream(connIndex, bybitStreams.marketBatches[connIndex]);
-    });
-    pongMonitor.start();
-    bybitStreams.pongMonitors.set(connIndex, pongMonitor);
-
-    const interval = setInterval(() => {
-        self.streamUtils.safeSend(ws, { op: 'ping' });
-    }, config.pingInterval);
-    bybitStreams.pingIntervals.set(connIndex, interval);
-}
-
-function stopBybitPing(connIndex) {
-    const interval = bybitStreams.pingIntervals.get(connIndex);
-    if (interval) {
-        clearInterval(interval);
-        bybitStreams.pingIntervals.delete(connIndex);
-    }
-    const monitor = bybitStreams.pongMonitors.get(connIndex);
-    if (monitor) {
-        monitor.stop();
-        bybitStreams.pongMonitors.delete(connIndex);
     }
 }
 
@@ -243,12 +205,6 @@ function flushBybitBatch() {
 
 function stopBybitNativeStream() {
     bybitStreams.state = self.streamUtils.StreamState.DISCONNECTED;
-
-    bybitStreams.pingIntervals.forEach((interval) => clearInterval(interval));
-    bybitStreams.pingIntervals.clear();
-
-    bybitStreams.pongMonitors.forEach((monitor) => monitor.stop());
-    bybitStreams.pongMonitors.clear();
 
     bybitStreams.reconnectTimeouts.forEach((timeout) => clearTimeout(timeout));
     bybitStreams.reconnectTimeouts.clear();
