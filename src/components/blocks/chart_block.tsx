@@ -9,6 +9,8 @@ import {
     type OHLCV,
 } from '../../services/exchange/chart_data';
 import { markets, get_market } from '../../stores/exchange_store';
+import { is_sub_minute_timeframe, type SubMinuteTimeframe } from '../../types/candle.types';
+import { start_candle_generation } from '../../services/candle_generator';
 
 interface ChartBlockProps {
     on_remove?: () => void;
@@ -19,6 +21,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
     const [symbol, set_symbol] = useState('BTC/USDT:USDT');
     const [timeframe, set_timeframe] = useState<Timeframe>('1');
     const [data, set_data] = useState<OHLCV[]>([]);
+    const [data_key, set_data_key] = useState('');
     const [loading, set_loading] = useState(true);
 
     const current_markets = markets.value;
@@ -43,22 +46,28 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
 
     const [chart_tick_size, set_chart_tick_size] = useState(next_tick_size);
 
+    const current_key = `${exchange}:${symbol}:${timeframe}`;
+
     const load_chart_data = useCallback(async () => {
         if (!symbol) return;
 
         set_loading(true);
+        set_data([]);
         try {
-            const chart_tf = toolbar_to_chart_timeframe(timeframe);
+            const chart_tf = is_sub_minute_timeframe(timeframe)
+                ? '1'
+                : toolbar_to_chart_timeframe(timeframe);
             const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
             set_chart_tick_size(next_tick_size);
             set_data(ohlcv);
+            set_data_key(current_key);
         } catch (err) {
             console.error('failed to load chart data:', err);
             set_data([]);
         } finally {
             set_loading(false);
         }
-    }, [exchange, symbol, timeframe, next_tick_size]);
+    }, [exchange, symbol, timeframe, next_tick_size, current_key]);
 
     useEffect(() => {
         if (symbol) {
@@ -66,13 +75,12 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         }
     }, [symbol, timeframe, load_chart_data]);
 
-    const has_data = data.length > 0;
+    const has_valid_data = data.length > 0 && data_key === current_key;
 
     useEffect(() => {
-        if (!symbol || !has_data) return;
+        if (!symbol || !has_valid_data) return;
 
-        const chart_tf = toolbar_to_chart_timeframe(timeframe);
-        const cleanup = watch_ohlcv(exchange, symbol, chart_tf, (candle) => {
+        const update_candle = (candle: OHLCV) => {
             set_data((prev) => {
                 if (prev.length === 0) return prev;
                 const last = prev[prev.length - 1];
@@ -83,13 +91,27 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                 }
                 return prev;
             });
-        });
+        };
 
-        return cleanup;
-    }, [exchange, symbol, timeframe, has_data]);
+        if (is_sub_minute_timeframe(timeframe)) {
+            const last_candle = data[data.length - 1];
+            return start_candle_generation(
+                exchange,
+                symbol,
+                timeframe as SubMinuteTimeframe,
+                update_candle,
+                last_candle
+            );
+        }
+
+        const chart_tf = toolbar_to_chart_timeframe(timeframe);
+        return watch_ohlcv(exchange, symbol, chart_tf, update_candle);
+    }, [exchange, symbol, timeframe, has_valid_data]);
 
     const handle_symbol_change = (ex: ExchangeId, s: string) => {
         if (ex === exchange && s === symbol) return;
+        set_data([]);
+        set_data_key('');
         set_loading(true);
         set_exchange(ex);
         set_symbol(s);
@@ -104,7 +126,11 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                     exchange_symbols={exchange_symbols}
                     timeframe={timeframe}
                     on_symbol_change={handle_symbol_change}
-                    on_timeframe_change={set_timeframe}
+                    on_timeframe_change={(tf) => {
+                        set_data([]);
+                        set_data_key('');
+                        set_timeframe(tf);
+                    }}
                     loading={!has_any_markets}
                 />
                 {on_remove && (

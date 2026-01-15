@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks';
 import { EXCHANGE_IDS, type ExchangeId } from '../../types/exchange.types';
+import type { Timeframe } from '../../types/candle.types';
 import { get_exchange_icon } from '../common/exchanges';
 import { favourites, toggle_favourite } from '../../stores/symbol_favourites';
 import { get_ticker } from '../../stores/exchange_store';
 import { SymbolRow, ITEM_HEIGHT, format_symbol } from './symbol_row';
-import { TimeframeSelector, type Timeframe } from './timeframe_selector';
+import { TimeframeSelector } from './timeframe_selector';
 import { TickerInfo } from './ticker_info';
 
 export type { Timeframe };

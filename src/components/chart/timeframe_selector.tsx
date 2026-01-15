@@ -1,22 +1,5 @@
 import { useState, useCallback } from 'preact/hooks';
-
-export type Timeframe =
-    | 'S1'
-    | 'S5'
-    | 'S15'
-    | 'S30'
-    | '1'
-    | '5'
-    | '15'
-    | '30'
-    | '60'
-    | '120'
-    | '240'
-    | '480'
-    | '720'
-    | 'D'
-    | 'W'
-    | 'M';
+import type { Timeframe } from '../../types/candle.types';
 
 const TIMEFRAME_LABELS: Record<Timeframe, string> = {
     S1: '1s',
