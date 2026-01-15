@@ -94,6 +94,9 @@ export function TradingPage() {
         if (!layout_locked.value) return;
 
         const target = e.target as HTMLElement;
+        const is_interactive = target.closest('button, input, .no-drag');
+        if (is_interactive) return;
+
         const is_drag_handle = target.closest('.drag-handle');
         const is_resize_handle = target.closest('.react-resizable-handle');
 
