@@ -3,7 +3,7 @@ const bybitStreams = {
     state: 'disconnected',
     markets: new Map(),
     tickerData: new Map(),
-    pending: new Map(),
+    pending: new Set(),
     flushTimeout: null,
     reconnectAttempts: new Map(),
     reconnectTimeouts: new Map(),
@@ -87,31 +87,24 @@ function connectBybitStream(connIndex, marketIds) {
             const symbol = bybitStreams.markets.get(marketId);
             if (!symbol) return;
 
-            const existing = bybitStreams.tickerData.get(symbol) || {};
+            let entry = bybitStreams.tickerData.get(symbol);
+            if (!entry) {
+                entry = self.streamUtils.createTickerEntry(symbol);
+                bybitStreams.tickerData.set(symbol, entry);
+            }
 
-            if (ticker.lastPrice) existing.last_price = parseFloat(ticker.lastPrice);
-            if (ticker.bid1Price) existing.best_bid = parseFloat(ticker.bid1Price);
-            if (ticker.ask1Price) existing.best_ask = parseFloat(ticker.ask1Price);
-            if (ticker.prevPrice24h) existing.price_24h = parseFloat(ticker.prevPrice24h);
-            if (ticker.turnover24h) existing.volume_24h = parseFloat(ticker.turnover24h);
-            if (ticker.fundingRate) existing.funding_rate = parseFloat(ticker.fundingRate);
+            if (ticker.lastPrice) entry.last_price = parseFloat(ticker.lastPrice);
+            if (ticker.bid1Price) entry.best_bid = parseFloat(ticker.bid1Price);
+            if (ticker.ask1Price) entry.best_ask = parseFloat(ticker.ask1Price);
+            if (ticker.prevPrice24h) entry.price_24h = parseFloat(ticker.prevPrice24h);
+            if (ticker.turnover24h) entry.volume_24h = parseFloat(ticker.turnover24h);
+            if (ticker.fundingRate) entry.funding_rate = parseFloat(ticker.fundingRate);
             if (ticker.nextFundingTime)
-                existing.next_funding_time = parseInt(ticker.nextFundingTime, 10);
+                entry.next_funding_time = parseInt(ticker.nextFundingTime, 10);
 
-            if (!existing.last_price || existing.last_price <= 0) return;
+            if (!entry.last_price || entry.last_price <= 0) return;
 
-            bybitStreams.tickerData.set(symbol, existing);
-            bybitStreams.pending.set(symbol, {
-                symbol,
-                last_price: existing.last_price,
-                best_bid: existing.best_bid ?? 0,
-                best_ask: existing.best_ask ?? 0,
-                price_24h: existing.price_24h ?? null,
-                volume_24h: existing.volume_24h ?? null,
-                funding_rate: existing.funding_rate ?? null,
-                next_funding_time: existing.next_funding_time ?? null,
-            });
-
+            bybitStreams.pending.add(symbol);
             scheduleBybitFlush();
         } catch (e) {
             console.error('bybit message parse error:', e.message);
@@ -183,23 +176,26 @@ function flushBybitBatch() {
     const pooled = self.streamUtils.getPooledUpdates(config.poolKey, size);
     let idx = 0;
 
-    bybitStreams.pending.forEach((data) => {
-        self.streamUtils.fillPooledUpdate(
-            pooled[idx++],
-            data.symbol,
-            data.last_price,
-            data.best_bid,
-            data.best_ask,
-            data.price_24h,
-            data.volume_24h,
-            data.funding_rate,
-            data.next_funding_time
-        );
-    });
+    for (const symbol of bybitStreams.pending) {
+        const entry = bybitStreams.tickerData.get(symbol);
+        if (entry && entry.last_price > 0) {
+            self.streamUtils.fillPooledUpdate(
+                pooled[idx++],
+                entry.symbol,
+                entry.last_price,
+                entry.best_bid,
+                entry.best_ask,
+                entry.price_24h,
+                entry.volume_24h,
+                entry.funding_rate,
+                entry.next_funding_time
+            );
+        }
+    }
     bybitStreams.pending.clear();
 
     if (idx > 0 && bybitStreams.postUpdate) {
-        bybitStreams.postUpdate('TICKER_UPDATE', pooled.slice(0, idx));
+        bybitStreams.postUpdate('TICKER_UPDATE', pooled, idx);
     }
 }
 

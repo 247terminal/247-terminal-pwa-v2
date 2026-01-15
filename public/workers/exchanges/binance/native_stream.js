@@ -18,16 +18,7 @@ const binanceStreams = {
 function getOrCreateEntry(symbol) {
     let entry = binanceStreams.tickerData.get(symbol);
     if (!entry) {
-        entry = {
-            symbol,
-            last_price: 0,
-            best_bid: 0,
-            best_ask: 0,
-            price_24h: null,
-            volume_24h: null,
-            funding_rate: null,
-            next_funding_time: null,
-        };
+        entry = self.streamUtils.createTickerEntry(symbol);
         binanceStreams.tickerData.set(symbol, entry);
     }
     return entry;
@@ -379,7 +370,7 @@ function flushBinanceBatch() {
     binanceStreams.pending.clear();
 
     if (idx > 0 && binanceStreams.postUpdate) {
-        binanceStreams.postUpdate('TICKER_UPDATE', pooled.slice(0, idx));
+        binanceStreams.postUpdate('TICKER_UPDATE', pooled, idx);
     }
 }
 

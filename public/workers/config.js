@@ -9,6 +9,14 @@ const OHLCV_RETRY_DELAY = 2000;
 const VALID_SETTLE = new Set(['USDT', 'USDC', 'USDH', 'USDE']);
 const VALID_QUOTES = new Set(['USDT', 'USDC']);
 
+const STREAM_CONFIG = {
+    backoffBase: 1000,
+    backoffMax: 30000,
+    backoffJitter: 0.3,
+    poolGrowthFactor: 1.5,
+    minPoolSize: 128,
+};
+
 const EXCHANGE_CONFIG = {
     binance: {
         ccxtClass: 'binanceusdm',

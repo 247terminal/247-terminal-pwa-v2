@@ -73,7 +73,16 @@ function getWorker(): Worker {
     worker = new Worker('/workers/exchange.worker.js');
 
     worker.onmessage = (event) => {
-        const { type, requestId: resId, result, error, streamId, data, exchangeId } = event.data;
+        const {
+            type,
+            requestId: resId,
+            result,
+            error,
+            streamId,
+            data,
+            exchangeId,
+            count,
+        } = event.data;
 
         if (type === 'RESPONSE') {
             const pending = pendingRequests.get(resId);
@@ -92,7 +101,7 @@ function getWorker(): Worker {
                 callback(data);
             }
         } else if (type === 'TICKER_UPDATE') {
-            update_ticker_stream_batch(exchangeId, data as StreamTickerUpdate[]);
+            update_ticker_stream_batch(exchangeId, data as StreamTickerUpdate[], count);
         } else if (type === 'BIDASK_UPDATE') {
             update_bidask_batch(exchangeId, data as BidAskUpdate[]);
         } else if (type === 'KLINE_UPDATE') {

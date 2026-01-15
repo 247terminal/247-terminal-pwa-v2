@@ -126,11 +126,14 @@ export function update_tickers_batch(exchange_id: ExchangeId, ticker_list: Ticke
 
 export function update_ticker_stream_batch(
     exchange_id: ExchangeId,
-    ticker_list: StreamTickerUpdate[]
+    ticker_list: StreamTickerUpdate[],
+    count?: number
 ) {
     const now = Date.now();
+    const len = count ?? ticker_list.length;
     batch(() => {
-        for (const ticker of ticker_list) {
+        for (let i = 0; i < len; i++) {
+            const ticker = ticker_list[i];
             const sig = get_ticker_signal(exchange_id, ticker.symbol);
             const current = sig.value;
             const last_price = ticker.last_price ?? current?.last_price ?? 0;

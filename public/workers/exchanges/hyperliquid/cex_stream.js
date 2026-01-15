@@ -4,7 +4,7 @@ const cexStreams = {
     markets: new Map(),
     assetIndexMap: new Map(),
     tickerData: new Map(),
-    pending: new Map(),
+    pending: new Set(),
     flushTimeout: null,
     reconnectAttempt: 0,
     reconnectTimeout: null,
@@ -114,22 +114,18 @@ function handleCexAllMids(data) {
         const midPrice = parseFloat(price);
         if (!midPrice || midPrice <= 0) continue;
 
-        const existing = cexStreams.tickerData.get(symbol) || {};
-        existing.last_price = midPrice;
-        if (!existing.best_bid) existing.best_bid = midPrice;
-        if (!existing.best_ask) existing.best_ask = midPrice;
-        cexStreams.tickerData.set(symbol, existing);
+        let entry = cexStreams.tickerData.get(symbol);
+        if (!entry) {
+            entry = self.streamUtils.createTickerEntry(symbol);
+            cexStreams.tickerData.set(symbol, entry);
+        }
 
-        cexStreams.pending.set(symbol, {
-            symbol,
-            last_price: midPrice,
-            best_bid: existing.best_bid,
-            best_ask: existing.best_ask,
-            price_24h: existing.price_24h ?? null,
-            volume_24h: existing.volume_24h ?? null,
-            funding_rate: existing.funding_rate ?? null,
-            next_funding_time: getNextHourTimestamp(),
-        });
+        entry.last_price = midPrice;
+        if (!entry.best_bid) entry.best_bid = midPrice;
+        if (!entry.best_ask) entry.best_ask = midPrice;
+        entry.next_funding_time = getNextHourTimestamp();
+
+        cexStreams.pending.add(symbol);
     }
 
     scheduleCexFlush();
@@ -148,45 +144,39 @@ function handleCexAssetCtxs(data) {
             if (!symbol) continue;
 
             const ctx = assets[i];
-            const existing = cexStreams.tickerData.get(symbol) || {};
+            let entry = cexStreams.tickerData.get(symbol);
+            if (!entry) {
+                entry = self.streamUtils.createTickerEntry(symbol);
+                cexStreams.tickerData.set(symbol, entry);
+            }
 
             if (ctx.prevDayPx != null) {
-                existing.price_24h = parseFloat(ctx.prevDayPx);
+                entry.price_24h = parseFloat(ctx.prevDayPx);
             }
             if (ctx.dayNtlVlm != null) {
-                existing.volume_24h = parseFloat(ctx.dayNtlVlm);
+                entry.volume_24h = parseFloat(ctx.dayNtlVlm);
             }
             if (ctx.impactPxs && ctx.impactPxs.length >= 2) {
-                existing.best_bid = parseFloat(ctx.impactPxs[0]);
-                existing.best_ask = parseFloat(ctx.impactPxs[1]);
+                entry.best_bid = parseFloat(ctx.impactPxs[0]);
+                entry.best_ask = parseFloat(ctx.impactPxs[1]);
             }
             if (ctx.funding != null) {
-                existing.funding_rate = parseFloat(ctx.funding);
+                entry.funding_rate = parseFloat(ctx.funding);
             }
-            if (!existing.last_price || existing.last_price <= 0) {
+            if (!entry.last_price || entry.last_price <= 0) {
                 if (ctx.markPx != null) {
                     const markPrice = parseFloat(ctx.markPx);
-                    if (markPrice > 0) existing.last_price = markPrice;
+                    if (markPrice > 0) entry.last_price = markPrice;
                 } else if (ctx.midPx != null) {
                     const midPrice = parseFloat(ctx.midPx);
-                    if (midPrice > 0) existing.last_price = midPrice;
+                    if (midPrice > 0) entry.last_price = midPrice;
                 }
             }
 
-            cexStreams.tickerData.set(symbol, existing);
+            entry.next_funding_time = getNextHourTimestamp();
 
-            const price = existing.last_price || 0;
-            if (price > 0) {
-                cexStreams.pending.set(symbol, {
-                    symbol,
-                    last_price: price,
-                    best_bid: existing.best_bid ?? price,
-                    best_ask: existing.best_ask ?? price,
-                    price_24h: existing.price_24h ?? null,
-                    volume_24h: existing.volume_24h ?? null,
-                    funding_rate: existing.funding_rate ?? null,
-                    next_funding_time: getNextHourTimestamp(),
-                });
+            if (entry.last_price > 0) {
+                cexStreams.pending.add(symbol);
             }
         }
     }
@@ -222,23 +212,26 @@ function flushCexBatch() {
     const pooled = self.streamUtils.getPooledUpdates(config.poolKeys.cex, size);
     let idx = 0;
 
-    cexStreams.pending.forEach((data) => {
-        self.streamUtils.fillPooledUpdate(
-            pooled[idx++],
-            data.symbol,
-            data.last_price,
-            data.best_bid,
-            data.best_ask,
-            data.price_24h,
-            data.volume_24h,
-            data.funding_rate,
-            data.next_funding_time
-        );
-    });
+    for (const symbol of cexStreams.pending) {
+        const entry = cexStreams.tickerData.get(symbol);
+        if (entry && entry.last_price > 0) {
+            self.streamUtils.fillPooledUpdate(
+                pooled[idx++],
+                entry.symbol,
+                entry.last_price,
+                entry.best_bid,
+                entry.best_ask,
+                entry.price_24h,
+                entry.volume_24h,
+                entry.funding_rate,
+                entry.next_funding_time
+            );
+        }
+    }
     cexStreams.pending.clear();
 
     if (idx > 0 && cexStreams.postUpdate) {
-        cexStreams.postUpdate(pooled.slice(0, idx));
+        cexStreams.postUpdate(pooled, idx);
     }
 }
 

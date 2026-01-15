@@ -21,14 +21,7 @@ function getTickerUpdateArray(exchangeId, size) {
     if (!arr || arr.length < size) {
         arr = new Array(size);
         for (let i = 0; i < size; i++) {
-            arr[i] = {
-                symbol: '',
-                last_price: 0,
-                best_bid: 0,
-                best_ask: 0,
-                price_24h: null,
-                volume_24h: null,
-            };
+            arr[i] = self.streamUtils.createTickerEntry();
         }
         tickerUpdatePool.set(exchangeId, arr);
     }
@@ -202,8 +195,8 @@ async function startTickerStream(exchangeId) {
         lastFlush: 0,
     });
 
-    const postTickerUpdate = (type, updates) =>
-        self.postMessage({ type, exchangeId, data: updates });
+    const postTickerUpdate = (type, updates, count) =>
+        self.postMessage({ type, exchangeId, data: updates, count });
 
     if (exchangeId === 'binance') {
         self.binanceNative.startBinanceNativeStream(
@@ -229,15 +222,16 @@ async function startTickerStream(exchangeId) {
     }
 
     if (exchangeId === 'hyperliquid') {
-        self.hyperliquidCex.startCexStream(exchange, BATCH_INTERVALS.ticker, (updates) =>
-            self.postMessage({ type: 'TICKER_UPDATE', exchangeId, data: updates })
+        self.hyperliquidCex.startCexStream(exchange, BATCH_INTERVALS.ticker, (updates, count) =>
+            self.postMessage({ type: 'TICKER_UPDATE', exchangeId, data: updates, count })
         );
         self.hyperliquidDex.startDexStream(
             exchangeId,
             exchange,
             isLinearSwap,
             BATCH_INTERVALS.ticker,
-            (updates) => self.postMessage({ type: 'TICKER_UPDATE', exchangeId, data: updates })
+            (updates, count) =>
+                self.postMessage({ type: 'TICKER_UPDATE', exchangeId, data: updates, count })
         );
         return;
     }
@@ -268,7 +262,7 @@ async function startTickerStream(exchangeId) {
         stream.timeout = null;
         stream.lastFlush = Date.now();
 
-        self.postMessage({ type: 'TICKER_UPDATE', exchangeId, data: pooled.slice(0, size) });
+        self.postMessage({ type: 'TICKER_UPDATE', exchangeId, data: pooled, count: size });
     };
 
     const batches = [];

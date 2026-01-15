@@ -6,39 +6,50 @@ const StreamState = {
     ERROR: 'error',
 };
 
-const BACKOFF_BASE = 1000;
-const BACKOFF_MAX = 30000;
-const BACKOFF_JITTER = 0.3;
-
 function calculateBackoff(attempt) {
-    const delay = Math.min(BACKOFF_BASE * Math.pow(2, attempt), BACKOFF_MAX);
-    const jitter = delay * BACKOFF_JITTER * (Math.random() * 2 - 1);
-    return Math.floor(delay + jitter);
+    const base = STREAM_CONFIG.backoffBase;
+    const max = STREAM_CONFIG.backoffMax;
+    const jitter = STREAM_CONFIG.backoffJitter;
+    const delay = Math.min(base * Math.pow(2, attempt), max);
+    return Math.floor(delay + delay * jitter * (Math.random() * 2 - 1));
 }
 
 const updatePoolCache = new Map();
 
 function getPooledUpdates(poolKey, size) {
     let pool = updatePoolCache.get(poolKey);
-    if (!pool || pool.length < size) {
-        const oldLen = pool ? pool.length : 0;
-        pool = pool || [];
-        pool.length = size;
-        for (let i = oldLen; i < size; i++) {
-            pool[i] = {
-                symbol: '',
-                last_price: 0,
-                best_bid: 0,
-                best_ask: 0,
-                price_24h: null,
-                volume_24h: null,
-                funding_rate: null,
-                next_funding_time: null,
-            };
+    const targetSize = Math.max(size, STREAM_CONFIG.minPoolSize);
+
+    if (!pool) {
+        pool = new Array(targetSize);
+        for (let i = 0; i < targetSize; i++) {
+            pool[i] = createTickerEntry();
+        }
+        updatePoolCache.set(poolKey, pool);
+    } else if (pool.length < size) {
+        const newSize = Math.ceil(size * STREAM_CONFIG.poolGrowthFactor);
+        const oldLen = pool.length;
+        pool.length = newSize;
+        for (let i = oldLen; i < newSize; i++) {
+            pool[i] = createTickerEntry();
         }
         updatePoolCache.set(poolKey, pool);
     }
+
     return pool;
+}
+
+function createTickerEntry(symbol = '') {
+    return {
+        symbol,
+        last_price: 0,
+        best_bid: 0,
+        best_ask: 0,
+        price_24h: null,
+        volume_24h: null,
+        funding_rate: null,
+        next_funding_time: null,
+    };
 }
 
 function fillPooledUpdate(
@@ -95,6 +106,7 @@ self.streamUtils = {
     calculateBackoff,
     getPooledUpdates,
     fillPooledUpdate,
+    createTickerEntry,
     createWebSocket,
     safeClose,
     safeSend,

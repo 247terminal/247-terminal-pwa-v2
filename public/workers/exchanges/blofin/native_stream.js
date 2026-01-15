@@ -15,19 +15,6 @@ const blofinStreams = {
     batchInterval: 200,
 };
 
-function createBlofinTickerEntry(symbol) {
-    return {
-        symbol,
-        last_price: 0,
-        best_bid: 0,
-        best_ask: 0,
-        price_24h: null,
-        volume_24h: null,
-        funding_rate: null,
-        next_funding_time: null,
-    };
-}
-
 function startBlofinNativeStream(symbols, batchInterval, postUpdate) {
     if (blofinStreams.state !== 'disconnected') return;
 
@@ -89,7 +76,7 @@ function connectBlofinStream() {
 
                 let entry = blofinStreams.tickerData.get(symbol);
                 if (!entry) {
-                    entry = createBlofinTickerEntry(symbol);
+                    entry = self.streamUtils.createTickerEntry(symbol);
                     blofinStreams.tickerData.set(symbol, entry);
                 }
 
@@ -179,7 +166,7 @@ function connectBlofinFundingStream() {
 
                 let entry = blofinStreams.tickerData.get(symbol);
                 if (!entry) {
-                    entry = createBlofinTickerEntry(symbol);
+                    entry = self.streamUtils.createTickerEntry(symbol);
                     blofinStreams.tickerData.set(symbol, entry);
                 }
 
@@ -299,7 +286,7 @@ function flushBlofinBatch() {
     blofinStreams.pending.clear();
 
     if (idx > 0 && blofinStreams.postUpdate) {
-        blofinStreams.postUpdate('TICKER_UPDATE', pooled.slice(0, idx));
+        blofinStreams.postUpdate('TICKER_UPDATE', pooled, idx);
     }
 }
 
