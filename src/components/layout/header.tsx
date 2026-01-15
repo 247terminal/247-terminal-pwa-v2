@@ -1,37 +1,48 @@
 import { useState } from 'preact/hooks';
 import { CommandBar } from '../common/command_bar';
 import { RigSelector } from '../common/rig_selector';
-import { Exchanges, get_exchange_icon } from '../common/exchanges';
+import { get_exchange_icon } from '../common/exchanges';
 import { SettingsButton } from '../common/settings_button';
 import { BlocksMenu } from '../common/blocks_menu';
 import { ThemeToggle } from '../common/theme_toggle';
 import { ConnectionStatus } from '../common/connection_status';
 import { LayoutLockToggle } from '../common/layout_lock_toggle';
+import { ExchangeButton } from '../common/exchange_button';
+import { ExchangePanel } from '../exchange/exchange_panel';
+import { exchange_connection_status } from '@/stores/credentials_store';
+import type { ExchangeId } from '@/types/credentials.types';
+
+const EXCHANGE_ORDER: ExchangeId[] = ['blofin', 'binance', 'hyperliquid', 'bybit'];
 
 export function Header() {
-    const handle_command = (command: string) => {
+    const [open_exchange, set_open_exchange] = useState<ExchangeId | null>(null);
+    const connection_status = exchange_connection_status.value;
+
+    function handle_command(command: string): void {
         console.log('Command submitted:', command);
-    };
+    }
 
-    const [exchanges, set_exchanges] = useState([
-        { id: 'blofin', name: 'Blofin', connected: false, icon: get_exchange_icon('blofin') },
-        { id: 'binance', name: 'Binance', connected: false, icon: get_exchange_icon('binance') },
-        { id: 'hyperliquid', name: 'Hyperliquid', connected: false, icon: get_exchange_icon('hyperliquid') },
-        { id: 'bybit', name: 'Bybit', connected: false, icon: get_exchange_icon('bybit') },
-    ]);
+    function handle_exchange_click(exchange_id: ExchangeId): void {
+        set_open_exchange((prev) => (prev === exchange_id ? null : exchange_id));
+    }
 
-    const handle_exchange_click = (exchange_id: string) => {
-        set_exchanges(prev => prev.map(exchange =>
-            exchange.id === exchange_id
-                ? { ...exchange, connected: !exchange.connected }
-                : exchange
-        ));
-    };
+    function handle_panel_close(): void {
+        set_open_exchange(null);
+    }
 
     return (
-        <header class="h-10 bg-theme-header flex items-center px-3 shrink-0">
-            <div class="flex-1 flex items-center">
-                <Exchanges exchanges={exchanges} on_exchange_click={handle_exchange_click} />
+        <header class="h-10 bg-theme-header flex items-center px-3 shrink-0 relative">
+            <div class="flex-1 flex items-center gap-1">
+                {EXCHANGE_ORDER.map((exchange_id) => (
+                    <ExchangeButton
+                        key={exchange_id}
+                        connected={connection_status[exchange_id]}
+                        is_selected={open_exchange === exchange_id}
+                        on_click={() => handle_exchange_click(exchange_id)}
+                    >
+                        {get_exchange_icon(exchange_id)}
+                    </ExchangeButton>
+                ))}
             </div>
             <div class="flex items-center gap-3">
                 <ConnectionStatus />
@@ -44,6 +55,14 @@ export function Header() {
                 <BlocksMenu />
                 <RigSelector />
             </div>
+
+            {open_exchange && (
+                <ExchangePanel
+                    exchange_id={open_exchange}
+                    is_open={true}
+                    on_close={handle_panel_close}
+                />
+            )}
         </header>
     );
 }
