@@ -16,7 +16,7 @@ import {
     get_exchange_markets,
     has_markets,
     clear_ticker_signals,
-} from './exchange_store';
+} from '../src/stores/exchange_store';
 
 const mock_market = {
     symbol: 'BTC/USDT',
