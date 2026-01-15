@@ -1,12 +1,5 @@
 const dexStreams = new Map();
 
-function isDexSymbol(symbol) {
-    const dashIndex = symbol.indexOf('-');
-    if (dashIndex <= 0) return false;
-    const prefix = symbol.substring(0, dashIndex);
-    return /^[A-Z]+$/.test(prefix);
-}
-
 function startDexStream(exchangeId, exchange, isLinearSwap, batchInterval, postUpdate) {
     if (exchangeId !== 'hyperliquid') return;
     if (dexStreams.get(exchangeId)) return;
@@ -15,7 +8,8 @@ function startDexStream(exchangeId, exchange, isLinearSwap, batchInterval, postU
     if (!config?.dexWsUrl) return;
 
     const dexMarkets = {};
-    const dexIndexMaps = {};
+    const dexAssetMaps = {};
+    const dexBaseIds = {};
 
     for (const market of Object.values(exchange.markets)) {
         if (isDexSymbol(market.symbol) && isLinearSwap(market)) {
@@ -25,26 +19,25 @@ function startDexStream(exchangeId, exchange, isLinearSwap, batchInterval, postU
             const key = `${dexName}:${ticker}`;
             dexMarkets[key] = market.symbol;
 
-            if (!dexIndexMaps[dexName]) dexIndexMaps[dexName] = [];
-            dexIndexMaps[dexName].push({
-                id: parseInt(market.id, 10),
-                symbol: market.symbol,
-            });
+            if (!dexAssetMaps[dexName]) dexAssetMaps[dexName] = {};
+            const assetId = parseInt(market.id, 10);
+            dexAssetMaps[dexName][assetId] = market.symbol;
+
+            if (!dexBaseIds[dexName] || assetId < dexBaseIds[dexName]) {
+                dexBaseIds[dexName] = assetId;
+            }
         }
     }
 
     if (Object.keys(dexMarkets).length === 0) return;
-
-    for (const dex of Object.keys(dexIndexMaps)) {
-        dexIndexMaps[dex].sort((a, b) => a.id - b.id);
-    }
 
     const ws = new WebSocket(config.dexWsUrl);
     dexStreams.set(exchangeId, {
         ws,
         active: true,
         markets: dexMarkets,
-        indexMaps: dexIndexMaps,
+        assetMaps: dexAssetMaps,
+        baseIds: dexBaseIds,
         tickerData: new Map(),
         pending: new Map(),
         timeout: null,
@@ -56,11 +49,12 @@ function startDexStream(exchangeId, exchange, isLinearSwap, batchInterval, postU
 
         const updates = [];
         stream.pending.forEach((data, symbol) => {
+            if (!data.last_price) return;
             updates.push({
                 symbol,
-                last_price: data.last_price ?? 0,
-                best_bid: data.best_bid ?? 0,
-                best_ask: data.best_ask ?? 0,
+                last_price: data.last_price,
+                best_bid: data.best_bid ?? data.last_price,
+                best_ask: data.best_ask ?? data.last_price,
                 price_24h: data.price_24h ?? null,
                 volume_24h: data.volume_24h ?? null,
             });
@@ -125,16 +119,22 @@ function startDexStream(exchangeId, exchange, isLinearSwap, batchInterval, postU
 
                 for (const [dexName, assets] of ctxs) {
                     if (!dexName || dexName === '') continue;
-                    const indexMap = stream.indexMaps[dexName];
-                    if (!indexMap) continue;
+                    const assetMap = stream.assetMaps[dexName];
+                    const baseId = stream.baseIds[dexName];
+                    if (!assetMap || baseId == null) continue;
 
-                    for (let i = 0; i < assets.length && i < indexMap.length; i++) {
+                    for (let i = 0; i < assets.length; i++) {
+                        const assetId = baseId + i;
+                        const symbol = assetMap[assetId];
+                        if (!symbol) continue;
+
                         const ctx = assets[i];
-                        const symbol = indexMap[i].symbol;
                         const existing = stream.tickerData.get(symbol) || {};
 
-                        existing.price_24h = ctx.prevDayPx ? parseFloat(ctx.prevDayPx) : null;
-                        existing.volume_24h = ctx.dayNtlVlm ? parseFloat(ctx.dayNtlVlm) : null;
+                        existing.price_24h =
+                            ctx.prevDayPx != null ? parseFloat(ctx.prevDayPx) : null;
+                        existing.volume_24h =
+                            ctx.dayNtlVlm != null ? parseFloat(ctx.dayNtlVlm) : null;
 
                         if (ctx.impactPxs && ctx.impactPxs.length >= 2) {
                             existing.best_bid = parseFloat(ctx.impactPxs[0]);
@@ -142,7 +142,9 @@ function startDexStream(exchangeId, exchange, isLinearSwap, batchInterval, postU
                         }
 
                         stream.tickerData.set(symbol, existing);
-                        stream.pending.set(symbol, existing);
+                        if (existing.last_price) {
+                            stream.pending.set(symbol, existing);
+                        }
                     }
                 }
                 scheduleBatch();

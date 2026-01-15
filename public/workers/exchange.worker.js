@@ -1,5 +1,6 @@
 importScripts('/ccxt.browser.min.js');
 importScripts('/workers/config.js');
+importScripts('/workers/utils.js');
 importScripts('/workers/exchanges/hyperliquid/dex_stream.js');
 
 const ccxtpro = self.ccxt.pro || self.ccxt;
@@ -63,12 +64,12 @@ async function fetchMarkets(exchangeId) {
             settle: market.settle || market.quote || '',
             active: market.active,
             type: market.type,
-            tick_size: market.precision?.price || 0.01,
-            min_qty: market.limits?.amount?.min || 0.001,
-            max_qty: market.limits?.amount?.max || 1000000,
-            qty_step: market.precision?.amount || 0.001,
-            contract_size: market.contractSize || 1,
-            max_leverage: market.limits?.leverage?.max || null,
+            tick_size: market.precision?.price ?? 0.01,
+            min_qty: market.limits?.amount?.min ?? 0.001,
+            max_qty: market.limits?.amount?.max ?? 1000000,
+            qty_step: market.precision?.amount ?? 0.001,
+            contract_size: market.contractSize ?? 1,
+            max_leverage: market.limits?.leverage?.max ?? null,
         }))
         .sort((a, b) => a.symbol.localeCompare(b.symbol));
 }
@@ -209,6 +210,7 @@ async function startTickerStream(exchangeId) {
                 for (const [symbol, ticker] of Object.entries(tickers)) {
                     const market = exchange.markets[symbol];
                     if (!market || !isLinearSwap(market)) continue;
+                    if (exchangeId === 'hyperliquid' && isDexSymbol(symbol)) continue;
                     stream.pending.set(symbol, ticker);
                 }
 
