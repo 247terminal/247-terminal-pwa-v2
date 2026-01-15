@@ -90,7 +90,7 @@ export function TickerInfo({ exchange, symbol }: TickerInfoProps) {
     if (!ticker) return null;
 
     return (
-        <div class="flex items-center gap-4 text-xs">
+        <div class="flex items-center gap-4 text-xs no-drag cursor-default">
             <span class={`font-semibold text-sm tabular-nums ${price_flash_class}`}>{price}</span>
             <div class="flex flex-col leading-tight">
                 <span class="text-base-content/50">24h Change</span>
