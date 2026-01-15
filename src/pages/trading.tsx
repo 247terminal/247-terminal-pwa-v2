@@ -10,7 +10,7 @@ import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock, TradeBlock } from '..
 import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_store';
 import { layout_locked, trigger_lock_shake } from '../stores/layout_lock_store';
 import { get_block_icon } from '../components/common/block_icons';
-import type { BlockType } from '../types/layout';
+import type { BlockType } from '../types/layout.types';
 import 'react-grid-layout/css/styles.css';
 
 const GRID_ROWS = 16;

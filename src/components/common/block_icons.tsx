@@ -1,4 +1,4 @@
-import type { BlockType } from '../../types/layout';
+import type { BlockType } from '../../types/layout.types';
 
 export function get_block_icon(type: BlockType, class_name: string = 'w-4 h-4') {
     switch (type) {

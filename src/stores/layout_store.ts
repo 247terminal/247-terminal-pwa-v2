@@ -1,6 +1,6 @@
 import { signal, computed } from '@preact/signals';
-import type { Block, BlockType, BlockLayout, Rig, RigsState } from '../types/layout';
-import { BLOCK_DEFAULTS } from '../types/layout';
+import type { Block, BlockType, BlockLayout, Rig, RigsState } from '../types/layout.types';
+import { BLOCK_DEFAULTS } from '../types/layout.types';
 
 const STORAGE_KEY = '247terminal_rigs';
 

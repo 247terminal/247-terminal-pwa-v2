@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { IconButton } from './icon_button';
 import { add_block } from '../../stores/layout_store';
-import type { BlockType as BlockTypeEnum } from '../../types/layout';
+import type { BlockType as BlockTypeEnum } from '../../types/layout.types';
 
 interface BlockOption {
     id: BlockTypeEnum;
