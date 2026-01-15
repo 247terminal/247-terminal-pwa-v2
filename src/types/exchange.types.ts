@@ -64,6 +64,8 @@ export interface StreamTickerUpdate {
     best_ask: number;
     price_24h: number | null;
     volume_24h: number | null;
+    funding_rate: number | null;
+    next_funding_time: number | null;
 }
 
 export interface BidAskUpdate {

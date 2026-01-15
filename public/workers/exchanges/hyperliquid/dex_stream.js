@@ -1,3 +1,8 @@
+function getNextHourTimestamp() {
+    const now = Date.now();
+    return Math.ceil(now / 3600000) * 3600000;
+}
+
 const dexStreams = {
     ws: null,
     state: 'disconnected',
@@ -140,6 +145,8 @@ function handleDexAllMids(data) {
             best_ask: existing.best_ask ?? midPrice,
             price_24h: existing.price_24h ?? null,
             volume_24h: existing.volume_24h ?? null,
+            funding_rate: existing.funding_rate ?? null,
+            next_funding_time: getNextHourTimestamp(),
         });
     }
 
@@ -175,6 +182,9 @@ function handleDexAssetCtxs(data) {
                 existing.best_bid = parseFloat(ctx.impactPxs[0]);
                 existing.best_ask = parseFloat(ctx.impactPxs[1]);
             }
+            if (ctx.funding != null) {
+                existing.funding_rate = parseFloat(ctx.funding);
+            }
 
             dexStreams.tickerData.set(symbol, existing);
 
@@ -186,6 +196,8 @@ function handleDexAssetCtxs(data) {
                     best_ask: existing.best_ask ?? existing.last_price,
                     price_24h: existing.price_24h ?? null,
                     volume_24h: existing.volume_24h ?? null,
+                    funding_rate: existing.funding_rate ?? null,
+                    next_funding_time: getNextHourTimestamp(),
                 });
             }
         }
@@ -231,7 +243,9 @@ function flushDexBatch() {
             data.best_bid,
             data.best_ask,
             data.price_24h,
-            data.volume_24h
+            data.volume_24h,
+            data.funding_rate,
+            data.next_funding_time
         );
     });
     dexStreams.pending.clear();

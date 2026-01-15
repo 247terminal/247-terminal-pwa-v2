@@ -1,7 +1,13 @@
+function getNextHourTimestamp() {
+    const now = Date.now();
+    return Math.ceil(now / 3600000) * 3600000;
+}
+
 const cexStreams = {
     ws: null,
     state: 'disconnected',
     markets: new Map(),
+    assetIndexMap: new Map(),
     tickerData: new Map(),
     pending: new Map(),
     flushTimeout: null,
@@ -27,6 +33,7 @@ function startCexStream(exchange, batchInterval, postUpdate) {
 
 function buildCexMarketMap(exchange) {
     cexStreams.markets.clear();
+    cexStreams.assetIndexMap.clear();
 
     for (const market of Object.values(exchange.markets)) {
         if (!isCexLinearSwap(market)) continue;
@@ -34,6 +41,11 @@ function buildCexMarketMap(exchange) {
 
         const ticker = market.base;
         cexStreams.markets.set(ticker, market.symbol);
+
+        const assetIndex = parseInt(market.id, 10);
+        if (!isNaN(assetIndex)) {
+            cexStreams.assetIndexMap.set(assetIndex, market.symbol);
+        }
     }
 }
 
@@ -61,6 +73,10 @@ function connectCexStream() {
             method: 'subscribe',
             subscription: { type: 'allMids' },
         });
+        self.streamUtils.safeSend(ws, {
+            method: 'subscribe',
+            subscription: { type: 'activeAssetData' },
+        });
     };
 
     ws.onmessage = (event) => {
@@ -68,36 +84,12 @@ function connectCexStream() {
 
         try {
             const msg = JSON.parse(event.data);
-            if (msg.channel !== 'allMids') return;
-            if (msg.data?.dex && msg.data.dex !== '') return;
 
-            const mids = msg.data?.mids;
-            if (!mids) return;
-
-            for (const [ticker, price] of Object.entries(mids)) {
-                const symbol = cexStreams.markets.get(ticker);
-                if (!symbol) continue;
-
-                const midPrice = parseFloat(price);
-                if (!midPrice || midPrice <= 0) continue;
-
-                const existing = cexStreams.tickerData.get(symbol) || {};
-                existing.last_price = midPrice;
-                existing.best_bid = midPrice;
-                existing.best_ask = midPrice;
-                cexStreams.tickerData.set(symbol, existing);
-
-                cexStreams.pending.set(symbol, {
-                    symbol,
-                    last_price: midPrice,
-                    best_bid: existing.best_bid ?? midPrice,
-                    best_ask: existing.best_ask ?? midPrice,
-                    price_24h: existing.price_24h ?? null,
-                    volume_24h: existing.volume_24h ?? null,
-                });
+            if (msg.channel === 'allMids') {
+                handleCexAllMids(msg.data);
+            } else if (msg.channel === 'activeAssetData') {
+                handleCexAssetData(msg.data);
             }
-
-            scheduleCexFlush();
         } catch (e) {
             console.error('hyperliquid cex parse error:', e.message);
         }
@@ -112,6 +104,84 @@ function connectCexStream() {
     ws.onerror = (err) => {
         console.error('hyperliquid cex error:', err.message || 'connection error');
     };
+}
+
+function handleCexAllMids(data) {
+    if (data?.dex && data.dex !== '') return;
+
+    const mids = data?.mids;
+    if (!mids) return;
+
+    for (const [ticker, price] of Object.entries(mids)) {
+        const symbol = cexStreams.markets.get(ticker);
+        if (!symbol) continue;
+
+        const midPrice = parseFloat(price);
+        if (!midPrice || midPrice <= 0) continue;
+
+        const existing = cexStreams.tickerData.get(symbol) || {};
+        existing.last_price = midPrice;
+        if (!existing.best_bid) existing.best_bid = midPrice;
+        if (!existing.best_ask) existing.best_ask = midPrice;
+        cexStreams.tickerData.set(symbol, existing);
+
+        cexStreams.pending.set(symbol, {
+            symbol,
+            last_price: midPrice,
+            best_bid: existing.best_bid,
+            best_ask: existing.best_ask,
+            price_24h: existing.price_24h ?? null,
+            volume_24h: existing.volume_24h ?? null,
+            funding_rate: existing.funding_rate ?? null,
+            next_funding_time: getNextHourTimestamp(),
+        });
+    }
+
+    scheduleCexFlush();
+}
+
+function handleCexAssetData(data) {
+    const ctxs = data?.activeAssetData;
+    if (!ctxs || !Array.isArray(ctxs)) return;
+
+    for (let i = 0; i < ctxs.length; i++) {
+        const symbol = cexStreams.assetIndexMap.get(i);
+        if (!symbol) continue;
+
+        const ctx = ctxs[i];
+        const existing = cexStreams.tickerData.get(symbol) || {};
+
+        if (ctx.prevDayPx != null) {
+            existing.price_24h = parseFloat(ctx.prevDayPx);
+        }
+        if (ctx.dayNtlVlm != null) {
+            existing.volume_24h = parseFloat(ctx.dayNtlVlm);
+        }
+        if (ctx.impactPxs && ctx.impactPxs.length >= 2) {
+            existing.best_bid = parseFloat(ctx.impactPxs[0]);
+            existing.best_ask = parseFloat(ctx.impactPxs[1]);
+        }
+        if (ctx.funding != null) {
+            existing.funding_rate = parseFloat(ctx.funding);
+        }
+
+        cexStreams.tickerData.set(symbol, existing);
+
+        if (existing.last_price && existing.last_price > 0) {
+            cexStreams.pending.set(symbol, {
+                symbol,
+                last_price: existing.last_price,
+                best_bid: existing.best_bid ?? existing.last_price,
+                best_ask: existing.best_ask ?? existing.last_price,
+                price_24h: existing.price_24h ?? null,
+                volume_24h: existing.volume_24h ?? null,
+                funding_rate: existing.funding_rate ?? null,
+                next_funding_time: getNextHourTimestamp(),
+            });
+        }
+    }
+
+    scheduleCexFlush();
 }
 
 function scheduleCexReconnect() {
@@ -150,7 +220,9 @@ function flushCexBatch() {
             data.best_bid,
             data.best_ask,
             data.price_24h,
-            data.volume_24h
+            data.volume_24h,
+            data.funding_rate,
+            data.next_funding_time
         );
     });
     cexStreams.pending.clear();
@@ -174,6 +246,8 @@ function stopCexStream() {
 
     cexStreams.pending.clear();
     cexStreams.tickerData.clear();
+    cexStreams.markets.clear();
+    cexStreams.assetIndexMap.clear();
 
     self.streamUtils.safeClose(cexStreams.ws);
     cexStreams.ws = null;

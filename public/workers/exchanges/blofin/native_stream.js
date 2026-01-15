@@ -79,6 +79,8 @@ function connectBlofinStream() {
                         best_ask: 0,
                         price_24h: null,
                         volume_24h: null,
+                        funding_rate: null,
+                        next_funding_time: null,
                     };
                     blofinStreams.tickerData.set(symbol, entry);
                 }
@@ -88,6 +90,9 @@ function connectBlofinStream() {
                 if (ticker.askPrice) entry.best_ask = parseFloat(ticker.askPrice);
                 if (ticker.open24h) entry.price_24h = parseFloat(ticker.open24h);
                 if (ticker.vol24h) entry.volume_24h = parseFloat(ticker.vol24h);
+                if (ticker.fundingRate) entry.funding_rate = parseFloat(ticker.fundingRate);
+                if (ticker.nextFundingTs)
+                    entry.next_funding_time = parseInt(ticker.nextFundingTs, 10);
 
                 blofinStreams.pending.add(symbol);
             }
@@ -206,7 +211,9 @@ function flushBlofinBatch() {
                 entry.best_bid,
                 entry.best_ask,
                 entry.price_24h,
-                entry.volume_24h
+                entry.volume_24h,
+                entry.funding_rate,
+                entry.next_funding_time
             );
         }
     }

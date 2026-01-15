@@ -101,6 +101,9 @@ function connectBybitStream(connIndex, marketIds) {
             if (ticker.ask1Price) existing.best_ask = parseFloat(ticker.ask1Price);
             if (ticker.prevPrice24h) existing.price_24h = parseFloat(ticker.prevPrice24h);
             if (ticker.turnover24h) existing.volume_24h = parseFloat(ticker.turnover24h);
+            if (ticker.fundingRate) existing.funding_rate = parseFloat(ticker.fundingRate);
+            if (ticker.nextFundingTime)
+                existing.next_funding_time = parseInt(ticker.nextFundingTime, 10);
 
             if (!existing.last_price || existing.last_price <= 0) return;
 
@@ -112,6 +115,8 @@ function connectBybitStream(connIndex, marketIds) {
                 best_ask: existing.best_ask ?? 0,
                 price_24h: existing.price_24h ?? null,
                 volume_24h: existing.volume_24h ?? null,
+                funding_rate: existing.funding_rate ?? null,
+                next_funding_time: existing.next_funding_time ?? null,
             });
 
             scheduleBybitFlush();
@@ -224,7 +229,9 @@ function flushBybitBatch() {
             data.best_bid,
             data.best_ask,
             data.price_24h,
-            data.volume_24h
+            data.volume_24h,
+            data.funding_rate,
+            data.next_funding_time
         );
     });
     bybitStreams.pending.clear();

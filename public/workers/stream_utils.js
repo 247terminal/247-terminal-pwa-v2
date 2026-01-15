@@ -32,6 +32,8 @@ function getPooledUpdates(poolKey, size) {
                 best_ask: 0,
                 price_24h: null,
                 volume_24h: null,
+                funding_rate: null,
+                next_funding_time: null,
             };
         }
         updatePoolCache.set(poolKey, pool);
@@ -39,13 +41,25 @@ function getPooledUpdates(poolKey, size) {
     return pool;
 }
 
-function fillPooledUpdate(obj, symbol, lastPrice, bestBid, bestAsk, price24h, volume24h) {
+function fillPooledUpdate(
+    obj,
+    symbol,
+    lastPrice,
+    bestBid,
+    bestAsk,
+    price24h,
+    volume24h,
+    fundingRate,
+    nextFundingTime
+) {
     obj.symbol = symbol;
     obj.last_price = lastPrice;
     obj.best_bid = bestBid;
     obj.best_ask = bestAsk;
     obj.price_24h = price24h;
     obj.volume_24h = volume24h;
+    obj.funding_rate = fundingRate ?? null;
+    obj.next_funding_time = nextFundingTime ?? null;
     return obj;
 }
 

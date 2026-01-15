@@ -1,10 +1,11 @@
 const binanceStreams = {
     ticker: null,
     bookTicker: null,
+    markPrice: null,
     klineConnections: [],
     klineSymbolBatches: [],
     state: 'disconnected',
-    reconnectAttempts: { ticker: 0, bookTicker: 0 },
+    reconnectAttempts: { ticker: 0, bookTicker: 0, markPrice: 0 },
     klineReconnectAttempts: new Map(),
     reconnectTimeouts: {},
     tickerData: new Map(),
@@ -26,6 +27,8 @@ function getOrCreateEntry(symbol) {
             best_ask: 0,
             price_24h: null,
             volume_24h: null,
+            funding_rate: null,
+            next_funding_time: null,
         };
         binanceStreams.tickerData.set(symbol, entry);
     }
@@ -45,10 +48,11 @@ function startBinanceNativeStream(symbols, batchInterval, postUpdate) {
     binanceStreams.state = self.streamUtils.StreamState.CONNECTING;
     binanceStreams.postUpdate = postUpdate;
     binanceStreams.batchInterval = batchInterval;
-    binanceStreams.reconnectAttempts = { ticker: 0, bookTicker: 0 };
+    binanceStreams.reconnectAttempts = { ticker: 0, bookTicker: 0, markPrice: 0 };
 
     connectTickerStream();
     connectBookTickerStream();
+    connectMarkPriceStream();
     connectKlineStreams(symbols);
 }
 
@@ -167,6 +171,66 @@ function connectBookTickerStream() {
 
     ws.onerror = (err) => {
         console.error('binance book error:', err.message || 'connection error');
+    };
+}
+
+function connectMarkPriceStream() {
+    const config = EXCHANGE_CONFIG.binance;
+    self.streamUtils.safeClose(binanceStreams.markPrice);
+    stopPing('markPrice');
+
+    const ws = self.streamUtils.createWebSocket(config.wsUrls.markPrice);
+    if (!ws) {
+        scheduleReconnect('markPrice', connectMarkPriceStream);
+        return;
+    }
+
+    binanceStreams.markPrice = ws;
+
+    ws.onopen = () => {
+        binanceStreams.reconnectAttempts.markPrice = 0;
+        updateState();
+        startPing('markPrice', ws);
+    };
+
+    ws.onmessage = (event) => {
+        if (binanceStreams.state === 'disconnected') return;
+
+        try {
+            const data = JSON.parse(event.data);
+            if (!Array.isArray(data)) return;
+
+            for (let i = 0; i < data.length; i++) {
+                const item = data[i];
+                if (!item.s) continue;
+
+                const symbol = parseSymbol(item.s);
+                if (!symbol) continue;
+
+                const entry = binanceStreams.tickerData.get(symbol);
+                if (!entry) continue;
+
+                if (item.r) entry.funding_rate = parseFloat(item.r);
+                if (item.T) entry.next_funding_time = parseInt(item.T, 10);
+
+                binanceStreams.pending.add(symbol);
+            }
+
+            scheduleFlush();
+        } catch (e) {
+            console.error('binance markprice parse error:', e.message);
+        }
+    };
+
+    ws.onclose = (event) => {
+        stopPing('markPrice');
+        if (binanceStreams.state === 'disconnected') return;
+        console.error('binance markprice closed:', event.code, event.reason);
+        scheduleReconnect('markPrice', connectMarkPriceStream);
+    };
+
+    ws.onerror = (err) => {
+        console.error('binance markprice error:', err.message || 'connection error');
     };
 }
 
@@ -298,45 +362,40 @@ function scheduleKlineReconnect(connIndex) {
     }, delay);
 }
 
+const reconnectFns = {
+    ticker: () => connectTickerStream(),
+    bookTicker: () => connectBookTickerStream(),
+    markPrice: () => connectMarkPriceStream(),
+};
+
 function startPing(key, ws) {
     const config = EXCHANGE_CONFIG.binance;
     stopPing(key);
-
     binanceStreams.pongMonitors[key] = self.streamUtils.createPongMonitor(() => {
         console.error('binance', key, 'pong timeout, reconnecting');
-        if (key === 'ticker') {
-            connectTickerStream();
-        } else {
-            connectBookTickerStream();
-        }
+        reconnectFns[key]?.();
     });
     binanceStreams.pongMonitors[key].start();
-
     binanceStreams.pingIntervals[key] = setInterval(() => {
-        if (ws?.readyState === WebSocket.OPEN) {
-            binanceStreams.pongMonitors[key]?.receivedPong();
-        }
+        if (ws?.readyState === WebSocket.OPEN) binanceStreams.pongMonitors[key]?.receivedPong();
     }, config.pingInterval);
 }
 
 function stopPing(key) {
-    if (binanceStreams.pingIntervals[key]) {
-        clearInterval(binanceStreams.pingIntervals[key]);
-        delete binanceStreams.pingIntervals[key];
-    }
-    if (binanceStreams.pongMonitors[key]) {
-        binanceStreams.pongMonitors[key].stop();
-        delete binanceStreams.pongMonitors[key];
-    }
+    if (binanceStreams.pingIntervals[key]) clearInterval(binanceStreams.pingIntervals[key]);
+    if (binanceStreams.pongMonitors[key]) binanceStreams.pongMonitors[key].stop();
+    delete binanceStreams.pingIntervals[key];
+    delete binanceStreams.pongMonitors[key];
 }
 
 function updateState() {
     const tickerOpen = binanceStreams.ticker?.readyState === WebSocket.OPEN;
     const bookOpen = binanceStreams.bookTicker?.readyState === WebSocket.OPEN;
+    const markOpen = binanceStreams.markPrice?.readyState === WebSocket.OPEN;
 
-    if (tickerOpen && bookOpen) {
+    if (tickerOpen && bookOpen && markOpen) {
         binanceStreams.state = self.streamUtils.StreamState.CONNECTED;
-    } else if (tickerOpen || bookOpen) {
+    } else if (tickerOpen || bookOpen || markOpen) {
         binanceStreams.state = self.streamUtils.StreamState.CONNECTING;
     }
 }
@@ -381,7 +440,9 @@ function flushBinanceBatch() {
                 entry.best_bid,
                 entry.best_ask,
                 entry.price_24h,
-                entry.volume_24h
+                entry.volume_24h,
+                entry.funding_rate,
+                entry.next_funding_time
             );
         }
     }
@@ -397,6 +458,7 @@ function stopBinanceNativeStream() {
 
     stopPing('ticker');
     stopPing('bookTicker');
+    stopPing('markPrice');
 
     for (let i = 0; i < binanceStreams.klineConnections.length; i++) {
         stopKlinePing(i);
@@ -419,8 +481,10 @@ function stopBinanceNativeStream() {
 
     self.streamUtils.safeClose(binanceStreams.ticker);
     self.streamUtils.safeClose(binanceStreams.bookTicker);
+    self.streamUtils.safeClose(binanceStreams.markPrice);
     binanceStreams.ticker = null;
     binanceStreams.bookTicker = null;
+    binanceStreams.markPrice = null;
 }
 
 function isBinanceNativeActive() {

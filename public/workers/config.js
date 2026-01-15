@@ -17,6 +17,7 @@ const EXCHANGE_CONFIG = {
         wsUrls: {
             ticker: 'wss://fstream.binance.com/ws/!miniTicker@arr',
             bookTicker: 'wss://fstream.binance.com/ws/!bookTicker',
+            markPrice: 'wss://fstream.binance.com/ws/!markPrice@arr@1s',
             klineBase: 'wss://fstream.binance.com/stream?streams=',
         },
         pingInterval: 30000,
