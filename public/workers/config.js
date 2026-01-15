@@ -37,6 +37,7 @@ const EXCHANGE_CONFIG = {
         headers: {
             'x-proxy-auth': '5cbb9da977ea3740b4dcdfeea9b020c8f6de45c2d0314f549723e8a4207c288a',
         },
+        restUrl: 'https://openapi.blofin.com',
         wsUrl: 'wss://openapi.blofin.com/ws/public',
         subscribeBatch: 100,
         pingInterval: 25000,

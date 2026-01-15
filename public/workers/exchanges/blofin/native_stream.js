@@ -331,4 +331,5 @@ self.blofinNative = {
     startBlofinNativeStream,
     stopBlofinNativeStream,
     isBlofinNativeActive,
+    convertBlofinSymbol,
 };

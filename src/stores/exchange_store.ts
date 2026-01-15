@@ -10,6 +10,7 @@ import {
     type StreamTickerUpdate,
     type BidAskUpdate,
     type PriceUpdate,
+    type FundingInfo,
 } from '../types/exchange.types';
 import type { MarketData } from '../services/exchange/chart_data';
 
@@ -204,6 +205,24 @@ export function set_initial_tickers(
                 price_24h: ticker.price_24h,
                 volume_24h: ticker.volume_24h,
                 last_updated: now,
+            };
+        }
+    });
+}
+
+export function update_initial_funding(
+    exchange_id: ExchangeId,
+    funding_rates: Record<string, FundingInfo>
+): void {
+    batch(() => {
+        for (const [symbol, funding] of Object.entries(funding_rates)) {
+            const sig = get_ticker_signal(exchange_id, symbol);
+            const current = sig.value;
+            if (!current) continue;
+            sig.value = {
+                ...current,
+                funding_rate: funding.funding_rate,
+                next_funding_time: funding.next_funding_time,
             };
         }
     });

@@ -5,6 +5,7 @@ importScripts('/workers/stream_utils.js');
 importScripts('/workers/exchanges/binance/native_stream.js');
 importScripts('/workers/exchanges/bybit/native_stream.js');
 importScripts('/workers/exchanges/blofin/native_stream.js');
+importScripts('/workers/exchanges/blofin/rest_api.js');
 importScripts('/workers/exchanges/hyperliquid/dex_stream.js');
 importScripts('/workers/exchanges/hyperliquid/cex_stream.js');
 
@@ -111,6 +112,31 @@ async function fetchTickers(exchangeId) {
             last_price: ticker.last ?? ticker.close ?? 0,
             price_24h: ticker.open ?? ticker.previousClose ?? null,
             volume_24h: ticker.quoteVolume ?? ticker.baseVolume ?? null,
+        };
+    }
+
+    return result;
+}
+
+async function fetchFundingRates(exchangeId) {
+    const exchange = getExchange(exchangeId);
+    const symbols = getSwapSymbols(exchange);
+    if (!symbols || symbols.length === 0) return {};
+
+    if (exchangeId === 'blofin') {
+        return self.blofinRest.fetchBlofinFundingRates(exchange);
+    }
+
+    const fundingRates = await exchange.fetchFundingRates(symbols);
+    const result = {};
+
+    for (const [symbol, funding] of Object.entries(fundingRates)) {
+        const market = exchange.markets[symbol];
+        if (!market || !isLinearSwap(market)) continue;
+
+        result[symbol] = {
+            funding_rate: funding.fundingRate ?? null,
+            next_funding_time: funding.fundingTimestamp ?? funding.nextFundingTimestamp ?? null,
         };
     }
 
@@ -332,6 +358,9 @@ self.onmessage = async (event) => {
                 break;
             case 'FETCH_TICKERS':
                 result = await fetchTickers(payload.exchangeId);
+                break;
+            case 'FETCH_FUNDING_RATES':
+                result = await fetchFundingRates(payload.exchangeId);
                 break;
             case 'FETCH_OHLCV':
                 result = await fetchOHLCV(

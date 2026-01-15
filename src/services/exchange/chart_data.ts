@@ -3,6 +3,7 @@ import type {
     StreamTickerUpdate,
     BidAskUpdate,
     PriceUpdate,
+    FundingInfo,
 } from '../../types/exchange.types';
 import {
     update_ticker_stream_batch,
@@ -181,6 +182,13 @@ export function fetch_tickers(
     signal?: AbortSignal
 ): Promise<Record<string, TickerInfo>> {
     return sendRequest<Record<string, TickerInfo>>('FETCH_TICKERS', { exchangeId }, signal);
+}
+
+export function fetch_funding_rates(
+    exchangeId: ExchangeId,
+    signal?: AbortSignal
+): Promise<Record<string, FundingInfo>> {
+    return sendRequest<Record<string, FundingInfo>>('FETCH_FUNDING_RATES', { exchangeId }, signal);
 }
 
 export function fetch_ohlcv(

@@ -78,3 +78,8 @@ export interface PriceUpdate {
     symbol: string;
     last_price: number;
 }
+
+export interface FundingInfo {
+    funding_rate: number | null;
+    next_funding_time: number | null;
+}
