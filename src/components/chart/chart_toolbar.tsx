@@ -5,6 +5,7 @@ import { favourites, toggle_favourite } from '../../stores/symbol_favourites';
 import { get_ticker } from '../../stores/exchange_store';
 import { SymbolRow, ITEM_HEIGHT, format_symbol } from './symbol_row';
 import { TimeframeSelector, type Timeframe } from './timeframe_selector';
+import { TickerInfo } from './ticker_info';
 
 export type { Timeframe };
 
@@ -462,6 +463,8 @@ export function ChartToolbar({
             </div>
 
             <TimeframeSelector timeframe={timeframe} on_change={on_timeframe_change} />
+
+            {symbol && <TickerInfo exchange={exchange} symbol={symbol} />}
         </div>
     );
 }

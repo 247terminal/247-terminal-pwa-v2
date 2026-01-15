@@ -2,7 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { effect } from '@preact/signals';
 import type { ExchangeId } from '../../types/exchange.types';
 import { get_market, get_ticker_signal } from '../../stores/exchange_store';
-import { tick_size_to_precision } from '../../utils/format';
+import { format_price } from '../../utils/format';
 
 export const ITEM_HEIGHT = 28;
 
@@ -20,13 +20,7 @@ export function format_symbol(symbol: string): string {
     return `${base}${quote}`.toUpperCase();
 }
 
-function format_price(price: number | null, tick_size: number): string {
-    if (price === null || price === 0) return '-';
-    const precision = tick_size_to_precision(tick_size);
-    return price.toFixed(precision);
-}
-
-function format_change(
+export function format_change(
     last: number | null,
     open: number | null
 ): { text: string; positive: boolean } {

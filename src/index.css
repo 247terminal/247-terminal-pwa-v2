@@ -1,182 +1,239 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @plugin "daisyui";
 
 @plugin "daisyui/theme" {
-  name: "terminal-dark";
-  default: true;
-  prefersdark: true;
-  color-scheme: dark;
+    name: 'terminal-dark';
+    default: true;
+    prefersdark: true;
+    color-scheme: dark;
 
-  --color-base-100: #09090b;
-  --color-base-200: #18181b;
-  --color-base-300: #27272a;
-  --color-base-content: #fafafa;
+    --color-base-100: #09090b;
+    --color-base-200: #18181b;
+    --color-base-300: #27272a;
+    --color-base-content: #fafafa;
 
-  --color-primary: #ef4444;
-  --color-primary-content: #ffffff;
+    --color-primary: #ef4444;
+    --color-primary-content: #ffffff;
 
-  --color-secondary: #27272a;
-  --color-secondary-content: #fafafa;
+    --color-secondary: #27272a;
+    --color-secondary-content: #fafafa;
 
-  --color-accent: #f87171;
-  --color-accent-content: #000000;
+    --color-accent: #f87171;
+    --color-accent-content: #000000;
 
-  --color-neutral: #18181b;
-  --color-neutral-content: #a1a1aa;
+    --color-neutral: #18181b;
+    --color-neutral-content: #a1a1aa;
 
-  --color-info: #3b82f6;
-  --color-info-content: #ffffff;
+    --color-info: #3b82f6;
+    --color-info-content: #ffffff;
 
-  --color-success: #22c55e;
-  --color-success-content: #000000;
+    --color-success: #22c55e;
+    --color-success-content: #000000;
 
-  --color-warning: #f59e0b;
-  --color-warning-content: #000000;
+    --color-warning: #f59e0b;
+    --color-warning-content: #000000;
 
-  --color-error: #ef4444;
-  --color-error-content: #ffffff;
+    --color-error: #ef4444;
+    --color-error-content: #ffffff;
 
-  --radius-selector: 0.5rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
+    --radius-selector: 0.5rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
 }
 
 @plugin "daisyui/theme" {
-  name: "terminal-light";
-  default: false;
-  prefersdark: false;
-  color-scheme: light;
+    name: 'terminal-light';
+    default: false;
+    prefersdark: false;
+    color-scheme: light;
 
-  --color-base-100: #ffffff;
-  --color-base-200: #f4f4f5;
-  --color-base-300: #e4e4e7;
-  --color-base-content: #09090b;
+    --color-base-100: #ffffff;
+    --color-base-200: #f4f4f5;
+    --color-base-300: #e4e4e7;
+    --color-base-content: #09090b;
 
-  --color-primary: #dc2626;
-  --color-primary-content: #ffffff;
+    --color-primary: #dc2626;
+    --color-primary-content: #ffffff;
 
-  --color-secondary: #e4e4e7;
-  --color-secondary-content: #09090b;
+    --color-secondary: #e4e4e7;
+    --color-secondary-content: #09090b;
 
-  --color-accent: #ef4444;
-  --color-accent-content: #ffffff;
+    --color-accent: #ef4444;
+    --color-accent-content: #ffffff;
 
-  --color-neutral: #f4f4f5;
-  --color-neutral-content: #71717a;
+    --color-neutral: #f4f4f5;
+    --color-neutral-content: #71717a;
 
-  --color-info: #2563eb;
-  --color-info-content: #ffffff;
+    --color-info: #2563eb;
+    --color-info-content: #ffffff;
 
-  --color-success: #16a34a;
-  --color-success-content: #ffffff;
+    --color-success: #16a34a;
+    --color-success-content: #ffffff;
 
-  --color-warning: #ca8a04;
-  --color-warning-content: #ffffff;
+    --color-warning: #ca8a04;
+    --color-warning-content: #ffffff;
 
-  --color-error: #dc2626;
-  --color-error-content: #ffffff;
+    --color-error: #dc2626;
+    --color-error-content: #ffffff;
 
-  --radius-selector: 0.5rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
+    --radius-selector: 0.5rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
 }
 
 :root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        sans-serif;
 }
 
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 .text-muted {
-  color: oklch(from var(--color-neutral-content) l c h / 1);
+    color: oklch(from var(--color-neutral-content) l c h / 1);
 }
 
 .border-subtle {
-  border-color: oklch(from var(--color-base-content) l c h / 0.08);
+    border-color: oklch(from var(--color-base-content) l c h / 0.08);
 }
 
 .border-subtle-light {
-  border-color: oklch(from var(--color-base-content) l c h / 0.12);
+    border-color: oklch(from var(--color-base-content) l c h / 0.12);
 }
 
 .glow-accent {
-  box-shadow: 0 0 20px oklch(from var(--color-primary) l c h / 0.15);
+    box-shadow: 0 0 20px oklch(from var(--color-primary) l c h / 0.15);
 }
 
 .glow-accent-strong {
-  box-shadow: 0 0 30px oklch(from var(--color-primary) l c h / 0.3);
+    box-shadow: 0 0 30px oklch(from var(--color-primary) l c h / 0.3);
 }
 
-[data-theme="terminal-dark"] .bg-theme-header {
-  background-color: oklch(0% 0 0);
+[data-theme='terminal-dark'] .bg-theme-header {
+    background-color: oklch(0% 0 0);
 }
 
-[data-theme="terminal-light"] .bg-theme-header {
-  background-color: oklch(100% 0 0);
+[data-theme='terminal-light'] .bg-theme-header {
+    background-color: oklch(100% 0 0);
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-  20%, 40%, 60%, 80% { transform: translateX(4px); }
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translateX(-4px);
+    }
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translateX(4px);
+    }
 }
 
 .animate-shake {
-  animation: shake 0.5s ease-in-out;
+    animation: shake 0.5s ease-in-out;
 }
 
 @keyframes pulse-once {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; background-color: oklch(from var(--color-primary) l c h / 0.2); }
-  100% { opacity: 1; }
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+        background-color: oklch(from var(--color-primary) l c h / 0.2);
+    }
+    100% {
+        opacity: 1;
+    }
 }
 
 .animate-pulse-once {
-  animation: pulse-once 0.3s ease-in-out;
+    animation: pulse-once 0.3s ease-in-out;
+}
+
+@keyframes flash-up {
+    0%,
+    30% {
+        color: var(--color-success);
+    }
+    100% {
+        color: var(--color-base-content);
+    }
+}
+
+@keyframes flash-down {
+    0%,
+    30% {
+        color: var(--color-error);
+    }
+    100% {
+        color: var(--color-base-content);
+    }
+}
+
+.animate-flash-up {
+    animation: flash-up 3s ease-in-out;
+}
+
+.animate-flash-down {
+    animation: flash-down 3s ease-in-out;
 }
 
 .react-grid-item.react-draggable-dragging,
 .react-grid-item.resizing {
-  background-color: oklch(from var(--color-primary) calc(l + 0.3) calc(c * 0.5) h / 0.4) !important;
-  border-color: oklch(from var(--color-primary) calc(l + 0.3) calc(c * 0.5) h / 0.4) !important;
+    background-color: oklch(
+        from var(--color-primary) calc(l + 0.3) calc(c * 0.5) h / 0.4
+    ) !important;
+    border-color: oklch(from var(--color-primary) calc(l + 0.3) calc(c * 0.5) h / 0.4) !important;
 }
 
 .react-grid-item .block-type-icon {
-  opacity: 0;
+    opacity: 0;
 }
 
 .react-grid-item.react-draggable-dragging > *:not(.block-type-icon),
 .react-grid-item.resizing > *:not(.block-type-icon) {
-  opacity: 0;
+    opacity: 0;
 }
 
 .react-grid-item.react-draggable-dragging .block-type-icon,
 .react-grid-item.resizing .block-type-icon {
-  opacity: 1;
+    opacity: 1;
 }
 
 .react-grid-layout:has(.react-draggable-dragging) .react-grid-item:not(.react-draggable-dragging),
 .react-grid-layout:has(.resizing) .react-grid-item:not(.resizing) {
-  background-color: var(--color-base-300) !important;
+    background-color: var(--color-base-300) !important;
 }
 
-.react-grid-layout:has(.react-draggable-dragging) .react-grid-item:not(.react-draggable-dragging) > *:not(.block-type-icon),
+.react-grid-layout:has(.react-draggable-dragging)
+    .react-grid-item:not(.react-draggable-dragging)
+    > *:not(.block-type-icon),
 .react-grid-layout:has(.resizing) .react-grid-item:not(.resizing) > *:not(.block-type-icon) {
-  opacity: 0;
+    opacity: 0;
 }
 
 .react-grid-layout:has(.react-draggable-dragging) .react-grid-item .block-type-icon,
 .react-grid-layout:has(.resizing) .react-grid-item .block-type-icon {
-  opacity: 1;
+    opacity: 1;
 }
