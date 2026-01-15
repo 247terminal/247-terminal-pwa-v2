@@ -80,9 +80,8 @@ function create_double_chart_rig(): Rig {
 }
 
 export function create_rig_from_template(template: DefaultRigTemplate): string {
-    const new_rig = template === 'single_chart'
-        ? create_single_chart_rig()
-        : create_double_chart_rig();
+    const new_rig =
+        template === 'single_chart' ? create_single_chart_rig() : create_double_chart_rig();
 
     const state = rigs_state.value;
     const new_state: RigsState = {
@@ -171,7 +170,13 @@ export const all_rigs = computed(() => {
 export const blocks = computed(() => active_rig.value?.blocks || []);
 export const layouts = computed(() => active_rig.value?.layouts || { lg: [] });
 
-function check_overlap(x: number, y: number, w: number, h: number, layouts: BlockLayout[]): boolean {
+function check_overlap(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    layouts: BlockLayout[]
+): boolean {
     for (const item of layouts) {
         const overlaps_x = x < item.x + item.w && x + w > item.x;
         const overlaps_y = y < item.y + item.h && y + h > item.y;
@@ -182,7 +187,12 @@ function check_overlap(x: number, y: number, w: number, h: number, layouts: Bloc
     return false;
 }
 
-function find_next_position(layouts: BlockLayout[], block_w: number, block_h: number, cols: number = 12): { x: number; y: number } {
+function find_next_position(
+    layouts: BlockLayout[],
+    block_w: number,
+    block_h: number,
+    cols: number = 12
+): { x: number; y: number } {
     if (layouts.length === 0) {
         return { x: 0, y: 0 };
     }
@@ -256,10 +266,10 @@ export function add_block(type: BlockType): string {
 export function remove_block(id: string): void {
     update_active_rig((rig) => ({
         ...rig,
-        blocks: rig.blocks.filter(b => b.id !== id),
+        blocks: rig.blocks.filter((b) => b.id !== id),
         layouts: {
             ...rig.layouts,
-            lg: rig.layouts.lg.filter(l => l.i !== id),
+            lg: rig.layouts.lg.filter((l) => l.i !== id),
         },
     }));
 }
@@ -298,9 +308,8 @@ export function delete_rig(id: string): boolean {
     }
 
     const { [id]: removed, ...remaining_rigs } = state.rigs;
-    const new_active_id = id === state.active_rig_id
-        ? Object.keys(remaining_rigs)[0]
-        : state.active_rig_id;
+    const new_active_id =
+        id === state.active_rig_id ? Object.keys(remaining_rigs)[0] : state.active_rig_id;
 
     const new_state: RigsState = {
         rigs: remaining_rigs,

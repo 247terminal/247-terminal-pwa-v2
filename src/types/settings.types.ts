@@ -1,4 +1,4 @@
-import type { ExchangeId } from "@/types/exchange.types";
+import type { ExchangeId } from '@/types/exchange.types';
 
 export interface ExchangeCredentials {
     api_key: string;

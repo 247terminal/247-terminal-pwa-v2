@@ -1,11 +1,13 @@
-import type { ExchangeId } from './types';
+import type {
+    ExchangeId,
+    StreamTickerUpdate,
+    BidAskUpdate,
+    PriceUpdate,
+} from '../../types/exchange.types';
 import {
     update_ticker_stream_batch,
     update_bidask_batch,
     update_price_batch,
-    type StreamTickerUpdate,
-    type BidAskUpdate,
-    type PriceUpdate,
 } from '../../stores/exchange_store';
 
 export interface MarketData {
@@ -228,20 +230,4 @@ export function start_ticker_stream(exchangeId: ExchangeId): void {
 
 export function stop_ticker_stream(exchangeId: ExchangeId): void {
     sendRequest('STOP_TICKER_STREAM', { exchangeId });
-}
-
-export function start_bidask_stream(exchangeId: ExchangeId): void {
-    sendRequest('START_BIDASK_STREAM', { exchangeId });
-}
-
-export function stop_bidask_stream(exchangeId: ExchangeId): void {
-    sendRequest('STOP_BIDASK_STREAM', { exchangeId });
-}
-
-export function start_kline_stream(exchangeId: ExchangeId): void {
-    sendRequest('START_KLINE_STREAM', { exchangeId });
-}
-
-export function stop_kline_stream(exchangeId: ExchangeId): void {
-    sendRequest('STOP_KLINE_STREAM', { exchangeId });
 }

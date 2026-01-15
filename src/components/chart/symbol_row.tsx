@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { effect } from '@preact/signals';
-import type { ExchangeId } from '../../services/exchange/types';
+import type { ExchangeId } from '../../types/exchange.types';
 import { get_market, get_ticker_signal } from '../../stores/exchange_store';
 import { tick_size_to_precision } from '../../utils/format';
 

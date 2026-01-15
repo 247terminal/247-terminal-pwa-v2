@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals';
-import type { ExchangeId } from '../services/exchange/types';
+import type { ExchangeId } from '../types/exchange.types';
 
 const STORAGE_KEY = '247terminal_favourites';
 

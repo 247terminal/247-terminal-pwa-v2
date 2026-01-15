@@ -1,4 +1,4 @@
-import { EXCHANGE_IDS, type ExchangeId } from './types';
+import { EXCHANGE_IDS, type ExchangeId } from '../../types/exchange.types';
 import { fetch_markets, fetch_tickers, start_ticker_stream } from './chart_data';
 import { set_markets, has_markets, set_initial_tickers } from '../../stores/exchange_store';
 

@@ -24,6 +24,7 @@ export interface SymbolData {
     funding_rate: number | null;
     next_funding_time: number | null;
     price_24h: number | null;
+    volume_24h: number | null;
     last_updated: number | null;
 }
 
@@ -31,4 +32,47 @@ export interface ExchangeState {
     status: ConnectionStatus;
     error: string | null;
     last_connected: number | null;
+}
+
+export interface TickerData {
+    last_price: number;
+    price_1m_ago: number | null;
+    best_bid: number;
+    best_ask: number;
+    funding_rate: number | null;
+    next_funding_time: number | null;
+    price_24h: number | null;
+    volume_24h: number | null;
+    last_updated: number;
+}
+
+export interface TickerUpdate {
+    symbol: string;
+    last_price: number;
+    best_bid: number;
+    best_ask: number;
+    funding_rate: number | null;
+    next_funding_time: number | null;
+    price_24h: number | null;
+    volume_24h: number | null;
+}
+
+export interface StreamTickerUpdate {
+    symbol: string;
+    last_price: number;
+    best_bid: number;
+    best_ask: number;
+    price_24h: number | null;
+    volume_24h: number | null;
+}
+
+export interface BidAskUpdate {
+    symbol: string;
+    best_bid: number;
+    best_ask: number;
+}
+
+export interface PriceUpdate {
+    symbol: string;
+    last_price: number;
 }

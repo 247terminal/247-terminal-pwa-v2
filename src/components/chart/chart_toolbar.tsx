@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks';
-import { EXCHANGE_IDS, type ExchangeId } from '../../services/exchange/types';
+import { EXCHANGE_IDS, type ExchangeId } from '../../types/exchange.types';
 import { get_exchange_icon } from '../common/exchanges';
 import { favourites, toggle_favourite } from '../../stores/symbol_favourites';
 import { get_ticker } from '../../stores/exchange_store';

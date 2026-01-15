@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
-import { EXCHANGE_IDS, type ExchangeId } from '../../services/exchange/types';
+import { EXCHANGE_IDS, type ExchangeId } from '../../types/exchange.types';
 import {
     fetch_ohlcv,
     watch_ohlcv,
