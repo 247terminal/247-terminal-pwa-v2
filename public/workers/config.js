@@ -17,8 +17,10 @@ const EXCHANGE_CONFIG = {
         wsUrls: {
             ticker: 'wss://fstream.binance.com/ws/!miniTicker@arr',
             bookTicker: 'wss://fstream.binance.com/ws/!bookTicker',
+            klineBase: 'wss://fstream.binance.com/stream?streams=',
         },
         pingInterval: 30000,
+        klineStreamsPerConnection: 200,
         poolKey: 'binance',
     },
     blofin: {

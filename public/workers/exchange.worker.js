@@ -206,7 +206,11 @@ async function startTickerStream(exchangeId) {
         self.postMessage({ type, exchangeId, data: updates });
 
     if (exchangeId === 'binance') {
-        self.binanceNative.startBinanceNativeStream(BATCH_INTERVALS.ticker, postTickerUpdate);
+        self.binanceNative.startBinanceNativeStream(
+            symbols,
+            BATCH_INTERVALS.ticker,
+            postTickerUpdate
+        );
         return;
     }
 
