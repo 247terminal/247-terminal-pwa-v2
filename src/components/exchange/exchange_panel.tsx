@@ -81,7 +81,7 @@ function HelpModal({ exchange_id, on_close }: HelpModalProps) {
             >
                 <div class="flex items-center justify-between px-6 py-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                        <div class="text-primary">
                             {get_exchange_icon(exchange_id)}
                         </div>
                         <span class="text-base font-semibold text-base-content">{exchange_name} Setup Guide</span>
