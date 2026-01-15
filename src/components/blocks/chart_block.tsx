@@ -89,6 +89,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
     }, [exchange, symbol, timeframe, has_data]);
 
     const handle_symbol_change = (ex: ExchangeId, s: string) => {
+        if (ex === exchange && s === symbol) return;
         set_loading(true);
         set_exchange(ex);
         set_symbol(s);
