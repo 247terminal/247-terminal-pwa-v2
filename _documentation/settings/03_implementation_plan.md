@@ -318,7 +318,138 @@ export interface SettingsUIState {
 }
 ```
 
-### 1.2 Layout Types Update (`src/types/layout.types.ts`)
+### 1.2 Settings Constants (`src/services/settings/settings.constants.ts`)
+
+```typescript
+import type { UserSettings, ExchangeId } from '@/types/settings.types';
+
+export const SETTINGS_STORAGE_KEY = '247terminal_settings_v2';
+export const CREDENTIALS_STORAGE_KEY = '247terminal_credentials';
+export const RIGS_STORAGE_KEY = '247terminal_rigs';
+
+export const EXCHANGE_IDS: ExchangeId[] = ['bybit', 'binance', 'blofin', 'hyperliquid'];
+
+export const TIMEFRAME_OPTIONS = [
+    { value: '1s', label: '1s' },
+    { value: '1m', label: '1m' },
+    { value: '3m', label: '3m' },
+    { value: '5m', label: '5m' },
+    { value: '15m', label: '15m' },
+    { value: '30m', label: '30m' },
+    { value: '1h', label: '1H' },
+    { value: '2h', label: '2H' },
+    { value: '4h', label: '4H' },
+    { value: '6h', label: '6H' },
+    { value: '12h', label: '12H' },
+    { value: 'D', label: 'D' },
+    { value: 'W', label: 'W' },
+    { value: 'M', label: 'M' },
+] as const;
+
+export const NOTIFICATION_FILTER_OPTIONS = [
+    { value: 'all', label: 'All' },
+    { value: 'critical', label: 'Critical Only' },
+    { value: 'special', label: 'Special Only' },
+    { value: 'both', label: 'Critical & Special' },
+] as const;
+
+export const SLIPPAGE_OPTIONS = [
+    { value: 1, label: '1%' },
+    { value: 2, label: '2%' },
+    { value: 3, label: '3%' },
+    { value: 5, label: '5%' },
+    { value: 'MARKET', label: 'Market' },
+] as const;
+
+export const BOT_PROTECTION_TIMEFRAMES = [
+    { value: '1', label: '1 Hour' },
+    { value: '4', label: '4 Hours' },
+    { value: '24', label: '24 Hours' },
+] as const;
+
+export const DEFAULT_SETTINGS: UserSettings = {
+    exchange: {
+        preferred: 'bybit',
+        enabled_exchanges: ['bybit'],
+    },
+    trading: {
+        sizes: [100, 500, 1000, 5000],
+        size_count: 4,
+        slippage: 3,
+        auto_tp_enabled: false,
+        auto_tp_value: 5,
+        auto_tp_limit: false,
+        auto_sl_enabled: false,
+        auto_sl_value: 3,
+        unique_shortcuts: false,
+    },
+    terminal: {
+        auto_login: false,
+        push_notifications: true,
+        notification_filter: 'all',
+        full_size_media: false,
+        disable_media: false,
+        freeze_on_hover: true,
+        share_trades: false,
+        show_profit: false,
+    },
+    chart: {
+        default_timeframe: '5m',
+        order_history: true,
+        up_candle_color: '#00C853',
+        down_candle_color: '#FF1744',
+        chart_tickers: [],
+        favorite_tickers: [],
+    },
+    news_providers: {
+        phoenix_enabled: false,
+        tree_enabled: false,
+        synoptic_enabled: false,
+        groq_enabled: false,
+    },
+    news_display: {
+        deduplicator: true,
+        text_shortener: false,
+        directional_highlight: true,
+        price_movement_highlight: true,
+        price_movement_threshold: 5,
+        price_movement_notification: false,
+        hide_tickerless: false,
+        translation_enabled: false,
+        translation_language: 'en',
+        delay_threshold: 5000,
+        history_limit: 100,
+        auto_clear_seconds: 0,
+        font_size: 12,
+    },
+    keywords: {
+        blacklisted_words: [],
+        blacklisted_coins: [],
+        critical_words: [],
+        special_words: [],
+        custom_mappings: [],
+        blacklisted_sources: [],
+    },
+    custom_websockets: [],
+    botting: {
+        enabled: false,
+        cooldown_hours: 1,
+        mobile_notification_enabled: false,
+        ntfy_topic: '',
+        auto_pause_enabled: false,
+        auto_pause_timeframe: '1',
+        auto_pause_threshold: 10,
+    },
+    shortcuts: {
+        disabled: false,
+        nuke_all: { modifier1: 'CTRL', modifier2: 'SHIFT', key: 'N' },
+        bindings: {},
+    },
+    ui_zoom: 1,
+};
+```
+
+### 1.3 Layout Types Update (`src/types/layout.types.ts`)
 
 Add sync metadata to existing types:
 
@@ -1424,7 +1555,959 @@ export function SettingsDrawer() {
 }
 ```
 
-### 3.3 Header Integration Update
+### 3.3 Trading Section (`src/components/settings/trading_section.tsx`)
+
+```typescript
+import { trading_settings, update_settings } from '@/stores/settings_store';
+import { SLIPPAGE_OPTIONS } from '@/services/settings/settings.constants';
+import type { TradingSettings } from '@/types/settings.types';
+
+export function TradingSection() {
+    const settings = trading_settings.value;
+
+    function handle_size_change(index: number, value: string): void {
+        const num_value = parseInt(value, 10);
+        if (isNaN(num_value) || num_value < 0) return;
+
+        const new_sizes = [...settings.sizes] as [number, number, number, number];
+        new_sizes[index] = num_value;
+        update_settings('trading', { sizes: new_sizes });
+    }
+
+    function handle_toggle(key: keyof TradingSettings, value: boolean): void {
+        update_settings('trading', { [key]: value });
+    }
+
+    function handle_number_change(key: keyof TradingSettings, value: string): void {
+        const num_value = parseFloat(value);
+        if (isNaN(num_value)) return;
+        update_settings('trading', { [key]: num_value });
+    }
+
+    return (
+        <div class="space-y-4 pt-2">
+            <div>
+                <label class="text-xs text-base-content/60 mb-2 block">POSITION SIZES (USDT)</label>
+                <div class="grid grid-cols-4 gap-2">
+                    {settings.sizes.map((size, index) => (
+                        <input
+                            key={index}
+                            type="number"
+                            class="input input-sm input-bordered w-full text-xs"
+                            value={size}
+                            onInput={(e) => handle_size_change(index, (e.target as HTMLInputElement).value)}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <label class="text-xs text-base-content/60 mb-1 block">SLIPPAGE</label>
+                <select
+                    class="select select-sm select-bordered w-full text-xs"
+                    value={settings.slippage}
+                    onChange={(e) => {
+                        const value = (e.target as HTMLSelectElement).value;
+                        update_settings('trading', {
+                            slippage: value === 'MARKET' ? 'MARKET' : parseInt(value, 10),
+                        });
+                    }}
+                >
+                    {SLIPPAGE_OPTIONS.map(({ value, label }) => (
+                        <option key={value} value={value}>{label}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div class="divider text-xs">AUTO TAKE PROFIT</div>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Enable Auto TP</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm toggle-primary"
+                    checked={settings.auto_tp_enabled}
+                    onChange={(e) => handle_toggle('auto_tp_enabled', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            {settings.auto_tp_enabled && (
+                <>
+                    <div class="flex items-center gap-2">
+                        <input
+                            type="number"
+                            class="input input-sm input-bordered flex-1 text-xs"
+                            value={settings.auto_tp_value}
+                            onInput={(e) => handle_number_change('auto_tp_value', (e.target as HTMLInputElement).value)}
+                        />
+                        <span class="text-xs text-base-content/60">%</span>
+                    </div>
+
+                    <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-xs">Use Limit Orders</span>
+                        <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            checked={settings.auto_tp_limit}
+                            onChange={(e) => handle_toggle('auto_tp_limit', (e.target as HTMLInputElement).checked)}
+                        />
+                    </label>
+                </>
+            )}
+
+            <div class="divider text-xs">AUTO STOP LOSS</div>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Enable Auto SL</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm toggle-primary"
+                    checked={settings.auto_sl_enabled}
+                    onChange={(e) => handle_toggle('auto_sl_enabled', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            {settings.auto_sl_enabled && (
+                <div class="flex items-center gap-2">
+                    <input
+                        type="number"
+                        class="input input-sm input-bordered flex-1 text-xs"
+                        value={settings.auto_sl_value}
+                        onInput={(e) => handle_number_change('auto_sl_value', (e.target as HTMLInputElement).value)}
+                    />
+                    <span class="text-xs text-base-content/60">%</span>
+                </div>
+            )}
+
+            <div class="divider" />
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Unique Coin Shortcuts</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={settings.unique_shortcuts}
+                    onChange={(e) => handle_toggle('unique_shortcuts', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+        </div>
+    );
+}
+```
+
+### 3.4 Terminal Section (`src/components/settings/terminal_section.tsx`)
+
+```typescript
+import { terminal_settings, update_settings } from '@/stores/settings_store';
+import { NOTIFICATION_FILTER_OPTIONS } from '@/services/settings/settings.constants';
+import type { TerminalSettings } from '@/types/settings.types';
+
+export function TerminalSection() {
+    const settings = terminal_settings.value;
+
+    function handle_toggle(key: keyof TerminalSettings, value: boolean): void {
+        update_settings('terminal', { [key]: value });
+    }
+
+    return (
+        <div class="space-y-4 pt-2">
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Auto Login</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm toggle-primary"
+                    checked={settings.auto_login}
+                    onChange={(e) => handle_toggle('auto_login', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Push Notifications</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm toggle-primary"
+                    checked={settings.push_notifications}
+                    onChange={(e) => handle_toggle('push_notifications', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            {settings.push_notifications && (
+                <div>
+                    <label class="text-xs text-base-content/60 mb-1 block">NOTIFICATION FILTER</label>
+                    <select
+                        class="select select-sm select-bordered w-full text-xs"
+                        value={settings.notification_filter}
+                        onChange={(e) => update_settings('terminal', {
+                            notification_filter: (e.target as HTMLSelectElement).value as TerminalSettings['notification_filter'],
+                        })}
+                    >
+                        {NOTIFICATION_FILTER_OPTIONS.map(({ value, label }) => (
+                            <option key={value} value={value}>{label}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            <div class="divider text-xs">MEDIA</div>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Full Size Media</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={settings.full_size_media}
+                    onChange={(e) => handle_toggle('full_size_media', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Disable Media</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={settings.disable_media}
+                    onChange={(e) => handle_toggle('disable_media', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            <div class="divider text-xs">BEHAVIOR</div>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Freeze Feed on Hover</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={settings.freeze_on_hover}
+                    onChange={(e) => handle_toggle('freeze_on_hover', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Share Trades in Chat</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={settings.share_trades}
+                    onChange={(e) => handle_toggle('share_trades', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Show Dollar Profit on PnL</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={settings.show_profit}
+                    onChange={(e) => handle_toggle('show_profit', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+        </div>
+    );
+}
+```
+
+### 3.5 Chart Section (`src/components/settings/chart_section.tsx`)
+
+```typescript
+import { chart_settings, update_settings } from '@/stores/settings_store';
+import { TIMEFRAME_OPTIONS } from '@/services/settings/settings.constants';
+
+export function ChartSection() {
+    const settings = chart_settings.value;
+
+    return (
+        <div class="space-y-4 pt-2">
+            <div>
+                <label class="text-xs text-base-content/60 mb-1 block">DEFAULT TIMEFRAME</label>
+                <select
+                    class="select select-sm select-bordered w-full text-xs"
+                    value={settings.default_timeframe}
+                    onChange={(e) => update_settings('chart', {
+                        default_timeframe: (e.target as HTMLSelectElement).value,
+                    })}
+                >
+                    {TIMEFRAME_OPTIONS.map(({ value, label }) => (
+                        <option key={value} value={value}>{label}</option>
+                    ))}
+                </select>
+            </div>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Show Order History</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm toggle-primary"
+                    checked={settings.order_history}
+                    onChange={(e) => update_settings('chart', {
+                        order_history: (e.target as HTMLInputElement).checked,
+                    })}
+                />
+            </label>
+
+            <div class="divider text-xs">CANDLE COLORS</div>
+
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <label class="text-xs text-base-content/60 mb-1 block">UP CANDLE</label>
+                    <input
+                        type="color"
+                        class="w-full h-8 rounded cursor-pointer"
+                        value={settings.up_candle_color}
+                        onInput={(e) => update_settings('chart', {
+                            up_candle_color: (e.target as HTMLInputElement).value,
+                        })}
+                    />
+                </div>
+                <div class="flex-1">
+                    <label class="text-xs text-base-content/60 mb-1 block">DOWN CANDLE</label>
+                    <input
+                        type="color"
+                        class="w-full h-8 rounded cursor-pointer"
+                        value={settings.down_candle_color}
+                        onInput={(e) => update_settings('chart', {
+                            down_candle_color: (e.target as HTMLInputElement).value,
+                        })}
+                    />
+                </div>
+            </div>
+
+            <div class="divider text-xs">FAVORITE TICKERS</div>
+
+            <div class="text-xs text-base-content/60">
+                {settings.favorite_tickers.length === 0 ? (
+                    <span>No favorite tickers. Add tickers from the chart header.</span>
+                ) : (
+                    <div class="flex flex-wrap gap-1">
+                        {settings.favorite_tickers.map((ticker) => (
+                            <span key={ticker} class="badge badge-sm">{ticker}</span>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+```
+
+### 3.6 News Section (`src/components/settings/news_section.tsx`)
+
+```typescript
+import { news_display_settings, news_provider_settings, update_settings } from '@/stores/settings_store';
+import { news_provider_credentials, update_news_provider_key } from '@/stores/credentials_store';
+
+export function NewsSection() {
+    const display = news_display_settings.value;
+    const providers = news_provider_settings.value;
+    const credentials = news_provider_credentials.value;
+
+    return (
+        <div class="space-y-4 pt-2">
+            <div class="divider text-xs m-0">PROVIDERS</div>
+
+            <div class="space-y-3">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs">Phoenix News</span>
+                        <input
+                            type="checkbox"
+                            class="toggle toggle-sm toggle-primary"
+                            checked={providers.phoenix_enabled}
+                            onChange={(e) => update_settings('news_providers', {
+                                phoenix_enabled: (e.target as HTMLInputElement).checked,
+                            })}
+                        />
+                    </div>
+                    {providers.phoenix_enabled && (
+                        <input
+                            type="password"
+                            class="input input-sm input-bordered w-full text-xs"
+                            placeholder="API Key"
+                            value={credentials.phoenix_key}
+                            onInput={(e) => update_news_provider_key('phoenix_key', (e.target as HTMLInputElement).value)}
+                        />
+                    )}
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs">Tree of Alpha</span>
+                        <input
+                            type="checkbox"
+                            class="toggle toggle-sm toggle-primary"
+                            checked={providers.tree_enabled}
+                            onChange={(e) => update_settings('news_providers', {
+                                tree_enabled: (e.target as HTMLInputElement).checked,
+                            })}
+                        />
+                    </div>
+                    {providers.tree_enabled && (
+                        <input
+                            type="password"
+                            class="input input-sm input-bordered w-full text-xs"
+                            placeholder="API Key"
+                            value={credentials.tree_key}
+                            onInput={(e) => update_news_provider_key('tree_key', (e.target as HTMLInputElement).value)}
+                        />
+                    )}
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs">Synoptic</span>
+                        <input
+                            type="checkbox"
+                            class="toggle toggle-sm toggle-primary"
+                            checked={providers.synoptic_enabled}
+                            onChange={(e) => update_settings('news_providers', {
+                                synoptic_enabled: (e.target as HTMLInputElement).checked,
+                            })}
+                        />
+                    </div>
+                    {providers.synoptic_enabled && (
+                        <input
+                            type="password"
+                            class="input input-sm input-bordered w-full text-xs"
+                            placeholder="API Key"
+                            value={credentials.synoptic_key}
+                            onInput={(e) => update_news_provider_key('synoptic_key', (e.target as HTMLInputElement).value)}
+                        />
+                    )}
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs">Groq AI (Sentiment)</span>
+                        <input
+                            type="checkbox"
+                            class="toggle toggle-sm toggle-primary"
+                            checked={providers.groq_enabled}
+                            onChange={(e) => update_settings('news_providers', {
+                                groq_enabled: (e.target as HTMLInputElement).checked,
+                            })}
+                        />
+                    </div>
+                    {providers.groq_enabled && (
+                        <input
+                            type="password"
+                            class="input input-sm input-bordered w-full text-xs"
+                            placeholder="API Key"
+                            value={credentials.groq_key}
+                            onInput={(e) => update_news_provider_key('groq_key', (e.target as HTMLInputElement).value)}
+                        />
+                    )}
+                </div>
+            </div>
+
+            <div class="divider text-xs">DISPLAY</div>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Deduplicator</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={display.deduplicator}
+                    onChange={(e) => update_settings('news_display', {
+                        deduplicator: (e.target as HTMLInputElement).checked,
+                    })}
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Text Shortener</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={display.text_shortener}
+                    onChange={(e) => update_settings('news_display', {
+                        text_shortener: (e.target as HTMLInputElement).checked,
+                    })}
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Directional Highlighting</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={display.directional_highlight}
+                    onChange={(e) => update_settings('news_display', {
+                        directional_highlight: (e.target as HTMLInputElement).checked,
+                    })}
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Hide Tickerless News</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm"
+                    checked={display.hide_tickerless}
+                    onChange={(e) => update_settings('news_display', {
+                        hide_tickerless: (e.target as HTMLInputElement).checked,
+                    })}
+                />
+            </label>
+
+            <div>
+                <label class="text-xs text-base-content/60 mb-1 block">FONT SIZE (px)</label>
+                <input
+                    type="number"
+                    class="input input-sm input-bordered w-full text-xs"
+                    value={display.font_size}
+                    min={8}
+                    max={24}
+                    onInput={(e) => update_settings('news_display', {
+                        font_size: parseInt((e.target as HTMLInputElement).value, 10) || 12,
+                    })}
+                />
+            </div>
+
+            <div>
+                <label class="text-xs text-base-content/60 mb-1 block">HISTORY LIMIT</label>
+                <input
+                    type="number"
+                    class="input input-sm input-bordered w-full text-xs"
+                    value={display.history_limit}
+                    min={10}
+                    max={500}
+                    onInput={(e) => update_settings('news_display', {
+                        history_limit: parseInt((e.target as HTMLInputElement).value, 10) || 100,
+                    })}
+                />
+            </div>
+        </div>
+    );
+}
+```
+
+### 3.7 Keyword Section (`src/components/settings/keyword_section.tsx`)
+
+```typescript
+import { useState } from 'preact/hooks';
+import { keyword_settings, update_settings } from '@/stores/settings_store';
+import type { KeywordSettings } from '@/types/settings.types';
+
+type KeywordListType = 'blacklisted_words' | 'blacklisted_coins' | 'critical_words' | 'special_words' | 'blacklisted_sources';
+
+const KEYWORD_LISTS: { key: KeywordListType; label: string; placeholder: string }[] = [
+    { key: 'blacklisted_words', label: 'Blacklisted Words', placeholder: 'Add word to hide...' },
+    { key: 'blacklisted_coins', label: 'Blacklisted Coins', placeholder: 'Add coin to hide...' },
+    { key: 'critical_words', label: 'Critical Words', placeholder: 'Add critical keyword...' },
+    { key: 'special_words', label: 'Special Alert Words', placeholder: 'Add special keyword...' },
+    { key: 'blacklisted_sources', label: 'Blacklisted Sources', placeholder: 'Add source to hide...' },
+];
+
+export function KeywordSection() {
+    const settings = keyword_settings.value;
+    const [active_list, set_active_list] = useState<KeywordListType>('blacklisted_words');
+    const [input_value, set_input_value] = useState('');
+
+    function handle_add(): void {
+        const trimmed = input_value.trim();
+        if (!trimmed) return;
+
+        const current_list = settings[active_list];
+        if (current_list.includes(trimmed)) {
+            set_input_value('');
+            return;
+        }
+
+        update_settings('keywords', {
+            [active_list]: [...current_list, trimmed],
+        });
+        set_input_value('');
+    }
+
+    function handle_remove(list_key: KeywordListType, item: string): void {
+        update_settings('keywords', {
+            [list_key]: settings[list_key].filter((i) => i !== item),
+        });
+    }
+
+    function handle_keydown(e: KeyboardEvent): void {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handle_add();
+        }
+    }
+
+    const current_config = KEYWORD_LISTS.find((l) => l.key === active_list);
+    const current_items = settings[active_list];
+
+    return (
+        <div class="space-y-4 pt-2">
+            <div class="tabs tabs-boxed bg-base-300">
+                {KEYWORD_LISTS.map(({ key, label }) => (
+                    <button
+                        key={key}
+                        class={`tab tab-xs flex-1 ${active_list === key ? 'tab-active' : ''}`}
+                        onClick={() => set_active_list(key)}
+                    >
+                        {label.split(' ')[0]}
+                    </button>
+                ))}
+            </div>
+
+            <div class="flex gap-2">
+                <input
+                    type="text"
+                    class="input input-sm input-bordered flex-1 text-xs"
+                    placeholder={current_config?.placeholder}
+                    value={input_value}
+                    onInput={(e) => set_input_value((e.target as HTMLInputElement).value)}
+                    onKeyDown={handle_keydown}
+                />
+                <button class="btn btn-sm btn-primary" onClick={handle_add}>
+                    Add
+                </button>
+            </div>
+
+            <div class="max-h-40 overflow-y-auto">
+                {current_items.length === 0 ? (
+                    <div class="text-xs text-base-content/40 text-center py-4">
+                        No items in this list
+                    </div>
+                ) : (
+                    <div class="flex flex-wrap gap-1">
+                        {current_items.map((item) => (
+                            <span key={item} class="badge badge-sm gap-1">
+                                {item}
+                                <button
+                                    class="text-base-content/40 hover:text-error"
+                                    onClick={() => handle_remove(active_list, item)}
+                                >
+                                    ×
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+```
+
+### 3.8 Shortcuts Section (`src/components/settings/shortcuts_section.tsx`)
+
+```typescript
+import { shortcut_settings, update_settings } from '@/stores/settings_store';
+import type { ShortcutBinding } from '@/types/settings.types';
+
+const MODIFIER_OPTIONS = ['NONE', 'CTRL', 'SHIFT'] as const;
+
+export function ShortcutsSection() {
+    const settings = shortcut_settings.value;
+
+    function update_nuke_all(updates: Partial<ShortcutBinding>): void {
+        update_settings('shortcuts', {
+            nuke_all: { ...settings.nuke_all, ...updates },
+        });
+    }
+
+    return (
+        <div class="space-y-4 pt-2">
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs">Disable All Shortcuts</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm toggle-error"
+                    checked={settings.disabled}
+                    onChange={(e) => update_settings('shortcuts', {
+                        disabled: (e.target as HTMLInputElement).checked,
+                    })}
+                />
+            </label>
+
+            {!settings.disabled && (
+                <>
+                    <div class="divider text-xs">NUKE ALL SHORTCUT</div>
+
+                    <div class="space-y-2">
+                        <div class="flex gap-2">
+                            <select
+                                class="select select-sm select-bordered flex-1 text-xs"
+                                value={settings.nuke_all.modifier1}
+                                onChange={(e) => update_nuke_all({
+                                    modifier1: (e.target as HTMLSelectElement).value as ShortcutBinding['modifier1'],
+                                })}
+                            >
+                                {MODIFIER_OPTIONS.map((mod) => (
+                                    <option key={mod} value={mod}>{mod}</option>
+                                ))}
+                            </select>
+
+                            <span class="text-xs self-center">+</span>
+
+                            <select
+                                class="select select-sm select-bordered flex-1 text-xs"
+                                value={settings.nuke_all.modifier2}
+                                onChange={(e) => update_nuke_all({
+                                    modifier2: (e.target as HTMLSelectElement).value as ShortcutBinding['modifier2'],
+                                })}
+                            >
+                                {MODIFIER_OPTIONS.map((mod) => (
+                                    <option key={mod} value={mod}>{mod}</option>
+                                ))}
+                            </select>
+
+                            <span class="text-xs self-center">+</span>
+
+                            <input
+                                type="text"
+                                class="input input-sm input-bordered w-16 text-xs text-center uppercase"
+                                maxLength={1}
+                                value={settings.nuke_all.key}
+                                onInput={(e) => update_nuke_all({
+                                    key: (e.target as HTMLInputElement).value.toUpperCase(),
+                                })}
+                            />
+                        </div>
+
+                        <div class="text-xs text-base-content/40 text-center">
+                            Current: {settings.nuke_all.modifier1 !== 'NONE' ? settings.nuke_all.modifier1 + ' + ' : ''}
+                            {settings.nuke_all.modifier2 !== 'NONE' ? settings.nuke_all.modifier2 + ' + ' : ''}
+                            {settings.nuke_all.key}
+                        </div>
+                    </div>
+
+                    <div class="divider text-xs">CUSTOM SHORTCUTS</div>
+
+                    <div class="text-xs text-base-content/40 text-center py-2">
+                        Custom shortcuts can be configured per-coin from the trading interface.
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+```
+
+### 3.9 Botting Section (`src/components/settings/botting_section.tsx`)
+
+```typescript
+import { botting_settings, update_settings } from '@/stores/settings_store';
+import { BOT_PROTECTION_TIMEFRAMES } from '@/services/settings/settings.constants';
+import type { BottingSettings } from '@/types/settings.types';
+
+export function BottingSection() {
+    const settings = botting_settings.value;
+
+    function handle_toggle(key: keyof BottingSettings, value: boolean): void {
+        update_settings('botting', { [key]: value });
+    }
+
+    function handle_number_change(key: keyof BottingSettings, value: string): void {
+        const num_value = parseFloat(value);
+        if (isNaN(num_value)) return;
+        update_settings('botting', { [key]: num_value });
+    }
+
+    return (
+        <div class="space-y-4 pt-2">
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs font-medium">Enable Bot Mode</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-sm toggle-primary"
+                    checked={settings.enabled}
+                    onChange={(e) => handle_toggle('enabled', (e.target as HTMLInputElement).checked)}
+                />
+            </label>
+
+            {settings.enabled && (
+                <>
+                    <div>
+                        <label class="text-xs text-base-content/60 mb-1 block">COOLDOWN (hours)</label>
+                        <input
+                            type="number"
+                            class="input input-sm input-bordered w-full text-xs"
+                            value={settings.cooldown_hours}
+                            min={0}
+                            max={24}
+                            onInput={(e) => handle_number_change('cooldown_hours', (e.target as HTMLInputElement).value)}
+                        />
+                    </div>
+
+                    <div class="divider text-xs">NOTIFICATIONS</div>
+
+                    <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-xs">Mobile Notifications (NTFY)</span>
+                        <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            checked={settings.mobile_notification_enabled}
+                            onChange={(e) => handle_toggle('mobile_notification_enabled', (e.target as HTMLInputElement).checked)}
+                        />
+                    </label>
+
+                    {settings.mobile_notification_enabled && (
+                        <input
+                            type="text"
+                            class="input input-sm input-bordered w-full text-xs"
+                            placeholder="NTFY Topic Name"
+                            value={settings.ntfy_topic}
+                            onInput={(e) => update_settings('botting', {
+                                ntfy_topic: (e.target as HTMLInputElement).value,
+                            })}
+                        />
+                    )}
+
+                    <div class="divider text-xs">AUTO-PAUSE PROTECTION</div>
+
+                    <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-xs">Enable Auto-Pause</span>
+                        <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            checked={settings.auto_pause_enabled}
+                            onChange={(e) => handle_toggle('auto_pause_enabled', (e.target as HTMLInputElement).checked)}
+                        />
+                    </label>
+
+                    {settings.auto_pause_enabled && (
+                        <>
+                            <div>
+                                <label class="text-xs text-base-content/60 mb-1 block">TIMEFRAME</label>
+                                <select
+                                    class="select select-sm select-bordered w-full text-xs"
+                                    value={settings.auto_pause_timeframe}
+                                    onChange={(e) => update_settings('botting', {
+                                        auto_pause_timeframe: (e.target as HTMLSelectElement).value,
+                                    })}
+                                >
+                                    {BOT_PROTECTION_TIMEFRAMES.map(({ value, label }) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="text-xs text-base-content/60 mb-1 block">LOSS THRESHOLD (%)</label>
+                                <input
+                                    type="number"
+                                    class="input input-sm input-bordered w-full text-xs"
+                                    value={settings.auto_pause_threshold}
+                                    min={1}
+                                    max={100}
+                                    onInput={(e) => handle_number_change('auto_pause_threshold', (e.target as HTMLInputElement).value)}
+                                />
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
+        </div>
+    );
+}
+```
+
+### 3.10 Backup Section (`src/components/settings/backup_section.tsx`)
+
+```typescript
+import { useRef, useState } from 'preact/hooks';
+import { export_settings_backup, import_settings_backup, wipe_settings, reset_settings } from '@/stores/settings_store';
+import { clear_credentials } from '@/stores/credentials_store';
+
+export function BackupSection() {
+    const file_input_ref = useRef<HTMLInputElement>(null);
+    const [importing, set_importing] = useState(false);
+    const [confirm_wipe, set_confirm_wipe] = useState(false);
+
+    async function handle_import(e: Event): Promise<void> {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        set_importing(true);
+        const success = await import_settings_backup(file);
+        set_importing(false);
+
+        if (success) {
+            alert('Settings imported successfully');
+        } else {
+            alert('Failed to import settings. Invalid file format.');
+        }
+
+        if (file_input_ref.current) {
+            file_input_ref.current.value = '';
+        }
+    }
+
+    function handle_wipe(): void {
+        if (!confirm_wipe) {
+            set_confirm_wipe(true);
+            return;
+        }
+
+        wipe_settings();
+        clear_credentials();
+        set_confirm_wipe(false);
+        alert('All settings and credentials have been wiped.');
+    }
+
+    return (
+        <div class="space-y-4 pt-2">
+            <div class="divider text-xs m-0">BACKUP</div>
+
+            <button
+                class="btn btn-sm btn-outline w-full text-xs"
+                onClick={export_settings_backup}
+            >
+                Export Settings Backup
+            </button>
+
+            <div>
+                <input
+                    ref={file_input_ref}
+                    type="file"
+                    accept=".json"
+                    class="hidden"
+                    onChange={handle_import}
+                />
+                <button
+                    class="btn btn-sm btn-outline w-full text-xs"
+                    onClick={() => file_input_ref.current?.click()}
+                    disabled={importing}
+                >
+                    {importing ? 'Importing...' : 'Import Settings Backup'}
+                </button>
+            </div>
+
+            <div class="divider text-xs">RESET</div>
+
+            <button
+                class="btn btn-sm btn-outline btn-warning w-full text-xs"
+                onClick={reset_settings}
+            >
+                Reset to Defaults
+            </button>
+
+            <div class="divider text-xs">DANGER ZONE</div>
+
+            <button
+                class={`btn btn-sm w-full text-xs ${confirm_wipe ? 'btn-error' : 'btn-outline btn-error'}`}
+                onClick={handle_wipe}
+            >
+                {confirm_wipe ? 'Click Again to Confirm Wipe' : 'Wipe All Data'}
+            </button>
+
+            {confirm_wipe && (
+                <div class="text-xs text-error text-center">
+                    This will delete all settings AND credentials. This cannot be undone.
+                    <button
+                        class="block mx-auto mt-1 text-base-content/40 hover:text-base-content"
+                        onClick={() => set_confirm_wipe(false)}
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+```
+
+### 3.11 Header Integration Update
 
 Update `header.tsx` to use the settings store:
 
@@ -1561,3 +2644,291 @@ export async function initialize_layouts(): Promise<void> {
 | Layout Sync | No server sync | Server sync with merge |
 | Visual Feedback | None | Icon turns red when connected |
 | API Validation | None | Test connection before saving |
+
+---
+
+## Appendix: Component Best Practices Review
+
+Based on analysis of current v2 components (`blocks_menu.tsx`, `rig_selector.tsx`, `chart_block.tsx`, `chart_toolbar.tsx`, `trading.tsx`), the following best practices should be applied throughout the codebase.
+
+### Current Issues Identified
+
+1. **Duplicated Logic** - Click outside and Escape key handlers are repeated in multiple components
+2. **Large Components** - `chart_toolbar.tsx` (467 lines) handles too many concerns: filtering, sorting, virtual scrolling, localStorage
+3. **Inline SVG Icons** - SVG icons defined inline in component constants
+4. **Mixed Concerns** - Some components mix UI rendering with business logic and data transformation
+
+### Recommended Patterns
+
+#### 1. Extract Reusable Custom Hooks
+
+Create `src/hooks/` directory for shared hooks:
+
+```typescript
+// src/hooks/use_click_outside.ts
+import { useEffect, RefObject } from 'preact/hooks';
+
+export function use_click_outside(
+    ref: RefObject<HTMLElement>,
+    handler: () => void
+): void {
+    useEffect(() => {
+        const handle_click = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                handler();
+            }
+        };
+        document.addEventListener('mousedown', handle_click);
+        return () => document.removeEventListener('mousedown', handle_click);
+    }, [ref, handler]);
+}
+```
+
+```typescript
+// src/hooks/use_escape_key.ts
+import { useEffect } from 'preact/hooks';
+
+export function use_escape_key(handler: () => void): void {
+    useEffect(() => {
+        const handle_keydown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') handler();
+        };
+        window.addEventListener('keydown', handle_keydown);
+        return () => window.removeEventListener('keydown', handle_keydown);
+    }, [handler]);
+}
+```
+
+```typescript
+// src/hooks/use_local_storage.ts
+import { useState, useCallback } from 'preact/hooks';
+
+export function use_local_storage<T>(
+    key: string,
+    initial_value: T
+): [T, (value: T) => void] {
+    const [stored_value, set_stored_value] = useState<T>(() => {
+        try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : initial_value;
+        } catch {
+            return initial_value;
+        }
+    });
+
+    const set_value = useCallback((value: T) => {
+        set_stored_value(value);
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch {}
+    }, [key]);
+
+    return [stored_value, set_value];
+}
+```
+
+#### 2. Extract Dropdown/Popup Pattern
+
+Create a reusable dropdown component:
+
+```typescript
+// src/components/common/dropdown.tsx
+import { useRef, ComponentChildren } from 'preact';
+import { use_click_outside } from '@/hooks/use_click_outside';
+import { use_escape_key } from '@/hooks/use_escape_key';
+
+interface DropdownProps {
+    is_open: boolean;
+    on_close: () => void;
+    position?: 'left' | 'right';
+    children: ComponentChildren;
+}
+
+export function Dropdown({ is_open, on_close, position = 'right', children }: DropdownProps) {
+    const ref = useRef<HTMLDivElement>(null);
+
+    use_click_outside(ref, on_close);
+    use_escape_key(on_close);
+
+    if (!is_open) return null;
+
+    return (
+        <div
+            ref={ref}
+            class={`absolute top-full ${position === 'left' ? 'left-0' : 'right-0'} mt-1 bg-base-100 rounded shadow-lg z-50`}
+        >
+            {children}
+        </div>
+    );
+}
+```
+
+#### 3. Move Non-UI Logic to Services/Utils
+
+For `chart_toolbar.tsx`, extract filtering and sorting:
+
+```typescript
+// src/services/symbol/symbol_filter.ts
+import type { ExchangeId } from '@/types/credentials.types';
+
+export interface SymbolWithExchange {
+    exchange: ExchangeId;
+    symbol: string;
+}
+
+export type FilterType = 'all' | 'favourites' | ExchangeId;
+export type SortField = 'symbol' | 'price' | 'change' | 'volume';
+export type SortDirection = 'asc' | 'desc';
+
+export function filter_symbols(
+    symbols: SymbolWithExchange[],
+    filter: FilterType,
+    favourites: SymbolWithExchange[],
+    search: string
+): SymbolWithExchange[] {
+    let result = symbols;
+
+    if (filter === 'favourites') {
+        result = result.filter((s) =>
+            favourites.some((f) => f.exchange === s.exchange && f.symbol === s.symbol)
+        );
+    } else if (filter !== 'all') {
+        result = result.filter((s) => s.exchange === filter);
+    }
+
+    if (search) {
+        const lower = search.toLowerCase();
+        result = result.filter((s) => s.symbol.toLowerCase().includes(lower));
+    }
+
+    return result;
+}
+
+export function sort_symbols(
+    symbols: SymbolWithExchange[],
+    field: SortField,
+    direction: SortDirection,
+    get_ticker: (ex: ExchangeId, symbol: string) => { last_price?: number; price_24h?: number; volume_24h?: number } | null
+): SymbolWithExchange[] {
+    return [...symbols].sort((a, b) => {
+        let cmp = 0;
+        if (field === 'symbol') {
+            cmp = a.symbol.localeCompare(b.symbol);
+        } else {
+            const ta = get_ticker(a.exchange, a.symbol);
+            const tb = get_ticker(b.exchange, b.symbol);
+            if (field === 'price') {
+                cmp = (ta?.last_price ?? 0) - (tb?.last_price ?? 0);
+            } else if (field === 'change') {
+                const ca = ta?.price_24h ? ((ta.last_price! - ta.price_24h) / ta.price_24h) * 100 : 0;
+                const cb = tb?.price_24h ? ((tb.last_price! - tb.price_24h) / tb.price_24h) * 100 : 0;
+                cmp = ca - cb;
+            } else if (field === 'volume') {
+                cmp = (ta?.volume_24h ?? 0) - (tb?.volume_24h ?? 0);
+            }
+        }
+        return direction === 'asc' ? cmp : -cmp;
+    });
+}
+```
+
+#### 4. Extract Virtual List Component
+
+```typescript
+// src/components/common/virtual_list.tsx
+import { useRef, useMemo, useCallback, ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
+
+interface VirtualListProps<T> {
+    items: T[];
+    item_height: number;
+    container_height: number;
+    overscan?: number;
+    render_item: (item: T, index: number) => ComponentChildren;
+}
+
+export function VirtualList<T>({
+    items,
+    item_height,
+    container_height,
+    overscan = 5,
+    render_item,
+}: VirtualListProps<T>) {
+    const [scroll_top, set_scroll_top] = useState(0);
+    const scroll_ref = useRef<HTMLDivElement>(null);
+
+    const total_height = items.length * item_height;
+
+    const { visible_items, top_offset } = useMemo(() => {
+        const start_index = Math.max(0, Math.floor(scroll_top / item_height) - overscan);
+        const end_index = Math.min(
+            items.length,
+            Math.ceil((scroll_top + container_height) / item_height) + overscan
+        );
+        return {
+            visible_items: items.slice(start_index, end_index).map((item, i) => ({
+                item,
+                index: start_index + i,
+            })),
+            top_offset: start_index * item_height,
+        };
+    }, [items, item_height, container_height, scroll_top, overscan]);
+
+    const handle_scroll = useCallback((e: Event) => {
+        set_scroll_top((e.target as HTMLDivElement).scrollTop);
+    }, []);
+
+    return (
+        <div
+            ref={scroll_ref}
+            class="overflow-y-auto"
+            style={{ height: `${container_height}px` }}
+            onScroll={handle_scroll}
+        >
+            <div style={{ height: `${total_height}px`, position: 'relative' }}>
+                <div style={{ transform: `translateY(${top_offset}px)` }}>
+                    {visible_items.map(({ item, index }) => render_item(item, index))}
+                </div>
+            </div>
+        </div>
+    );
+}
+```
+
+### Component Size Guidelines
+
+| Component Type | Max Lines | If Exceeded |
+|----------------|-----------|-------------|
+| Simple UI component | ~100 | Fine as is |
+| Complex component | ~200 | Consider extraction |
+| Feature component | ~300 | Must extract hooks/utils |
+| Page component | ~200 | Keep rendering only |
+
+### Folder Structure for Larger Features
+
+For complex features like the symbol selector:
+
+```
+src/components/chart/
+├── symbol_selector/
+│   ├── index.ts              # Re-exports
+│   ├── symbol_selector.tsx   # Main component (~150 lines)
+│   ├── symbol_list.tsx       # Virtual list rendering
+│   ├── symbol_filters.tsx    # Filter tabs/buttons
+│   └── use_symbol_filter.ts  # Filter/sort hook
+├── chart_toolbar.tsx         # Now ~150 lines
+└── trading_chart.tsx
+```
+
+### Applying to Settings Components
+
+The settings section components in this plan follow best practices:
+- Each section is ~100-130 lines
+- They use store functions directly (no inline business logic)
+- Event handlers are simple one-liners or extracted functions
+- No duplicated patterns (hooks will be shared)
+
+When implementing, ensure:
+1. Use `use_click_outside` and `use_escape_key` hooks for exchange panel
+2. Extract settings drawer accordion as reusable component if needed elsewhere
+3. Keep section components focused on form rendering only

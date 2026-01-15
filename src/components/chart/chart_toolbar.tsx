@@ -257,7 +257,7 @@ export function ChartToolbar({
                 <button
                     type="button"
                     onClick={() => set_symbol_open(!symbol_open)}
-                    class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-base-200 hover:bg-base-300 text-base-content transition-colors font-medium min-w-[120px] text-left"
+                    class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-base-200 hover:bg-base-300 text-base-content transition-colors font-medium min-w-30 text-left"
                 >
                     {loading ? (
                         'Loading...'
@@ -276,7 +276,7 @@ export function ChartToolbar({
                             class="fixed inset-0 z-40 no-drag cursor-default"
                             onClick={() => set_symbol_open(false)}
                         />
-                        <div class="absolute top-full left-0 mt-1 bg-base-200 rounded shadow-lg z-50 w-[388px] no-drag cursor-default">
+                        <div class="absolute top-full left-0 mt-1 bg-base-200 rounded shadow-lg z-50 w-97 no-drag cursor-default">
                             <div class="p-1">
                                 <input
                                     type="text"
@@ -329,11 +329,11 @@ export function ChartToolbar({
                                 </div>
                             </div>
                             <div class="flex items-center px-2 py-1 text-xs text-base-content/50 border-t border-base-300">
-                                <span class="w-4 mr-2 flex-shrink-0" />
+                                <span class="w-4 mr-2 shrink-0" />
                                 <button
                                     type="button"
                                     onClick={() => toggle_sort('symbol')}
-                                    class="w-32 text-left hover:text-base-content transition-colors flex-shrink-0"
+                                    class="w-32 text-left hover:text-base-content transition-colors shrink-0"
                                 >
                                     Symbol{' '}
                                     {sort_field === 'symbol' &&
@@ -342,7 +342,7 @@ export function ChartToolbar({
                                 <button
                                     type="button"
                                     onClick={() => toggle_sort('price')}
-                                    class="w-20 text-right hover:text-base-content transition-colors flex-shrink-0"
+                                    class="w-20 text-right hover:text-base-content transition-colors shrink-0"
                                 >
                                     {sort_field === 'price' &&
                                         (sort_direction === 'asc' ? '↑' : '↓')}{' '}
@@ -351,7 +351,7 @@ export function ChartToolbar({
                                 <button
                                     type="button"
                                     onClick={() => toggle_sort('change')}
-                                    class="w-16 text-right hover:text-base-content transition-colors flex-shrink-0"
+                                    class="w-16 text-right hover:text-base-content transition-colors shrink-0"
                                 >
                                     {sort_field === 'change' &&
                                         (sort_direction === 'asc' ? '↑' : '↓')}{' '}
@@ -360,7 +360,7 @@ export function ChartToolbar({
                                 <button
                                     type="button"
                                     onClick={() => toggle_sort('volume')}
-                                    class="w-16 text-right hover:text-base-content transition-colors flex-shrink-0"
+                                    class="w-16 text-right hover:text-base-content transition-colors shrink-0"
                                 >
                                     {sort_field === 'volume' &&
                                         (sort_direction === 'asc' ? '↑' : '↓')}{' '}
@@ -370,7 +370,7 @@ export function ChartToolbar({
                             <div class="relative">
                                 {visible_items.sticky_header && scroll_top >= HEADER_HEIGHT && (
                                     <div
-                                        class="absolute top-0 left-0 right-[15px] z-10 flex items-center gap-1.5 px-2 text-xs bg-base-300 text-base-content/70"
+                                        class="absolute top-0 left-0 right-3.75 z-10 flex items-center gap-1.5 px-2 text-xs bg-base-300 text-base-content/70"
                                         style={{ height: `${HEADER_HEIGHT}px` }}
                                     >
                                         {get_exchange_icon(visible_items.sticky_header.exchange)}
