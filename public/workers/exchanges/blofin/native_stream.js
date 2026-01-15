@@ -82,7 +82,7 @@ function connectBlofinStream() {
                 if (ticker.bidPrice) entry.best_bid = parseFloat(ticker.bidPrice);
                 if (ticker.askPrice) entry.best_ask = parseFloat(ticker.askPrice);
                 if (ticker.open24h) entry.price_24h = parseFloat(ticker.open24h);
-                if (ticker.vol24h) entry.volume_24h = parseFloat(ticker.vol24h);
+                if (ticker.volCurrency24h) entry.volume_24h = parseFloat(ticker.volCurrency24h) * lastPrice;
                 if (ticker.fundingRate) entry.funding_rate = parseFloat(ticker.fundingRate);
                 if (ticker.nextFundingTs)
                     entry.next_funding_time = parseInt(ticker.nextFundingTs, 10);
