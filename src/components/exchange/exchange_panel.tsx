@@ -342,7 +342,7 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                     type="button"
                     onClick={handle_test}
                     disabled={testing}
-                    class="w-full px-3 py-2 text-xs text-primary hover:bg-base-200 transition-colors disabled:opacity-50"
+                    class="w-full px-3 py-2 text-xs text-primary bg-base-200/50 hover:bg-base-200 transition-colors disabled:opacity-50"
                 >
                     {testing ? 'CONNECTING...' : 'CONNECT'}
                 </button>
