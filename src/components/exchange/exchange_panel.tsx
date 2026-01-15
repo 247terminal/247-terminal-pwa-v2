@@ -74,7 +74,7 @@ function HelpModal({ exchange_id, on_close }: HelpModalProps) {
     use_escape_key(on_close);
 
     return (
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-60">
             <div
                 ref={modal_ref}
                 class="bg-base-100 rounded-2xl shadow-2xl max-w-lg w-full mx-4 max-h-[85vh] overflow-hidden"
@@ -84,7 +84,7 @@ function HelpModal({ exchange_id, on_close }: HelpModalProps) {
                         <div class="text-primary">
                             {get_exchange_icon(exchange_id)}
                         </div>
-                        <span class="text-base font-semibold text-base-content">{exchange_name} Setup Guide</span>
+                        <span class="text-base font-semibold text-base-content">Setup Guide</span>
                     </div>
                     <button
                         type="button"
@@ -102,7 +102,7 @@ function HelpModal({ exchange_id, on_close }: HelpModalProps) {
                     <div class="space-y-3">
                         {steps.map((step, index) => (
                             <div key={index} class="flex items-baseline gap-3">
-                                <span class="flex-shrink-0 text-sm text-primary font-medium">
+                                <span class="shrink-0 text-sm text-primary font-medium">
                                     {index + 1}.
                                 </span>
                                 <p class="text-sm text-base-content/80 leading-relaxed">{step}</p>

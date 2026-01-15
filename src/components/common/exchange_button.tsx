@@ -16,9 +16,14 @@ export function ExchangeButton({ connected, is_selected, on_click, children }: E
 
     const selected_classes = is_selected ? 'bg-error/10' : '';
 
+    function handle_mousedown(e: MouseEvent): void {
+        e.stopPropagation();
+    }
+
     return (
         <button
             type="button"
+            onMouseDown={handle_mousedown}
             onClick={on_click}
             class={`${base_classes} ${state_classes} ${selected_classes}`}
         >
