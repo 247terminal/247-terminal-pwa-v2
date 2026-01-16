@@ -13,6 +13,8 @@ const blofinStreams = {
     fundingPingInterval: null,
     postUpdate: null,
     batchInterval: 200,
+    tickerBuffer: new Map(),
+    fundingBuffer: new Map(),
 };
 
 function startBlofinNativeStream(symbols, batchInterval, postUpdate) {
@@ -68,29 +70,9 @@ function connectBlofinStream() {
             if (!msg.data || !Array.isArray(msg.data)) return;
 
             for (const ticker of msg.data) {
-                const symbol = convertBlofinSymbol(ticker.instId);
-                if (!symbol) continue;
-
-                const lastPrice = parseFloat(ticker.last);
-                if (!lastPrice || lastPrice <= 0) continue;
-
-                let entry = blofinStreams.tickerData.get(symbol);
-                if (!entry) {
-                    entry = self.streamUtils.createTickerEntry(symbol);
-                    blofinStreams.tickerData.set(symbol, entry);
+                if (ticker.instId) {
+                    blofinStreams.tickerBuffer.set(ticker.instId, ticker);
                 }
-
-                entry.last_price = lastPrice;
-                if (ticker.bidPrice) entry.best_bid = parseFloat(ticker.bidPrice);
-                if (ticker.askPrice) entry.best_ask = parseFloat(ticker.askPrice);
-                if (ticker.open24h) entry.price_24h = parseFloat(ticker.open24h);
-                if (ticker.volCurrency24h)
-                    entry.volume_24h = parseFloat(ticker.volCurrency24h) * lastPrice;
-                if (ticker.fundingRate) entry.funding_rate = parseFloat(ticker.fundingRate);
-                if (ticker.nextFundingTs)
-                    entry.next_funding_time = parseInt(ticker.nextFundingTs, 10);
-
-                blofinStreams.pending.add(symbol);
             }
 
             scheduleBlofinFlush();
@@ -161,21 +143,8 @@ function connectBlofinFundingStream() {
             if (!msg.data || !Array.isArray(msg.data)) return;
 
             for (const funding of msg.data) {
-                const symbol = convertBlofinSymbol(funding.instId);
-                if (!symbol) continue;
-
-                let entry = blofinStreams.tickerData.get(symbol);
-                if (!entry) {
-                    entry = self.streamUtils.createTickerEntry(symbol);
-                    blofinStreams.tickerData.set(symbol, entry);
-                }
-
-                if (funding.fundingRate) entry.funding_rate = parseFloat(funding.fundingRate);
-                if (funding.fundingTime)
-                    entry.next_funding_time = parseInt(funding.fundingTime, 10);
-
-                if (entry.last_price > 0) {
-                    blofinStreams.pending.add(symbol);
+                if (funding.instId) {
+                    blofinStreams.fundingBuffer.set(funding.instId, funding);
                 }
             }
 
@@ -254,12 +223,57 @@ function scheduleBlofinReconnect() {
 }
 
 function scheduleBlofinFlush() {
-    if (blofinStreams.flushTimeout || blofinStreams.pending.size === 0) return;
+    if (blofinStreams.flushTimeout) return;
     blofinStreams.flushTimeout = setTimeout(flushBlofinBatch, blofinStreams.batchInterval);
 }
 
 function flushBlofinBatch() {
     blofinStreams.flushTimeout = null;
+
+    for (const ticker of blofinStreams.tickerBuffer.values()) {
+        const symbol = convertBlofinSymbol(ticker.instId);
+        if (!symbol) continue;
+
+        const lastPrice = parseFloat(ticker.last);
+        if (!lastPrice || lastPrice <= 0) continue;
+
+        let entry = blofinStreams.tickerData.get(symbol);
+        if (!entry) {
+            entry = self.streamUtils.createTickerEntry(symbol);
+            blofinStreams.tickerData.set(symbol, entry);
+        }
+
+        entry.last_price = lastPrice;
+        if (ticker.bidPrice) entry.best_bid = parseFloat(ticker.bidPrice);
+        if (ticker.askPrice) entry.best_ask = parseFloat(ticker.askPrice);
+        if (ticker.open24h) entry.price_24h = parseFloat(ticker.open24h);
+        if (ticker.volCurrency24h) entry.volume_24h = parseFloat(ticker.volCurrency24h) * lastPrice;
+        if (ticker.fundingRate) entry.funding_rate = parseFloat(ticker.fundingRate);
+        if (ticker.nextFundingTs) entry.next_funding_time = parseInt(ticker.nextFundingTs, 10);
+
+        blofinStreams.pending.add(symbol);
+    }
+    blofinStreams.tickerBuffer.clear();
+
+    for (const funding of blofinStreams.fundingBuffer.values()) {
+        const symbol = convertBlofinSymbol(funding.instId);
+        if (!symbol) continue;
+
+        let entry = blofinStreams.tickerData.get(symbol);
+        if (!entry) {
+            entry = self.streamUtils.createTickerEntry(symbol);
+            blofinStreams.tickerData.set(symbol, entry);
+        }
+
+        if (funding.fundingRate) entry.funding_rate = parseFloat(funding.fundingRate);
+        if (funding.fundingTime) entry.next_funding_time = parseInt(funding.fundingTime, 10);
+
+        if (entry.last_price > 0) {
+            blofinStreams.pending.add(symbol);
+        }
+    }
+    blofinStreams.fundingBuffer.clear();
+
     if (blofinStreams.pending.size === 0) return;
 
     const config = EXCHANGE_CONFIG.blofin;
@@ -316,6 +330,8 @@ function stopBlofinNativeStream() {
 
     blofinStreams.tickerData.clear();
     blofinStreams.pending.clear();
+    blofinStreams.tickerBuffer.clear();
+    blofinStreams.fundingBuffer.clear();
 
     self.streamUtils.safeClose(blofinStreams.ws);
     blofinStreams.ws = null;

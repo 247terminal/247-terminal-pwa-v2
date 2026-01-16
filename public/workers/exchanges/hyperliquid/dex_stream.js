@@ -12,6 +12,7 @@ const dexStreams = {
     reconnectTimeout: null,
     postUpdate: null,
     batchInterval: 200,
+    messageBuffer: [],
 };
 
 function startDexStream(exchangeId, exchange, isLinearSwap, batchInterval, postUpdate) {
@@ -84,18 +85,8 @@ function connectDexStream(wsUrl) {
 
     ws.onmessage = (event) => {
         if (dexStreams.state === 'disconnected') return;
-
-        try {
-            const msg = JSON.parse(event.data);
-
-            if (msg.channel === 'allMids') {
-                handleDexAllMids(msg.data);
-            } else if (msg.channel === 'allDexsAssetCtxs') {
-                handleDexAssetCtxs(msg.data);
-            }
-        } catch (e) {
-            console.error('hyperliquid dex parse error:', e.message);
-        }
+        dexStreams.messageBuffer.push(event.data);
+        scheduleDexFlush();
     };
 
     ws.onclose = (event) => {
@@ -137,8 +128,6 @@ function handleDexAllMids(data) {
 
         dexStreams.pending.add(symbol);
     }
-
-    scheduleDexFlush();
 }
 
 function handleDexAssetCtxs(data) {
@@ -194,8 +183,6 @@ function handleDexAssetCtxs(data) {
             }
         }
     }
-
-    scheduleDexFlush();
 }
 
 function startDexPing() {
@@ -228,12 +215,28 @@ function scheduleDexReconnect(wsUrl) {
 }
 
 function scheduleDexFlush() {
-    if (dexStreams.flushTimeout || dexStreams.pending.size === 0) return;
+    if (dexStreams.flushTimeout) return;
     dexStreams.flushTimeout = setTimeout(flushDexBatch, dexStreams.batchInterval);
 }
 
 function flushDexBatch() {
     dexStreams.flushTimeout = null;
+
+    for (const raw of dexStreams.messageBuffer) {
+        try {
+            const msg = JSON.parse(raw);
+
+            if (msg.channel === 'allMids') {
+                handleDexAllMids(msg.data);
+            } else if (msg.channel === 'allDexsAssetCtxs') {
+                handleDexAssetCtxs(msg.data);
+            }
+        } catch (e) {
+            console.error('hyperliquid dex parse error:', e.message);
+        }
+    }
+    dexStreams.messageBuffer.length = 0;
+
     if (dexStreams.pending.size === 0) return;
 
     const config = EXCHANGE_CONFIG.hyperliquid;
@@ -281,6 +284,7 @@ function stopDexStream(exchangeId) {
 
     dexStreams.pending.clear();
     dexStreams.tickerData.clear();
+    dexStreams.messageBuffer.length = 0;
 
     self.streamUtils.safeClose(dexStreams.ws);
     dexStreams.ws = null;

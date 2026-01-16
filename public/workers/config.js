@@ -59,6 +59,7 @@ const EXCHANGE_CONFIG = {
         defaultType: 'swap',
         wsUrl: 'wss://stream.bybit.com/v5/public/linear',
         maxSubsPerConnection: 500,
+        subscribeBatch: 100,
         pingInterval: 20000,
         poolKey: 'bybit',
     },

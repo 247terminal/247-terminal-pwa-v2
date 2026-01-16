@@ -11,6 +11,7 @@ const cexStreams = {
     reconnectTimeout: null,
     postUpdate: null,
     batchInterval: 200,
+    messageBuffer: [],
 };
 
 function startCexStream(exchange, batchInterval, postUpdate) {
@@ -78,18 +79,8 @@ function connectCexStream() {
 
     ws.onmessage = (event) => {
         if (cexStreams.state === 'disconnected') return;
-
-        try {
-            const msg = JSON.parse(event.data);
-
-            if (msg.channel === 'allMids') {
-                handleCexAllMids(msg.data);
-            } else if (msg.channel === 'allDexsAssetCtxs') {
-                handleCexAssetCtxs(msg.data);
-            }
-        } catch (e) {
-            console.error('hyperliquid cex parse error:', e.message);
-        }
+        cexStreams.messageBuffer.push(event.data);
+        scheduleCexFlush();
     };
 
     ws.onclose = (event) => {
@@ -130,8 +121,6 @@ function handleCexAllMids(data) {
 
         cexStreams.pending.add(symbol);
     }
-
-    scheduleCexFlush();
 }
 
 function handleCexAssetCtxs(data) {
@@ -183,8 +172,6 @@ function handleCexAssetCtxs(data) {
             }
         }
     }
-
-    scheduleCexFlush();
 }
 
 function startCexPing() {
@@ -217,12 +204,28 @@ function scheduleCexReconnect() {
 }
 
 function scheduleCexFlush() {
-    if (cexStreams.flushTimeout || cexStreams.pending.size === 0) return;
+    if (cexStreams.flushTimeout) return;
     cexStreams.flushTimeout = setTimeout(flushCexBatch, cexStreams.batchInterval);
 }
 
 function flushCexBatch() {
     cexStreams.flushTimeout = null;
+
+    for (const raw of cexStreams.messageBuffer) {
+        try {
+            const msg = JSON.parse(raw);
+
+            if (msg.channel === 'allMids') {
+                handleCexAllMids(msg.data);
+            } else if (msg.channel === 'allDexsAssetCtxs') {
+                handleCexAssetCtxs(msg.data);
+            }
+        } catch (e) {
+            console.error('hyperliquid cex parse error:', e.message);
+        }
+    }
+    cexStreams.messageBuffer.length = 0;
+
     if (cexStreams.pending.size === 0) return;
 
     const config = EXCHANGE_CONFIG.hyperliquid;
@@ -270,6 +273,7 @@ function stopCexStream() {
     cexStreams.tickerData.clear();
     cexStreams.markets.clear();
     cexStreams.assetIndexMap.clear();
+    cexStreams.messageBuffer.length = 0;
 
     self.streamUtils.safeClose(cexStreams.ws);
     cexStreams.ws = null;

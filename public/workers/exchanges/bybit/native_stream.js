@@ -11,6 +11,7 @@ const bybitStreams = {
     postUpdate: null,
     batchInterval: 200,
     marketBatches: [],
+    tickerBuffer: new Map(),
 };
 
 function startBybitNativeStream(exchange, batchInterval, postUpdate) {
@@ -85,29 +86,10 @@ function connectBybitStream(connIndex, marketIds) {
             if (!msg.topic?.startsWith('tickers.') || !msg.data) return;
 
             const ticker = msg.data;
-            const marketId = ticker.symbol;
-            const symbol = bybitStreams.markets.get(marketId);
-            if (!symbol) return;
-
-            let entry = bybitStreams.tickerData.get(symbol);
-            if (!entry) {
-                entry = self.streamUtils.createTickerEntry(symbol);
-                bybitStreams.tickerData.set(symbol, entry);
+            if (ticker.symbol) {
+                bybitStreams.tickerBuffer.set(ticker.symbol, ticker);
+                scheduleBybitFlush();
             }
-
-            if (ticker.lastPrice) entry.last_price = parseFloat(ticker.lastPrice);
-            if (ticker.bid1Price) entry.best_bid = parseFloat(ticker.bid1Price);
-            if (ticker.ask1Price) entry.best_ask = parseFloat(ticker.ask1Price);
-            if (ticker.prevPrice24h) entry.price_24h = parseFloat(ticker.prevPrice24h);
-            if (ticker.turnover24h) entry.volume_24h = parseFloat(ticker.turnover24h);
-            if (ticker.fundingRate) entry.funding_rate = parseFloat(ticker.fundingRate);
-            if (ticker.nextFundingTime)
-                entry.next_funding_time = parseInt(ticker.nextFundingTime, 10);
-
-            if (!entry.last_price || entry.last_price <= 0) return;
-
-            bybitStreams.pending.add(symbol);
-            scheduleBybitFlush();
         } catch (e) {
             console.error('bybit message parse error:', e.message);
         }
@@ -126,10 +108,11 @@ function connectBybitStream(connIndex, marketIds) {
 }
 
 function subscribeBybitSymbols(ws, marketIds) {
+    const config = EXCHANGE_CONFIG.bybit;
     const topics = marketIds.map((id) => `tickers.${id}`);
 
-    for (let i = 0; i < topics.length; i += 100) {
-        const batch = topics.slice(i, i + 100);
+    for (let i = 0; i < topics.length; i += config.subscribeBatch) {
+        const batch = topics.slice(i, i + config.subscribeBatch);
         self.streamUtils.safeSend(ws, { op: 'subscribe', args: batch });
     }
 }
@@ -188,12 +171,38 @@ function scheduleBybitReconnect(connIndex) {
 }
 
 function scheduleBybitFlush() {
-    if (bybitStreams.flushTimeout || bybitStreams.pending.size === 0) return;
+    if (bybitStreams.flushTimeout) return;
     bybitStreams.flushTimeout = setTimeout(flushBybitBatch, bybitStreams.batchInterval);
 }
 
 function flushBybitBatch() {
     bybitStreams.flushTimeout = null;
+
+    for (const ticker of bybitStreams.tickerBuffer.values()) {
+        const marketId = ticker.symbol;
+        const symbol = bybitStreams.markets.get(marketId);
+        if (!symbol) continue;
+
+        let entry = bybitStreams.tickerData.get(symbol);
+        if (!entry) {
+            entry = self.streamUtils.createTickerEntry(symbol);
+            bybitStreams.tickerData.set(symbol, entry);
+        }
+
+        if (ticker.lastPrice) entry.last_price = parseFloat(ticker.lastPrice);
+        if (ticker.bid1Price) entry.best_bid = parseFloat(ticker.bid1Price);
+        if (ticker.ask1Price) entry.best_ask = parseFloat(ticker.ask1Price);
+        if (ticker.prevPrice24h) entry.price_24h = parseFloat(ticker.prevPrice24h);
+        if (ticker.turnover24h) entry.volume_24h = parseFloat(ticker.turnover24h);
+        if (ticker.fundingRate) entry.funding_rate = parseFloat(ticker.fundingRate);
+        if (ticker.nextFundingTime) entry.next_funding_time = parseInt(ticker.nextFundingTime, 10);
+
+        if (!entry.last_price || entry.last_price <= 0) continue;
+
+        bybitStreams.pending.add(symbol);
+    }
+    bybitStreams.tickerBuffer.clear();
+
     if (bybitStreams.pending.size === 0) return;
 
     const config = EXCHANGE_CONFIG.bybit;
@@ -239,6 +248,7 @@ function stopBybitNativeStream() {
     bybitStreams.markets.clear();
     bybitStreams.tickerData.clear();
     bybitStreams.pending.clear();
+    bybitStreams.tickerBuffer.clear();
     bybitStreams.reconnectAttempts.clear();
     bybitStreams.marketBatches = [];
 

@@ -13,6 +13,10 @@ const binanceStreams = {
     flushTimeout: null,
     postUpdate: null,
     batchInterval: 200,
+    tickerBuffer: [],
+    bookTickerBuffer: new Map(),
+    markPriceBuffer: [],
+    klineBuffer: new Map(),
 };
 
 function getOrCreateEntry(symbol) {
@@ -64,33 +68,8 @@ function connectTickerStream() {
 
     ws.onmessage = (event) => {
         if (binanceStreams.state === 'disconnected') return;
-
-        try {
-            const data = JSON.parse(event.data);
-            if (!Array.isArray(data)) return;
-
-            for (let i = 0; i < data.length; i++) {
-                const ticker = data[i];
-                if (!ticker.s) continue;
-
-                const symbol = parseSymbol(ticker.s);
-                if (!symbol) continue;
-
-                const lastPrice = parseFloat(ticker.c);
-                if (!lastPrice || lastPrice <= 0) continue;
-
-                const entry = getOrCreateEntry(symbol);
-                if (ticker.o) entry.price_24h = parseFloat(ticker.o);
-                if (ticker.q) entry.volume_24h = parseFloat(ticker.q);
-                if (!entry.last_price) entry.last_price = lastPrice;
-
-                binanceStreams.pending.add(symbol);
-            }
-
-            scheduleFlush();
-        } catch (e) {
-            console.error('binance ticker parse error:', e.message);
-        }
+        binanceStreams.tickerBuffer.push(event.data);
+        scheduleFlush();
     };
 
     ws.onclose = (event) => {
@@ -123,23 +102,9 @@ function connectBookTickerStream() {
 
     ws.onmessage = (event) => {
         if (binanceStreams.state === 'disconnected') return;
-
         try {
             const data = JSON.parse(event.data);
-            if (!data.s) return;
-
-            const symbol = parseSymbol(data.s);
-            if (!symbol) return;
-
-            const bid = parseFloat(data.b);
-            const ask = parseFloat(data.a);
-            if ((!bid || bid <= 0) && (!ask || ask <= 0)) return;
-
-            const entry = getOrCreateEntry(symbol);
-            if (bid > 0) entry.best_bid = bid;
-            if (ask > 0) entry.best_ask = ask;
-
-            binanceStreams.pending.add(symbol);
+            if (data.s) binanceStreams.bookTickerBuffer.set(data.s, data);
             scheduleFlush();
         } catch (e) {
             console.error('binance book parse error:', e.message);
@@ -176,31 +141,8 @@ function connectMarkPriceStream() {
 
     ws.onmessage = (event) => {
         if (binanceStreams.state === 'disconnected') return;
-
-        try {
-            const data = JSON.parse(event.data);
-            if (!Array.isArray(data)) return;
-
-            for (let i = 0; i < data.length; i++) {
-                const item = data[i];
-                if (!item.s) continue;
-
-                const symbol = parseSymbol(item.s);
-                if (!symbol) continue;
-
-                const entry = binanceStreams.tickerData.get(symbol);
-                if (!entry) continue;
-
-                if (item.r) entry.funding_rate = parseFloat(item.r);
-                if (item.T) entry.next_funding_time = parseInt(item.T, 10);
-
-                binanceStreams.pending.add(symbol);
-            }
-
-            scheduleFlush();
-        } catch (e) {
-            console.error('binance markprice parse error:', e.message);
-        }
+        binanceStreams.markPriceBuffer.push(event.data);
+        scheduleFlush();
     };
 
     ws.onclose = (event) => {
@@ -257,24 +199,10 @@ function connectKlineStream(connIndex, streamNames) {
 
     ws.onmessage = (event) => {
         if (binanceStreams.state === 'disconnected') return;
-
         try {
             const msg = JSON.parse(event.data);
-            if (!msg.data?.e || msg.data.e !== 'kline') return;
-
-            const kline = msg.data.k;
-            if (!kline?.s) return;
-
-            const symbol = parseSymbol(kline.s);
-            if (!symbol) return;
-
-            const closePrice = parseFloat(kline.c);
-            if (!closePrice || closePrice <= 0) return;
-
-            const entry = binanceStreams.tickerData.get(symbol);
-            if (entry) {
-                entry.last_price = closePrice;
-                binanceStreams.pending.add(symbol);
+            if (msg.data?.e === 'kline' && msg.data.k?.s) {
+                binanceStreams.klineBuffer.set(msg.data.k.s, msg.data.k);
                 scheduleFlush();
             }
         } catch (e) {
@@ -338,12 +266,98 @@ function scheduleReconnect(key, connectFn) {
 }
 
 function scheduleFlush() {
-    if (binanceStreams.flushTimeout || binanceStreams.pending.size === 0) return;
+    if (binanceStreams.flushTimeout) return;
     binanceStreams.flushTimeout = setTimeout(flushBinanceBatch, binanceStreams.batchInterval);
 }
 
 function flushBinanceBatch() {
     binanceStreams.flushTimeout = null;
+
+    for (const raw of binanceStreams.tickerBuffer) {
+        try {
+            const data = JSON.parse(raw);
+            if (!Array.isArray(data)) continue;
+
+            for (let i = 0; i < data.length; i++) {
+                const ticker = data[i];
+                if (!ticker.s) continue;
+
+                const symbol = parseSymbol(ticker.s);
+                if (!symbol) continue;
+
+                const lastPrice = parseFloat(ticker.c);
+                if (!lastPrice || lastPrice <= 0) continue;
+
+                const entry = getOrCreateEntry(symbol);
+                if (ticker.o) entry.price_24h = parseFloat(ticker.o);
+                if (ticker.q) entry.volume_24h = parseFloat(ticker.q);
+                if (!entry.last_price) entry.last_price = lastPrice;
+
+                binanceStreams.pending.add(symbol);
+            }
+        } catch (e) {
+            console.error('binance ticker parse error:', e.message);
+        }
+    }
+    binanceStreams.tickerBuffer.length = 0;
+
+    for (const data of binanceStreams.bookTickerBuffer.values()) {
+        const symbol = parseSymbol(data.s);
+        if (!symbol) continue;
+
+        const bid = parseFloat(data.b);
+        const ask = parseFloat(data.a);
+        if ((!bid || bid <= 0) && (!ask || ask <= 0)) continue;
+
+        const entry = getOrCreateEntry(symbol);
+        if (bid > 0) entry.best_bid = bid;
+        if (ask > 0) entry.best_ask = ask;
+
+        binanceStreams.pending.add(symbol);
+    }
+    binanceStreams.bookTickerBuffer.clear();
+
+    for (const raw of binanceStreams.markPriceBuffer) {
+        try {
+            const data = JSON.parse(raw);
+            if (!Array.isArray(data)) continue;
+
+            for (let i = 0; i < data.length; i++) {
+                const item = data[i];
+                if (!item.s) continue;
+
+                const symbol = parseSymbol(item.s);
+                if (!symbol) continue;
+
+                const entry = binanceStreams.tickerData.get(symbol);
+                if (!entry) continue;
+
+                if (item.r) entry.funding_rate = parseFloat(item.r);
+                if (item.T) entry.next_funding_time = parseInt(item.T, 10);
+
+                binanceStreams.pending.add(symbol);
+            }
+        } catch (e) {
+            console.error('binance markprice parse error:', e.message);
+        }
+    }
+    binanceStreams.markPriceBuffer.length = 0;
+
+    for (const kline of binanceStreams.klineBuffer.values()) {
+        const symbol = parseSymbol(kline.s);
+        if (!symbol) continue;
+
+        const closePrice = parseFloat(kline.c);
+        if (!closePrice || closePrice <= 0) continue;
+
+        const entry = binanceStreams.tickerData.get(symbol);
+        if (entry) {
+            entry.last_price = closePrice;
+            binanceStreams.pending.add(symbol);
+        }
+    }
+    binanceStreams.klineBuffer.clear();
+
     if (binanceStreams.pending.size === 0) return;
 
     const config = EXCHANGE_CONFIG.binance;
@@ -394,6 +408,10 @@ function stopBinanceNativeStream() {
 
     binanceStreams.tickerData.clear();
     binanceStreams.pending.clear();
+    binanceStreams.tickerBuffer.length = 0;
+    binanceStreams.bookTickerBuffer.clear();
+    binanceStreams.markPriceBuffer.length = 0;
+    binanceStreams.klineBuffer.clear();
 
     self.streamUtils.safeClose(binanceStreams.ticker);
     self.streamUtils.safeClose(binanceStreams.bookTicker);
