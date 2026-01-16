@@ -119,7 +119,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
 
     return (
         <div class="h-full flex flex-col group">
-            <div class="drag-handle flex items-center justify-between bg-theme-header border-b border-base-300/50 relative z-10 cursor-move">
+            <div class="drag-handle flex items-center justify-between bg-theme-header border-b border-base-300/50 relative z-40 cursor-move">
                 <ChartToolbar
                     exchange={exchange}
                     symbol={symbol}

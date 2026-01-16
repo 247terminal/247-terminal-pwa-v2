@@ -215,7 +215,7 @@ export const DrawingToolbar = memo(function DrawingToolbar({
 
     return (
         <div
-            class="absolute left-2 z-30"
+            class="absolute left-3 z-30"
             style={{ top: 'calc(50% - 13px)', transform: 'translateY(-50%)' }}
         >
             <div
