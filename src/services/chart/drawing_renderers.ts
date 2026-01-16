@@ -1,39 +1,16 @@
 import type { PixelPoint, MeasureResult } from '../../types/drawing.types';
 import { DRAWING_CONSTANTS } from '../../config/drawing.constants';
+import { parse_color, type RGBA } from '../../utils/color';
 
-const RGBA_REGEX = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/;
-const HEX_REGEX = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;
-
-const COLOR_CACHE = new Map<string, { r: number; g: number; b: number; a: number }>();
+const COLOR_CACHE = new Map<string, RGBA>();
 const MAX_CACHE_SIZE = DRAWING_CONSTANTS.CACHE.MAX_COLOR_CACHE_SIZE;
+const DEFAULT_RGBA: RGBA = { r: 41, g: 98, b: 255, a: 1 };
 
-function parse_color_rgba_cached(color: string): { r: number; g: number; b: number; a: number } {
+function parse_color_cached(color: string): RGBA {
     const cached = COLOR_CACHE.get(color);
     if (cached) return cached;
 
-    let result: { r: number; g: number; b: number; a: number };
-
-    const rgba_match = RGBA_REGEX.exec(color);
-    if (rgba_match) {
-        result = {
-            r: parseInt(rgba_match[1]),
-            g: parseInt(rgba_match[2]),
-            b: parseInt(rgba_match[3]),
-            a: rgba_match[4] ? parseFloat(rgba_match[4]) : 1,
-        };
-    } else {
-        const hex_match = HEX_REGEX.exec(color);
-        if (hex_match) {
-            result = {
-                r: parseInt(hex_match[1], 16),
-                g: parseInt(hex_match[2], 16),
-                b: parseInt(hex_match[3], 16),
-                a: 1,
-            };
-        } else {
-            result = { r: 41, g: 98, b: 255, a: 1 };
-        }
-    }
+    const result = parse_color(color) || DEFAULT_RGBA;
 
     if (COLOR_CACHE.size >= MAX_CACHE_SIZE) {
         const firstKey = COLOR_CACHE.keys().next().value;
@@ -45,7 +22,7 @@ function parse_color_rgba_cached(color: string): { r: number; g: number; b: numb
 }
 
 function get_fill_and_stroke(color: string): { fill: string; stroke: string } {
-    const { r, g, b, a } = parse_color_rgba_cached(color);
+    const { r, g, b, a } = parse_color_cached(color);
     const fill_alpha = Math.min(a * DRAWING_CONSTANTS.FILL_OPACITY, DRAWING_CONSTANTS.FILL_OPACITY);
     return {
         fill: `rgba(${r}, ${g}, ${b}, ${fill_alpha})`,
@@ -54,7 +31,7 @@ function get_fill_and_stroke(color: string): { fill: string; stroke: string } {
 }
 
 function get_stroke_color(color: string): string {
-    const { r, g, b, a } = parse_color_rgba_cached(color);
+    const { r, g, b, a } = parse_color_cached(color);
     return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
