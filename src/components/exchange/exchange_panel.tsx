@@ -12,7 +12,7 @@ import {
     EXCHANGE_SETUP_GUIDES,
     EXCHANGE_NAMES,
 } from '@/services/exchange/exchange.service';
-import { get_exchange_icon } from '@/components/common/exchanges';
+import { get_exchange_icon, get_exchange_logo } from '@/components/common/exchanges';
 import type { ExchangeId } from '@/types/credentials.types';
 
 interface ExchangePanelProps {
@@ -235,6 +235,9 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                 ref={container_ref}
                 class="fixed top-10 left-0 mt-1 w-80 bg-base-100 rounded-r shadow-lg z-50"
             >
+                <div class="flex justify-center py-4 text-base-content/60">
+                    {get_exchange_logo(exchange_id)}
+                </div>
                 <div class="flex">
                     <button
                         type="button"
