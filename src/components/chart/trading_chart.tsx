@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'preact/hooks';
+import { useRef, useEffect, useState } from 'preact/hooks';
 import {
     createChart,
     CandlestickSeries,
@@ -11,6 +11,11 @@ import {
 } from 'lightweight-charts';
 import type { OHLCV } from '../../services/exchange/chart_data';
 import { tick_size_to_precision } from '../../utils/format';
+import { get_timeframe_seconds } from '../../services/chart/drawing_manager';
+import { use_chart_drawing } from '../../hooks/use_chart_drawing';
+import { DrawingToolbar } from './drawing_toolbar';
+import { DrawingOverlay } from './drawing_overlay';
+import { ErrorBoundary } from '../common/error_boundary';
 
 const VISIBLE_CANDLES = 100;
 const RIGHT_OFFSET = 20;
@@ -19,6 +24,7 @@ interface TradingChartProps {
     data: OHLCV[];
     loading?: boolean;
     tick_size?: number;
+    timeframe?: string;
 }
 
 function get_css_variable(name: string): string {
@@ -53,10 +59,47 @@ function ohlcv_to_candle(ohlcv: OHLCV): CandlestickData<Time> {
     };
 }
 
-export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartProps) {
+export function TradingChart({
+    data,
+    loading,
+    tick_size = 0.01,
+    timeframe = '1',
+}: TradingChartProps) {
     const container_ref = useRef<HTMLDivElement>(null);
     const chart_ref = useRef<IChartApi | null>(null);
     const series_ref = useRef<ISeriesApi<'Candlestick'> | null>(null);
+    const prev_first_time = useRef<number | null>(null);
+
+    const [chart, set_chart] = useState<IChartApi | null>(null);
+    const [series, set_series] = useState<ISeriesApi<'Candlestick'> | null>(null);
+
+    const first_candle_time = data.length > 0 ? data[0].time : null;
+
+    const {
+        tool,
+        set_tool,
+        drawings,
+        active_drawing,
+        selected_id,
+        measure_result,
+        measure_points,
+        resizing,
+        delete_selected,
+        clear_drawings,
+        change_selected_color,
+        selected_drawing,
+        show_overlay,
+        handle_mouse_down,
+        handle_chart_click,
+        handle_mouse_move,
+        handle_mouse_up,
+    } = use_chart_drawing({
+        chart_ref,
+        series_ref,
+        container_ref,
+        timeframe,
+        first_candle_time,
+    });
 
     useEffect(() => {
         if (!container_ref.current) return;
@@ -72,15 +115,10 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
                 vertLines: { color: colors.grid },
                 horzLines: { color: colors.grid },
             },
-            crosshair: {
-                mode: CrosshairMode.Normal,
-            },
+            crosshair: { mode: CrosshairMode.Normal },
             rightPriceScale: {
                 borderColor: colors.grid,
-                scaleMargins: {
-                    top: 0.1,
-                    bottom: 0.1,
-                },
+                scaleMargins: { top: 0.1, bottom: 0.1 },
             },
             timeScale: {
                 borderColor: colors.grid,
@@ -88,9 +126,7 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
                 secondsVisible: false,
                 rightOffset: RIGHT_OFFSET,
             },
-            handleScale: {
-                axisPressedMouseMove: true,
-            },
+            handleScale: { axisPressedMouseMove: true },
             handleScroll: {
                 mouseWheel: true,
                 pressedMouseMove: true,
@@ -105,11 +141,7 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
             wickUpColor: colors.up,
             wickDownColor: colors.down,
             borderVisible: false,
-            priceFormat: {
-                type: 'price',
-                precision: 2,
-                minMove: 0.01,
-            },
+            priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
         });
 
         const apply_theme = () => {
@@ -139,6 +171,8 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
 
         chart_ref.current = chart;
         series_ref.current = candle_series;
+        set_chart(chart);
+        set_series(candle_series);
 
         const handle_resize = () => {
             if (container_ref.current && chart_ref.current) {
@@ -159,23 +193,17 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
             chart.remove();
             chart_ref.current = null;
             series_ref.current = null;
+            set_chart(null);
+            set_series(null);
         };
     }, []);
 
-    const prev_first_time = useRef<number | null>(null);
-
     useEffect(() => {
-        if (!series_ref.current || !chart_ref.current || data.length === 0 || loading) {
-            return;
-        }
+        if (!series_ref.current || !chart_ref.current || data.length === 0 || loading) return;
 
         const precision = tick_size_to_precision(tick_size);
         series_ref.current.applyOptions({
-            priceFormat: {
-                type: 'price',
-                precision,
-                minMove: tick_size,
-            },
+            priceFormat: { type: 'price', precision, minMove: tick_size },
         });
 
         const candles = data.map(ohlcv_to_candle);
@@ -199,18 +227,61 @@ export function TradingChart({ data, loading, tick_size = 0.01 }: TradingChartPr
     const show_dimmed = loading && has_data;
 
     return (
-        <div class="absolute inset-0">
-            <div
-                ref={container_ref}
-                class={`absolute inset-0 transition-opacity duration-200 ${
-                    show_dimmed ? 'opacity-40' : has_data ? 'opacity-100' : 'opacity-0'
-                }`}
-            />
-            {show_spinner && (
-                <div class="absolute inset-0 flex items-center justify-center bg-base-100">
-                    <div class="w-8 h-8 border-2 border-base-content/20 border-t-primary rounded-full animate-spin" />
-                </div>
-            )}
-        </div>
+        <ErrorBoundary>
+            <div class="absolute inset-0">
+                <div
+                    ref={container_ref}
+                    class={`absolute inset-0 transition-opacity duration-200 ${
+                        show_dimmed ? 'opacity-40' : has_data ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    onMouseDown={handle_mouse_down}
+                    onTouchStart={handle_mouse_down}
+                    onClick={handle_chart_click}
+                    onMouseMove={handle_mouse_move}
+                    onTouchMove={handle_mouse_move}
+                    onMouseUp={handle_mouse_up}
+                    onTouchEnd={handle_mouse_up}
+                />
+                {show_overlay && (
+                    <div
+                        class="absolute inset-0 z-20"
+                        style={{ cursor: resizing ? 'grabbing' : 'crosshair', touchAction: 'none' }}
+                        onMouseDown={handle_mouse_down}
+                        onTouchStart={handle_mouse_down}
+                        onClick={handle_chart_click}
+                        onMouseMove={handle_mouse_move}
+                        onTouchMove={handle_mouse_move}
+                        onMouseUp={handle_mouse_up}
+                        onTouchEnd={handle_mouse_up}
+                    />
+                )}
+                <DrawingOverlay
+                    chart={chart}
+                    series={series}
+                    drawings={drawings}
+                    active_drawing={active_drawing}
+                    selected_id={selected_id}
+                    timeframe_seconds={get_timeframe_seconds(timeframe)}
+                    measure_result={measure_result}
+                    measure_points={measure_points}
+                    tick_size={tick_size}
+                />
+                <DrawingToolbar
+                    active_tool={tool}
+                    on_tool_change={set_tool}
+                    on_delete_selected={delete_selected}
+                    on_clear_all={clear_drawings}
+                    selected_id={selected_id}
+                    has_drawings={drawings.length > 0}
+                    selected_color={selected_drawing?.color}
+                    on_color_change={change_selected_color}
+                />
+                {show_spinner && (
+                    <div class="absolute inset-0 flex items-center justify-center bg-base-100">
+                        <div class="w-8 h-8 border-2 border-base-content/20 border-t-primary rounded-full animate-spin" />
+                    </div>
+                )}
+            </div>
+        </ErrorBoundary>
     );
 }
