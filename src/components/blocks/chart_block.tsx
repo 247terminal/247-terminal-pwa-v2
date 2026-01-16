@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
 import { EXCHANGE_IDS, type ExchangeId } from '../../types/exchange.types';
@@ -48,32 +48,39 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
 
     const current_key = `${exchange}:${symbol}:${timeframe}`;
 
-    const load_chart_data = useCallback(async () => {
+    useEffect(() => {
         if (!symbol) return;
 
-        set_loading(true);
-        set_data([]);
-        try {
-            const chart_tf = is_sub_minute_timeframe(timeframe)
-                ? '1'
-                : toolbar_to_chart_timeframe(timeframe);
-            const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
-            set_chart_tick_size(next_tick_size);
-            set_data(ohlcv);
-            set_data_key(current_key);
-        } catch (err) {
-            console.error('failed to load chart data:', err);
-            set_data([]);
-        } finally {
-            set_loading(false);
-        }
-    }, [exchange, symbol, timeframe, next_tick_size, current_key]);
+        let cancelled = false;
 
-    useEffect(() => {
-        if (symbol) {
-            load_chart_data();
-        }
-    }, [symbol, timeframe, load_chart_data]);
+        const load_chart_data = async () => {
+            set_loading(true);
+            try {
+                const chart_tf = is_sub_minute_timeframe(timeframe)
+                    ? '1'
+                    : toolbar_to_chart_timeframe(timeframe);
+                const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
+                if (cancelled) return;
+                set_chart_tick_size(next_tick_size);
+                set_data(ohlcv);
+                set_data_key(current_key);
+            } catch (err) {
+                if (cancelled) return;
+                console.error('failed to load chart data:', err);
+                set_data([]);
+            } finally {
+                if (!cancelled) {
+                    set_loading(false);
+                }
+            }
+        };
+
+        load_chart_data();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [exchange, symbol, timeframe, next_tick_size, current_key]);
 
     const has_valid_data = data.length > 0 && data_key === current_key;
 
@@ -108,14 +115,20 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         return watch_ohlcv(exchange, symbol, chart_tf, update_candle);
     }, [exchange, symbol, timeframe, has_valid_data]);
 
-    const handle_symbol_change = (ex: ExchangeId, s: string) => {
-        if (ex === exchange && s === symbol) return;
-        set_data([]);
-        set_data_key('');
+    const handle_symbol_change = useCallback(
+        (ex: ExchangeId, s: string) => {
+            if (ex === exchange && s === symbol) return;
+            set_loading(true);
+            set_exchange(ex);
+            set_symbol(s);
+        },
+        [exchange, symbol]
+    );
+
+    const handle_timeframe_change = useCallback((tf: Timeframe) => {
         set_loading(true);
-        set_exchange(ex);
-        set_symbol(s);
-    };
+        set_timeframe(tf);
+    }, []);
 
     return (
         <div class="h-full flex flex-col group">
@@ -126,11 +139,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                     exchange_symbols={exchange_symbols}
                     timeframe={timeframe}
                     on_symbol_change={handle_symbol_change}
-                    on_timeframe_change={(tf) => {
-                        set_data([]);
-                        set_data_key('');
-                        set_timeframe(tf);
-                    }}
+                    on_timeframe_change={handle_timeframe_change}
                     loading={!has_any_markets}
                 />
                 {on_remove && (

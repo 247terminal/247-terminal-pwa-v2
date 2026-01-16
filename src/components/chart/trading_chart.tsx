@@ -199,7 +199,14 @@ export function TradingChart({
     }, []);
 
     useEffect(() => {
-        if (!series_ref.current || !chart_ref.current || data.length === 0 || loading) return;
+        if (!series_ref.current || !chart_ref.current) return;
+
+        if (data.length === 0) {
+            prev_first_time.current = null;
+            return;
+        }
+
+        if (loading) return;
 
         const precision = tick_size_to_precision(tick_size);
         series_ref.current.applyOptions({
