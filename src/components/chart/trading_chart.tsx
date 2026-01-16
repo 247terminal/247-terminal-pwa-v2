@@ -221,6 +221,7 @@ export function TradingChart({
             prev_first_time.current === null || prev_first_time.current !== first_time;
 
         if (is_new_symbol) {
+            chart_ref.current.priceScale('right').applyOptions({ autoScale: true });
             const from = Math.max(0, data.length - VISIBLE_CANDLES);
             const to = data.length - 1 + RIGHT_OFFSET;
             chart_ref.current.timeScale().setVisibleLogicalRange({ from, to });
