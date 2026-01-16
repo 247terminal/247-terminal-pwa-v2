@@ -7,6 +7,7 @@ const dexStreams = {
     tickerData: new Map(),
     pending: new Set(),
     flushTimeout: null,
+    pingInterval: null,
     reconnectAttempt: 0,
     reconnectTimeout: null,
     postUpdate: null,
@@ -78,6 +79,7 @@ function connectDexStream(wsUrl) {
             method: 'subscribe',
             subscription: { type: 'allDexsAssetCtxs' },
         });
+        startDexPing();
     };
 
     ws.onmessage = (event) => {
@@ -98,6 +100,7 @@ function connectDexStream(wsUrl) {
 
     ws.onclose = (event) => {
         if (dexStreams.state === 'disconnected') return;
+        stopDexPing();
         console.error('hyperliquid dex closed:', event.code, event.reason);
         scheduleDexReconnect(wsUrl);
     };
@@ -195,6 +198,21 @@ function handleDexAssetCtxs(data) {
     scheduleDexFlush();
 }
 
+function startDexPing() {
+    stopDexPing();
+    const config = EXCHANGE_CONFIG.hyperliquid;
+    dexStreams.pingInterval = setInterval(() => {
+        self.streamUtils.safeSend(dexStreams.ws, { method: 'ping' });
+    }, config.pingInterval);
+}
+
+function stopDexPing() {
+    if (dexStreams.pingInterval) {
+        clearInterval(dexStreams.pingInterval);
+        dexStreams.pingInterval = null;
+    }
+}
+
 function scheduleDexReconnect(wsUrl) {
     if (dexStreams.reconnectTimeout) return;
 
@@ -251,6 +269,7 @@ function stopDexStream(exchangeId) {
 
     dexStreams.state = self.streamUtils.StreamState.DISCONNECTED;
 
+    stopDexPing();
     if (dexStreams.reconnectTimeout) {
         clearTimeout(dexStreams.reconnectTimeout);
         dexStreams.reconnectTimeout = null;

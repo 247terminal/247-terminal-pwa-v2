@@ -6,6 +6,7 @@ const cexStreams = {
     tickerData: new Map(),
     pending: new Set(),
     flushTimeout: null,
+    pingInterval: null,
     reconnectAttempt: 0,
     reconnectTimeout: null,
     postUpdate: null,
@@ -72,6 +73,7 @@ function connectCexStream() {
             method: 'subscribe',
             subscription: { type: 'allDexsAssetCtxs' },
         });
+        startCexPing();
     };
 
     ws.onmessage = (event) => {
@@ -92,6 +94,7 @@ function connectCexStream() {
 
     ws.onclose = (event) => {
         if (cexStreams.state === 'disconnected') return;
+        stopCexPing();
         console.error('hyperliquid cex closed:', event.code, event.reason);
         scheduleCexReconnect();
     };
@@ -184,6 +187,21 @@ function handleCexAssetCtxs(data) {
     scheduleCexFlush();
 }
 
+function startCexPing() {
+    stopCexPing();
+    const config = EXCHANGE_CONFIG.hyperliquid;
+    cexStreams.pingInterval = setInterval(() => {
+        self.streamUtils.safeSend(cexStreams.ws, { method: 'ping' });
+    }, config.pingInterval);
+}
+
+function stopCexPing() {
+    if (cexStreams.pingInterval) {
+        clearInterval(cexStreams.pingInterval);
+        cexStreams.pingInterval = null;
+    }
+}
+
 function scheduleCexReconnect() {
     if (cexStreams.reconnectTimeout) return;
 
@@ -238,6 +256,7 @@ function flushCexBatch() {
 function stopCexStream() {
     cexStreams.state = self.streamUtils.StreamState.DISCONNECTED;
 
+    stopCexPing();
     if (cexStreams.reconnectTimeout) {
         clearTimeout(cexStreams.reconnectTimeout);
         cexStreams.reconnectTimeout = null;

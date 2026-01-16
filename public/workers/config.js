@@ -48,6 +48,7 @@ const EXCHANGE_CONFIG = {
         defaultType: 'swap',
         wsUrl: 'wss://api.hyperliquid.xyz/ws',
         dexWsUrl: 'wss://api.hyperliquid.xyz/ws',
+        pingInterval: 30000,
         poolKeys: {
             cex: 'hyperliquid_cex',
             dex: 'hyperliquid_dex',
@@ -58,6 +59,7 @@ const EXCHANGE_CONFIG = {
         defaultType: 'swap',
         wsUrl: 'wss://stream.bybit.com/v5/public/linear',
         maxSubsPerConnection: 500,
+        pingInterval: 20000,
         poolKey: 'bybit',
     },
 };

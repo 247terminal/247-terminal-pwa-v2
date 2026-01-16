@@ -1,5 +1,6 @@
 const bybitStreams = {
     connections: [],
+    pingIntervals: [],
     state: 'disconnected',
     markets: new Map(),
     tickerData: new Map(),
@@ -64,6 +65,7 @@ function connectBybitStream(connIndex, marketIds) {
     ws.onopen = () => {
         bybitStreams.reconnectAttempts.set(connIndex, 0);
         subscribeBybitSymbols(ws, marketIds);
+        startBybitPing(connIndex, ws);
         updateBybitState();
     };
 
@@ -113,6 +115,7 @@ function connectBybitStream(connIndex, marketIds) {
 
     ws.onclose = (event) => {
         if (bybitStreams.state === 'disconnected') return;
+        stopBybitPing(connIndex);
         console.error('bybit connection', connIndex, 'closed:', event.code, event.reason);
         scheduleBybitReconnect(connIndex);
     };
@@ -129,6 +132,28 @@ function subscribeBybitSymbols(ws, marketIds) {
         const batch = topics.slice(i, i + 100);
         self.streamUtils.safeSend(ws, { op: 'subscribe', args: batch });
     }
+}
+
+function startBybitPing(connIndex, ws) {
+    stopBybitPing(connIndex);
+    const config = EXCHANGE_CONFIG.bybit;
+    bybitStreams.pingIntervals[connIndex] = setInterval(() => {
+        self.streamUtils.safeSend(ws, { op: 'ping' });
+    }, config.pingInterval);
+}
+
+function stopBybitPing(connIndex) {
+    if (bybitStreams.pingIntervals[connIndex]) {
+        clearInterval(bybitStreams.pingIntervals[connIndex]);
+        bybitStreams.pingIntervals[connIndex] = null;
+    }
+}
+
+function stopAllBybitPings() {
+    for (let i = 0; i < bybitStreams.pingIntervals.length; i++) {
+        stopBybitPing(i);
+    }
+    bybitStreams.pingIntervals = [];
 }
 
 function updateBybitState() {
@@ -202,6 +227,7 @@ function flushBybitBatch() {
 function stopBybitNativeStream() {
     bybitStreams.state = self.streamUtils.StreamState.DISCONNECTED;
 
+    stopAllBybitPings();
     bybitStreams.reconnectTimeouts.forEach((timeout) => clearTimeout(timeout));
     bybitStreams.reconnectTimeouts.clear();
 
