@@ -161,7 +161,12 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                 )}
             </div>
             <div class="flex-1 relative min-h-0 overflow-hidden">
-                <TradingChart data={data} loading={loading} tick_size={chart_tick_size} />
+                <TradingChart
+                    data={data}
+                    data_key={current_key}
+                    loading={loading}
+                    tick_size={chart_tick_size}
+                />
             </div>
         </div>
     );

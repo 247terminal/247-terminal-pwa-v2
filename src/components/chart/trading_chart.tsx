@@ -22,6 +22,7 @@ const RIGHT_OFFSET = 20;
 
 interface TradingChartProps {
     data: OHLCV[];
+    data_key?: string;
     loading?: boolean;
     tick_size?: number;
     timeframe?: string;
@@ -61,6 +62,7 @@ function ohlcv_to_candle(ohlcv: OHLCV): CandlestickData<Time> {
 
 export function TradingChart({
     data,
+    data_key,
     loading,
     tick_size = 0.01,
     timeframe = '1',
@@ -68,7 +70,7 @@ export function TradingChart({
     const container_ref = useRef<HTMLDivElement>(null);
     const chart_ref = useRef<IChartApi | null>(null);
     const series_ref = useRef<ISeriesApi<'Candlestick'> | null>(null);
-    const prev_first_time = useRef<number | null>(null);
+    const prev_data_key = useRef<string | undefined>(undefined);
 
     const [chart, set_chart] = useState<IChartApi | null>(null);
     const [series, set_series] = useState<ISeriesApi<'Candlestick'> | null>(null);
@@ -202,7 +204,7 @@ export function TradingChart({
         if (!series_ref.current || !chart_ref.current) return;
 
         if (data.length === 0) {
-            prev_first_time.current = null;
+            prev_data_key.current = undefined;
             return;
         }
 
@@ -216,19 +218,17 @@ export function TradingChart({
         const candles = data.map(ohlcv_to_candle);
         series_ref.current.setData(candles);
 
-        const first_time = data[0].time;
-        const is_new_symbol =
-            prev_first_time.current === null || prev_first_time.current !== first_time;
+        const is_new_data = prev_data_key.current !== data_key;
 
-        if (is_new_symbol) {
+        if (is_new_data) {
             chart_ref.current.priceScale('right').applyOptions({ autoScale: true });
             const from = Math.max(0, data.length - VISIBLE_CANDLES);
             const to = data.length - 1 + RIGHT_OFFSET;
             chart_ref.current.timeScale().setVisibleLogicalRange({ from, to });
         }
 
-        prev_first_time.current = first_time;
-    }, [data, tick_size, loading]);
+        prev_data_key.current = data_key;
+    }, [data, data_key, tick_size, loading]);
 
     const has_data = data.length > 0;
     const show_spinner = loading && !has_data;
