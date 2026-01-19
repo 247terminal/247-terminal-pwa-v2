@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
+import { SquarePen, X, Plus } from 'lucide-preact';
 import {
     active_rig,
     all_rigs,
@@ -101,7 +102,7 @@ export function RigSelector() {
                 class="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded text-xs text-primary/60 hover:bg-primary/20 hover:text-primary/80 transition-colors"
             >
                 <svg class="w-3 h-3" viewBox="0 0 15 15" fill="currentColor">
-                    <path d="m9 8.2l1 5.8h1.5c.5 0 .5 1 0 1h-8c-.5 0-.5-1 0-1H5l1-5.8q1.5 1.02 3 0M8.4 12H6.6l-.3 2h2.4zM8 9.25H7L6.75 11h1.5zm1.75-2.62c-.02.37-.19.96-.5 1.27L13 9.38v5.25c0 .5 1 .5 1 0V9.75c.75.25 1.25-1.05.5-1.3zM3.5 1C0 1-1 9.5 1.25 9.5c.75 0 1.99-3.9 1.99-3.9l2.01.75c0-.41.25-.97.52-1.26l-2.06-.78s.79-2.46.79-2.81c0-.25-.5-.5-1-.5m4 7C8.38 8 9 7.38 9 6.5C9 5.63 8.38 5 7.5 5C6.63 5 6 5.64 6 6.52C6 7.39 6.63 8 7.5 8"/>
+                    <path d="m9 8.2l1 5.8h1.5c.5 0 .5 1 0 1h-8c-.5 0-.5-1 0-1H5l1-5.8q1.5 1.02 3 0M8.4 12H6.6l-.3 2h2.4zM8 9.25H7L6.75 11h1.5zm1.75-2.62c-.02.37-.19.96-.5 1.27L13 9.38v5.25c0 .5 1 .5 1 0V9.75c.75.25 1.25-1.05.5-1.3zM3.5 1C0 1-1 9.5 1.25 9.5c.75 0 1.99-3.9 1.99-3.9l2.01.75c0-.41.25-.97.52-1.26l-2.06-.78s.79-2.46.79-2.81c0-.25-.5-.5-1-.5m4 7C8.38 8 9 7.38 9 6.5C9 5.63 8.38 5 7.5 5C6.63 5 6 5.64 6 6.52C6 7.39 6.63 8 7.5 8" />
                 </svg>
                 <span class="tracking-wider font-medium">{current_rig?.name || 'DEFAULT'}</span>
             </button>
@@ -120,7 +121,9 @@ export function RigSelector() {
                                         ref={edit_input_ref}
                                         type="text"
                                         value={edit_name}
-                                        onInput={(e) => set_edit_name((e.target as HTMLInputElement).value)}
+                                        onInput={(e) =>
+                                            set_edit_name((e.target as HTMLInputElement).value)
+                                        }
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') handle_save_edit();
                                             if (e.key === 'Escape') set_editing_id(null);
@@ -131,25 +134,26 @@ export function RigSelector() {
                                     />
                                 ) : (
                                     <>
-                                        <span class={`text-xs tracking-wide ${rig.id === current_rig?.id ? 'text-primary font-bold' : 'text-base-content'}`}>{rig.name}</span>
+                                        <span
+                                            class={`text-xs tracking-wide ${rig.id === current_rig?.id ? 'text-primary font-bold' : 'text-base-content'}`}
+                                        >
+                                            {rig.name}
+                                        </span>
                                         <div class="flex items-center gap-1">
                                             <button
-                                                onClick={(e) => handle_start_edit(e, rig.id, rig.name)}
+                                                onClick={(e) =>
+                                                    handle_start_edit(e, rig.id, rig.name)
+                                                }
                                                 class="p-1 text-base-content/40 hover:text-base-content transition-colors"
                                             >
-                                                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                                </svg>
+                                                <SquarePen class="w-3 h-3" />
                                             </button>
                                             {rigs.length > 1 && (
                                                 <button
                                                     onClick={(e) => handle_delete(e, rig.id)}
                                                     class="p-1 text-base-content/40 hover:text-error transition-colors"
                                                 >
-                                                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M18 6L6 18M6 6l12 12"/>
-                                                    </svg>
+                                                    <X class="w-3 h-3" />
                                                 </button>
                                             )}
                                         </div>
@@ -166,7 +170,9 @@ export function RigSelector() {
                                     ref={input_ref}
                                     type="text"
                                     value={new_rig_name}
-                                    onInput={(e) => set_new_rig_name((e.target as HTMLInputElement).value)}
+                                    onInput={(e) =>
+                                        set_new_rig_name((e.target as HTMLInputElement).value)
+                                    }
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') handle_create();
                                         if (e.key === 'Escape') set_is_creating(false);
@@ -180,9 +186,7 @@ export function RigSelector() {
                                 onClick={() => set_is_creating(true)}
                                 class="w-full flex items-center gap-2 px-3 py-2 text-xs text-primary hover:bg-base-200 transition-colors"
                             >
-                                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 5v14M5 12h14"/>
-                                </svg>
+                                <Plus class="w-3 h-3" />
                                 <span>NEW RIG</span>
                             </button>
                         )}

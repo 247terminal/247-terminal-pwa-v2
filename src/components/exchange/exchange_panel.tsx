@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'preact/hooks';
+import { Eye, EyeOff, X, UserPlus, KeyRound, CircleHelp, AlertTriangle } from 'lucide-preact';
 import { use_click_outside, use_escape_key } from '@/hooks';
 import {
     exchange_credentials,
@@ -43,17 +44,7 @@ function PasswordInput({ value, placeholder, on_change }: PasswordInputProps) {
                 onClick={() => set_visible(!visible)}
                 class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content transition-colors"
             >
-                {visible ? (
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                        <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                ) : (
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
-                    </svg>
-                )}
+                {visible ? <EyeOff class="w-3.5 h-3.5" /> : <Eye class="w-3.5 h-3.5" />}
             </button>
         </div>
     );
@@ -79,9 +70,7 @@ function HelpModal({ exchange_id, on_close }: HelpModalProps) {
             >
                 <div class="flex items-center justify-between px-6 py-4">
                     <div class="flex items-center gap-3">
-                        <div class="text-primary">
-                            {get_exchange_icon(exchange_id)}
-                        </div>
+                        <div class="text-primary">{get_exchange_icon(exchange_id)}</div>
                         <span class="text-base font-semibold text-base-content">Setup Guide</span>
                     </div>
                     <button
@@ -89,10 +78,7 @@ function HelpModal({ exchange_id, on_close }: HelpModalProps) {
                         onClick={on_close}
                         class="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
                     >
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
+                        <X class="w-5 h-5" />
                     </button>
                 </div>
 
@@ -111,14 +97,17 @@ function HelpModal({ exchange_id, on_close }: HelpModalProps) {
                     {notes.length > 0 && (
                         <div class="mt-6 p-4 rounded-xl bg-warning/5 border border-warning/20">
                             <div class="flex items-center gap-2 mb-3">
-                                <svg class="w-4 h-4 text-warning" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" />
-                                </svg>
-                                <span class="text-sm font-medium text-warning">Important Notes</span>
+                                <AlertTriangle class="w-4 h-4 text-warning" />
+                                <span class="text-sm font-medium text-warning">
+                                    Important Notes
+                                </span>
                             </div>
                             <ul class="space-y-2">
                                 {notes.map((note, index) => (
-                                    <li key={index} class="flex items-start gap-2 text-sm text-base-content/70">
+                                    <li
+                                        key={index}
+                                        class="flex items-start gap-2 text-sm text-base-content/70"
+                                    >
                                         <span class="text-warning leading-relaxed">•</span>
                                         <span class="leading-relaxed">{note}</span>
                                     </li>
@@ -242,12 +231,7 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                         onClick={() => open_link(links.open_account)}
                         class="group relative flex-1 flex justify-center py-2 text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
                     >
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                            <circle cx="9" cy="7" r="4" />
-                            <line x1="19" y1="8" x2="19" y2="14" />
-                            <line x1="22" y1="11" x2="16" y2="11" />
-                        </svg>
+                        <UserPlus class="w-4 h-4" />
                         <span class="absolute bottom-full mb-1 px-2 py-1 text-xs bg-base-300 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                             Open Account
                         </span>
@@ -257,9 +241,7 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                         onClick={() => open_link(links.api_management)}
                         class="group relative flex-1 flex justify-center py-2 text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
                     >
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                        </svg>
+                        <KeyRound class="w-4 h-4" />
                         <span class="absolute bottom-full mb-1 px-2 py-1 text-xs bg-base-300 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                             Get API Key
                         </span>
@@ -269,102 +251,101 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                         onClick={() => set_help_open(true)}
                         class="group relative flex-1 flex justify-center py-2 text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
                     >
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                            <circle cx="12" cy="17" r="0.5" fill="currentColor" />
-                        </svg>
+                        <CircleHelp class="w-5 h-5" />
                         <span class="absolute bottom-full mb-1 px-2 py-1 text-xs bg-base-300 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                             Setup Guide
                         </span>
                     </button>
                 </div>
                 <div class="p-3 space-y-2">
-                {fields.includes('api_key') && (
-                    <PasswordInput
-                        value={form_data.api_key}
-                        placeholder="API KEY"
-                        on_change={(value) => update_field('api_key', value)}
-                    />
-                )}
-
-                {fields.includes('api_secret') && (
-                    <PasswordInput
-                        value={form_data.api_secret}
-                        placeholder="API SECRET"
-                        on_change={(value) => update_field('api_secret', value)}
-                    />
-                )}
-
-                {fields.includes('passphrase') && (
-                    <PasswordInput
-                        value={form_data.passphrase}
-                        placeholder="PASSPHRASE"
-                        on_change={(value) => update_field('passphrase', value)}
-                    />
-                )}
-
-                {fields.includes('wallet_address') && (
-                    <input
-                        type="text"
-                        class="w-full bg-base-300 px-2 py-1.5 rounded text-xs text-base-content outline-none"
-                        value={form_data.wallet_address}
-                        onInput={(e) => update_field('wallet_address', (e.target as HTMLInputElement).value)}
-                        placeholder="WALLET ADDRESS"
-                    />
-                )}
-
-                {fields.includes('private_key') && (
-                    <PasswordInput
-                        value={form_data.private_key}
-                        placeholder="PRIVATE KEY"
-                        on_change={(value) => update_field('private_key', value)}
-                    />
-                )}
-
-                {fields.includes('hedge_mode') && (
-                    <label class="flex items-center justify-between cursor-pointer">
-                        <span class="text-xs text-base-content tracking-wide">HEDGE MODE</span>
-                        <input
-                            type="checkbox"
-                            class="toggle toggle-xs toggle-primary"
-                            checked={form_data.hedge_mode}
-                            onChange={(e) => update_field('hedge_mode', (e.target as HTMLInputElement).checked)}
+                    {fields.includes('api_key') && (
+                        <PasswordInput
+                            value={form_data.api_key}
+                            placeholder="API KEY"
+                            on_change={(value) => update_field('api_key', value)}
                         />
-                    </label>
-                )}
+                    )}
 
-                {error && (
-                    <div class="text-xs text-error">{error}</div>
-                )}
-            </div>
+                    {fields.includes('api_secret') && (
+                        <PasswordInput
+                            value={form_data.api_secret}
+                            placeholder="API SECRET"
+                            on_change={(value) => update_field('api_secret', value)}
+                        />
+                    )}
 
-            <div>
-                <button
-                    type="button"
-                    onClick={handle_test}
-                    disabled={testing}
-                    class="w-full px-3 py-2 text-xs text-primary bg-base-200/50 hover:bg-base-200 transition-colors disabled:opacity-50"
-                >
-                    {testing ? 'CONNECTING...' : 'CONNECT'}
-                </button>
+                    {fields.includes('passphrase') && (
+                        <PasswordInput
+                            value={form_data.passphrase}
+                            placeholder="PASSPHRASE"
+                            on_change={(value) => update_field('passphrase', value)}
+                        />
+                    )}
 
-                {credentials.connected && (
+                    {fields.includes('wallet_address') && (
+                        <input
+                            type="text"
+                            class="w-full bg-base-300 px-2 py-1.5 rounded text-xs text-base-content outline-none"
+                            value={form_data.wallet_address}
+                            onInput={(e) =>
+                                update_field('wallet_address', (e.target as HTMLInputElement).value)
+                            }
+                            placeholder="WALLET ADDRESS"
+                        />
+                    )}
+
+                    {fields.includes('private_key') && (
+                        <PasswordInput
+                            value={form_data.private_key}
+                            placeholder="PRIVATE KEY"
+                            on_change={(value) => update_field('private_key', value)}
+                        />
+                    )}
+
+                    {fields.includes('hedge_mode') && (
+                        <label class="flex items-center justify-between cursor-pointer">
+                            <span class="text-xs text-base-content tracking-wide">HEDGE MODE</span>
+                            <input
+                                type="checkbox"
+                                class="toggle toggle-xs toggle-primary"
+                                checked={form_data.hedge_mode}
+                                onChange={(e) =>
+                                    update_field(
+                                        'hedge_mode',
+                                        (e.target as HTMLInputElement).checked
+                                    )
+                                }
+                            />
+                        </label>
+                    )}
+
+                    {error && <div class="text-xs text-error">{error}</div>}
+                </div>
+
+                <div>
                     <button
                         type="button"
-                        onClick={handle_disconnect}
-                        class="w-full px-3 py-2 text-xs text-error/60 hover:text-error hover:bg-base-200 transition-colors"
+                        onClick={handle_test}
+                        disabled={testing}
+                        class="w-full px-3 py-2 text-xs text-primary bg-base-200/50 hover:bg-base-200 transition-colors disabled:opacity-50"
                     >
-                        DISCONNECT
+                        {testing ? 'CONNECTING...' : 'CONNECT'}
                     </button>
-                )}
-            </div>
+
+                    {credentials.connected && (
+                        <button
+                            type="button"
+                            onClick={handle_disconnect}
+                            class="w-full px-3 py-2 text-xs text-error/60 hover:text-error hover:bg-base-200 transition-colors"
+                        >
+                            DISCONNECT
+                        </button>
+                    )}
+                </div>
             </div>
 
             {help_open && (
-                <HelpModal
-                    exchange_id={exchange_id}
-                    on_close={() => set_help_open(false)}
-                />
+                <HelpModal exchange_id={exchange_id} on_close={() => set_help_open(false)} />
             )}
         </>
     );

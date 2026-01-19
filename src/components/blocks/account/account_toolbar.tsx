@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'preact/hooks';
+import { Eye, EyeOff, Radiation } from 'lucide-preact';
 import type { AccountTab } from '../../../types/account.types';
 import {
     active_tab,
@@ -37,61 +38,6 @@ function TabButton({ tab, label, count }: TabButtonProps) {
     );
 }
 
-function EyeOpenIcon() {
-    return (
-        <svg
-            class="w-4 h-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-        >
-            <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
-            <circle cx="12" cy="12" r="3" />
-        </svg>
-    );
-}
-
-function EyeClosedIcon() {
-    return (
-        <svg
-            class="w-4 h-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-        >
-            <path d="m15 18-.722-3.25" />
-            <path d="M2 8a10.645 10.645 0 0 0 20 0" />
-            <path d="m20 15-1.726-2.05" />
-            <path d="m4 15 1.726-2.05" />
-            <path d="m9 18 .722-3.25" />
-        </svg>
-    );
-}
-
-function NukeIcon() {
-    return (
-        <svg
-            class="w-4 h-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-        >
-            <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0" />
-            <path d="M12 9v4" />
-            <path d="M12 17v.01" />
-        </svg>
-    );
-}
-
 export function AccountToolbar() {
     const [confirming_nuke, set_confirming_nuke] = useState(false);
     const is_private = privacy_mode.value;
@@ -122,7 +68,7 @@ export function AccountToolbar() {
                 class="p-1 rounded text-base-content/50 hover:text-base-content hover:bg-base-300 transition-colors"
                 title={is_private ? 'Show values' : 'Hide values'}
             >
-                {is_private ? <EyeClosedIcon /> : <EyeOpenIcon />}
+                {is_private ? <EyeOff class="w-4 h-4" /> : <Eye class="w-4 h-4" />}
             </button>
 
             <button
@@ -135,7 +81,7 @@ export function AccountToolbar() {
                 }`}
                 title={confirming_nuke ? 'Click again to confirm' : 'Close all positions'}
             >
-                <NukeIcon />
+                <Radiation class="w-4 h-4" />
             </button>
         </div>
     );

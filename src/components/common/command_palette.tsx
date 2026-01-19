@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import { Search } from 'lucide-preact';
 
 interface Command {
     name: string;
@@ -24,9 +25,10 @@ export function CommandPalette({ is_open, on_close }: CommandPaletteProps) {
     const [selected_index, set_selected_index] = useState(0);
     const input_ref = useRef<HTMLInputElement>(null);
 
-    const filtered_commands = COMMANDS.filter(cmd =>
-        cmd.name.toLowerCase().includes(query.toLowerCase()) ||
-        cmd.params.toLowerCase().includes(query.toLowerCase())
+    const filtered_commands = COMMANDS.filter(
+        (cmd) =>
+            cmd.name.toLowerCase().includes(query.toLowerCase()) ||
+            cmd.params.toLowerCase().includes(query.toLowerCase())
     );
 
     useEffect(() => {
@@ -45,10 +47,10 @@ export function CommandPalette({ is_open, on_close }: CommandPaletteProps) {
                 on_close();
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                set_selected_index(i => Math.min(i + 1, filtered_commands.length - 1));
+                set_selected_index((i) => Math.min(i + 1, filtered_commands.length - 1));
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                set_selected_index(i => Math.max(i - 1, 0));
+                set_selected_index((i) => Math.max(i - 1, 0));
             } else if (e.key === 'Enter') {
                 e.preventDefault();
                 console.log('Execute command:', filtered_commands[selected_index]);
@@ -71,9 +73,7 @@ export function CommandPalette({ is_open, on_close }: CommandPaletteProps) {
             <div class="absolute inset-0 bg-black/50" onClick={on_close} />
             <div class="relative w-full max-w-2xl bg-base-200 border border-base-300 rounded-lg shadow-2xl overflow-hidden">
                 <div class="flex items-center gap-3 px-4 py-3 border-b border-base-300">
-                    <svg class="w-5 h-5 text-base-content/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                    <Search class="w-5 h-5 text-base-content/50" />
                     <input
                         ref={input_ref}
                         type="text"
@@ -82,7 +82,9 @@ export function CommandPalette({ is_open, on_close }: CommandPaletteProps) {
                         placeholder="COMMAND / SEARCH..."
                         class="flex-1 bg-transparent text-base-content placeholder-base-content/50 outline-none tracking-wider"
                     />
-                    <kbd class="px-2 py-1 bg-base-300 rounded text-xs text-base-content/50">ESC</kbd>
+                    <kbd class="px-2 py-1 bg-base-300 rounded text-xs text-base-content/50">
+                        ESC
+                    </kbd>
                 </div>
 
                 <div class="px-4 py-2 flex items-center justify-between text-xs tracking-wider">
@@ -105,7 +107,9 @@ export function CommandPalette({ is_open, on_close }: CommandPaletteProps) {
                             <span class="px-3 py-1 bg-primary text-primary-content text-xs font-bold rounded tracking-wider min-w-[80px] text-center">
                                 {cmd.name}
                             </span>
-                            <span class="flex-1 text-base-content/70 tracking-wider">{cmd.params}</span>
+                            <span class="flex-1 text-base-content/70 tracking-wider">
+                                {cmd.params}
+                            </span>
                             {index === selected_index && (
                                 <span class="flex items-center gap-1 text-xs text-base-content/50">
                                     ENTER <span class="text-primary">✓</span>

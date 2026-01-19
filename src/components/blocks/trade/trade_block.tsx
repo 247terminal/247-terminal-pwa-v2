@@ -1,4 +1,5 @@
 import { useMemo } from 'preact/hooks';
+import { X } from 'lucide-preact';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import { markets } from '../../../stores/exchange_store';
 import { selected_order_type } from '../../../stores/trade_store';
@@ -37,15 +38,7 @@ export function TradeBlock({ on_remove }: TradeBlockProps) {
                         onClick={on_remove}
                         class="text-base-content/40 hover:text-base-content transition-all opacity-0 group-hover:opacity-100"
                     >
-                        <svg
-                            class="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        >
-                            <path d="M18 6L6 18M6 6l12 12" />
-                        </svg>
+                        <X class="w-4 h-4" />
                     </button>
                 )}
             </div>

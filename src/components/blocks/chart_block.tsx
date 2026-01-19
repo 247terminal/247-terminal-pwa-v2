@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
+import { X } from 'lucide-preact';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
 import { EXCHANGE_IDS, type ExchangeId } from '../../types/exchange.types';
@@ -144,15 +145,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                         onClick={on_remove}
                         class="px-3 text-base-content/40 hover:text-base-content transition-all opacity-0 group-hover:opacity-100"
                     >
-                        <svg
-                            class="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        >
-                            <path d="M18 6L6 18M6 6l12 12" />
-                        </svg>
+                        <X class="w-4 h-4" />
                     </button>
                 )}
             </div>

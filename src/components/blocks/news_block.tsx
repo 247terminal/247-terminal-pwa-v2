@@ -1,3 +1,5 @@
+import { X } from 'lucide-preact';
+
 interface NewsBlockProps {
     on_remove?: () => void;
 }
@@ -13,15 +15,7 @@ export function NewsBlock({ on_remove }: NewsBlockProps) {
                         onClick={on_remove}
                         class="text-base-content/40 hover:text-base-content transition-all opacity-0 group-hover:opacity-100"
                     >
-                        <svg
-                            class="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        >
-                            <path d="M18 6L6 18M6 6l12 12" />
-                        </svg>
+                        <X class="w-4 h-4" />
                     </button>
                 )}
             </div>

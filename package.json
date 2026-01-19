@@ -18,6 +18,7 @@
         "@preact/signals": "^2.5.1",
         "ccxt": "^4.5.32",
         "lightweight-charts": "^5.1.0",
+        "lucide-preact": "^0.562.0",
         "preact": "^10.27.2",
         "preact-iso": "^2.11.1",
         "protobufjs": "^8.0.0",

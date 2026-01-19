@@ -1,5 +1,15 @@
 import { useState, useCallback, useRef, useEffect } from 'preact/hooks';
 import { memo } from 'preact/compat';
+import {
+    MousePointer2,
+    Ruler,
+    Minus,
+    TrendingUp,
+    Square,
+    Pencil,
+    Trash2,
+    Eraser,
+} from 'lucide-preact';
 import type { DrawingTool, DrawingToolbarProps, ToolButtonProps } from '../../types/drawing.types';
 import { ColorPicker } from './color_picker';
 
@@ -28,82 +38,6 @@ const ToolButton = memo(function ToolButton({
     );
 });
 
-const SelectIcon = memo(function SelectIcon() {
-    return (
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
-            <path d="M13 13l6 6" />
-        </svg>
-    );
-});
-
-const MeasureIcon = memo(function MeasureIcon() {
-    return (
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
-            <path d="m14.5 12.5 2-2" />
-            <path d="m11.5 9.5 2-2" />
-            <path d="m8.5 6.5 2-2" />
-            <path d="m17.5 15.5 2-2" />
-        </svg>
-    );
-});
-
-const HLineIcon = memo(function HLineIcon() {
-    return (
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12h18" />
-        </svg>
-    );
-});
-
-const TrendLineIcon = memo(function TrendLineIcon() {
-    return (
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 21L21 3" />
-        </svg>
-    );
-});
-
-const RectangleIcon = memo(function RectangleIcon() {
-    return (
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-        </svg>
-    );
-});
-
-const BrushIcon = memo(function BrushIcon() {
-    return (
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
-            <path d="m15 5 4 4" />
-        </svg>
-    );
-});
-
-const DeleteIcon = memo(function DeleteIcon() {
-    return (
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 6h18" />
-            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            <line x1="10" y1="11" x2="10" y2="17" />
-            <line x1="14" y1="11" x2="14" y2="17" />
-        </svg>
-    );
-});
-
-const ClearAllIcon = memo(function ClearAllIcon() {
-    return (
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
-            <path d="M22 21H7" />
-            <path d="m5 11 9 9" />
-        </svg>
-    );
-});
-
 const ColorIcon = memo(function ColorIcon({ color }: { color: string }) {
     return (
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -113,23 +47,50 @@ const ColorIcon = memo(function ColorIcon({ color }: { color: string }) {
     );
 });
 
+const ICON_CLASS = 'w-4 h-4';
+
 const TOOLS: readonly {
     tool: DrawingTool;
     Icon: preact.FunctionComponent;
     title: string;
     aria_label: string;
 }[] = [
-    { tool: 'select', Icon: SelectIcon, title: 'Select (Esc)', aria_label: 'Select drawing tool' },
-    { tool: 'measure', Icon: MeasureIcon, title: 'Measure', aria_label: 'Measure price and time' },
+    {
+        tool: 'select',
+        Icon: () => <MousePointer2 class={ICON_CLASS} />,
+        title: 'Select (Esc)',
+        aria_label: 'Select drawing tool',
+    },
+    {
+        tool: 'measure',
+        Icon: () => <Ruler class={ICON_CLASS} />,
+        title: 'Measure',
+        aria_label: 'Measure price and time',
+    },
     {
         tool: 'horizontal_line',
-        Icon: HLineIcon,
+        Icon: () => <Minus class={ICON_CLASS} />,
         title: 'Horizontal Line',
         aria_label: 'Draw horizontal line',
     },
-    { tool: 'trend_line', Icon: TrendLineIcon, title: 'Trend Line', aria_label: 'Draw trend line' },
-    { tool: 'rectangle', Icon: RectangleIcon, title: 'Rectangle', aria_label: 'Draw rectangle' },
-    { tool: 'brush', Icon: BrushIcon, title: 'Brush', aria_label: 'Freehand brush tool' },
+    {
+        tool: 'trend_line',
+        Icon: () => <TrendingUp class={ICON_CLASS} />,
+        title: 'Trend Line',
+        aria_label: 'Draw trend line',
+    },
+    {
+        tool: 'rectangle',
+        Icon: () => <Square class={ICON_CLASS} />,
+        title: 'Rectangle',
+        aria_label: 'Draw rectangle',
+    },
+    {
+        tool: 'brush',
+        Icon: () => <Pencil class={ICON_CLASS} />,
+        title: 'Brush',
+        aria_label: 'Freehand brush tool',
+    },
 ] as const;
 
 export const DrawingToolbar = memo(function DrawingToolbar({
@@ -253,7 +214,7 @@ export const DrawingToolbar = memo(function DrawingToolbar({
                             title="Delete Selected"
                             aria_label="Delete selected drawing"
                         >
-                            <DeleteIcon />
+                            <Trash2 class={ICON_CLASS} />
                         </ToolButton>
                     </>
                 )}
@@ -266,7 +227,7 @@ export const DrawingToolbar = memo(function DrawingToolbar({
                             title="Clear All Drawings"
                             aria_label="Clear all drawings from chart"
                         >
-                            <ClearAllIcon />
+                            <Eraser class={ICON_CLASS} />
                         </ToolButton>
                     </>
                 )}
