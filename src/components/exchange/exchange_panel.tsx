@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'preact/hooks';
-import { Eye, EyeOff, X, UserPlus, KeyRound, CircleHelp, AlertTriangle } from 'lucide-preact';
+import { Eye, EyeOff, X, UserPlus, KeyRound, AlertTriangle } from 'lucide-preact';
 import { use_click_outside, use_escape_key } from '@/hooks';
 import {
     exchange_credentials,
@@ -251,7 +251,10 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                         onClick={() => set_help_open(true)}
                         class="group relative flex-1 flex justify-center py-2 text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
                     >
-                        <CircleHelp class="w-5 h-5" />
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <circle cx="12" cy="17" r="0.5" fill="currentColor" />
+                        </svg>
                         <span class="absolute bottom-full mb-1 px-2 py-1 text-xs bg-base-300 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                             Setup Guide
                         </span>
