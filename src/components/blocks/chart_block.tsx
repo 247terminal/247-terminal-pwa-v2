@@ -21,7 +21,6 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
     const [symbol, set_symbol] = useState('BTC/USDT:USDT');
     const [timeframe, set_timeframe] = useState<Timeframe>('1');
     const [data, set_data] = useState<OHLCV[]>([]);
-    const [data_key, set_data_key] = useState('');
     const [loading, set_loading] = useState(true);
 
     const current_markets = markets.value;
@@ -52,42 +51,14 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         if (!symbol) return;
 
         let cancelled = false;
+        let cleanup_stream: (() => void) | null = null;
 
-        const load_chart_data = async () => {
-            set_loading(true);
-            try {
-                const chart_tf = is_sub_minute_timeframe(timeframe)
-                    ? '1'
-                    : toolbar_to_chart_timeframe(timeframe);
-                const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
-                if (cancelled) return;
-                set_chart_tick_size(next_tick_size);
-                set_data(ohlcv);
-                set_data_key(current_key);
-            } catch (err) {
-                if (cancelled) return;
-                console.error('failed to load chart data:', err);
-                set_data([]);
-            } finally {
-                if (!cancelled) {
-                    set_loading(false);
-                }
-            }
-        };
-
-        load_chart_data();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [exchange, symbol, timeframe, next_tick_size, current_key]);
-
-    const has_valid_data = data.length > 0 && data_key === current_key;
-
-    useEffect(() => {
-        if (!symbol || !has_valid_data) return;
+        const chart_tf = is_sub_minute_timeframe(timeframe)
+            ? '1'
+            : toolbar_to_chart_timeframe(timeframe);
 
         const update_candle = (candle: OHLCV) => {
+            if (cancelled) return;
             set_data((prev) => {
                 if (prev.length === 0) return prev;
                 const last = prev[prev.length - 1];
@@ -100,20 +71,45 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
             });
         };
 
-        if (is_sub_minute_timeframe(timeframe)) {
-            const last_candle = data[data.length - 1];
-            return start_candle_generation(
-                exchange,
-                symbol,
-                timeframe as SubMinuteTimeframe,
-                update_candle,
-                last_candle
-            );
+        const load_chart_data = async () => {
+            set_loading(true);
+            try {
+                const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
+                if (cancelled) return;
+                set_chart_tick_size(next_tick_size);
+                set_data(ohlcv);
+
+                if (is_sub_minute_timeframe(timeframe) && ohlcv.length > 0) {
+                    cleanup_stream = start_candle_generation(
+                        exchange,
+                        symbol,
+                        timeframe as SubMinuteTimeframe,
+                        update_candle,
+                        ohlcv[ohlcv.length - 1]
+                    );
+                }
+            } catch (err) {
+                if (cancelled) return;
+                console.error('failed to load chart data:', err);
+                set_data([]);
+            } finally {
+                if (!cancelled) {
+                    set_loading(false);
+                }
+            }
+        };
+
+        if (!is_sub_minute_timeframe(timeframe)) {
+            cleanup_stream = watch_ohlcv(exchange, symbol, chart_tf, update_candle);
         }
 
-        const chart_tf = toolbar_to_chart_timeframe(timeframe);
-        return watch_ohlcv(exchange, symbol, chart_tf, update_candle);
-    }, [exchange, symbol, timeframe, has_valid_data]);
+        load_chart_data();
+
+        return () => {
+            cancelled = true;
+            if (cleanup_stream) cleanup_stream();
+        };
+    }, [exchange, symbol, timeframe, next_tick_size]);
 
     const handle_symbol_change = useCallback(
         (ex: ExchangeId, s: string) => {
