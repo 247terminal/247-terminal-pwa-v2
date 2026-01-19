@@ -20,6 +20,7 @@
         "lightweight-charts": "^5.1.0",
         "preact": "^10.27.2",
         "preact-iso": "^2.11.1",
+        "protobufjs": "^8.0.0",
         "react-grid-layout": "^2.2.2",
         "rxjs": "^7.8.2",
         "viem": "^2.44.4"
@@ -40,6 +41,7 @@
         "tailwindcss": "^4.1.18",
         "typescript": "~5.9.3",
         "vite": "^7.2.4",
+        "vite-plugin-node-polyfills": "^0.25.0",
         "vitest": "^4.0.16"
     }
 }

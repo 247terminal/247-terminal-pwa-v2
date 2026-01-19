@@ -4,56 +4,15 @@ import type {
     BidAskUpdate,
     PriceUpdate,
     FundingInfo,
-} from '../../types/exchange.types';
+} from '@/types/exchange.types';
+import type { MarketData, TickerInfo, OHLCV, ChartTimeframe } from '@/types/chart.types';
 import {
     update_ticker_stream_batch,
     update_bidask_batch,
     update_price_batch,
-} from '../../stores/exchange_store';
+} from '@/stores/exchange_store';
 
-export interface MarketData {
-    symbol: string;
-    base: string;
-    quote: string;
-    settle: string;
-    active: boolean;
-    type: string;
-    tick_size: number;
-    min_qty: number;
-    max_qty: number;
-    qty_step: number;
-    contract_size: number;
-    max_leverage: number | null;
-}
-
-export interface TickerInfo {
-    last_price: number;
-    price_24h: number | null;
-    volume_24h: number | null;
-}
-
-export interface OHLCV {
-    time: number;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-}
-
-export type ChartTimeframe =
-    | '1'
-    | '5'
-    | '15'
-    | '30'
-    | '60'
-    | '120'
-    | '240'
-    | '480'
-    | '720'
-    | 'D'
-    | 'W'
-    | 'M';
+export type { MarketData, TickerInfo, OHLCV, ChartTimeframe };
 
 type WorkerCallback = (data: OHLCV) => void;
 
@@ -71,7 +30,9 @@ const streamCallbacks = new Map<string, WorkerCallback>();
 function getWorker(): Worker {
     if (worker) return worker;
 
-    worker = new Worker('/workers/exchange.worker.js');
+    worker = new Worker(new URL('../../workers/exchange.worker.ts', import.meta.url), {
+        type: 'module',
+    });
 
     worker.onmessage = (event) => {
         const {

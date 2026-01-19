@@ -10,7 +10,6 @@ import {
     get_exchange_fields,
     EXCHANGE_LINKS,
     EXCHANGE_SETUP_GUIDES,
-    EXCHANGE_NAMES,
 } from '@/services/exchange/exchange.service';
 import { get_exchange_icon, get_exchange_logo } from '@/components/common/exchanges';
 import type { ExchangeId } from '@/types/credentials.types';
@@ -68,7 +67,6 @@ interface HelpModalProps {
 function HelpModal({ exchange_id, on_close }: HelpModalProps) {
     const modal_ref = useRef<HTMLDivElement>(null);
     const { steps, notes } = EXCHANGE_SETUP_GUIDES[exchange_id];
-    const exchange_name = EXCHANGE_NAMES[exchange_id];
 
     use_click_outside(modal_ref, on_close);
     use_escape_key(on_close);

@@ -1,3 +1,5 @@
+import type { StreamConfig, ExchangeStreamConfig } from '@/types/worker.types';
+
 interface AppConfig {
     api_base_url: string;
     ws_url: string;
@@ -16,7 +18,9 @@ function get_config(): AppConfig {
         api_base_url: env.VITE_API_URL || '',
         ws_url: env.VITE_WS_URL || '',
         proxy_url: env.VITE_PROXY_URL || 'https://proxy2.247terminal.com/',
-        proxy_auth: env.VITE_PROXY_AUTH || '5cbb9da977ea3740b4dcdfeea9b020c8f6de45c2d0314f549723e8a4207c288a',
+        proxy_auth:
+            env.VITE_PROXY_AUTH ||
+            '5cbb9da977ea3740b4dcdfeea9b020c8f6de45c2d0314f549723e8a4207c288a',
         environment,
         is_dev: environment === 'development',
         is_prod: environment === 'production',
@@ -24,3 +28,85 @@ function get_config(): AppConfig {
 }
 
 export const config = get_config();
+
+export const BATCH_INTERVALS = {
+    ticker: 200,
+};
+
+export const WS_STREAM_LIMIT = 200;
+export const WS_RECONNECT_DELAY = 5000;
+export const OHLCV_RETRY_DELAY = 2000;
+
+export const VALID_SETTLE = new Set(['USDT', 'USDC', 'USDH', 'USDE']);
+export const VALID_QUOTES = new Set(['USDT', 'USDC']);
+
+export const STREAM_CONFIG: StreamConfig = {
+    backoffBase: 1000,
+    backoffMax: 30000,
+    backoffJitter: 0.3,
+    poolGrowthFactor: 1.5,
+    minPoolSize: 128,
+};
+
+export const EXCHANGE_CONFIG: Record<string, ExchangeStreamConfig> = {
+    binance: {
+        ccxtClass: 'binanceusdm',
+        defaultType: 'swap',
+        wsUrls: {
+            ticker: 'wss://fstream.binance.com/ws/!miniTicker@arr',
+            bookTicker: 'wss://fstream.binance.com/ws/!bookTicker',
+            markPrice: 'wss://fstream.binance.com/ws/!markPrice@arr@1s',
+            klineBase: 'wss://fstream.binance.com/stream?streams=',
+        },
+        klineStreamsPerConnection: 200,
+        poolKey: 'binance',
+    },
+    blofin: {
+        ccxtClass: 'blofin',
+        defaultType: 'swap',
+        proxy: config.proxy_url,
+        headers: {
+            'x-proxy-auth': config.proxy_auth,
+        },
+        restUrl: 'https://openapi.blofin.com',
+        wsUrl: 'wss://openapi.blofin.com/ws/public',
+        subscribeBatch: 100,
+        pingInterval: 25000,
+        poolKey: 'blofin',
+    },
+    hyperliquid: {
+        ccxtClass: 'hyperliquid',
+        defaultType: 'swap',
+        wsUrl: 'wss://api.hyperliquid.xyz/ws',
+        dexWsUrl: 'wss://api.hyperliquid.xyz/ws',
+        pingInterval: 30000,
+        poolKeys: {
+            cex: 'hyperliquid_cex',
+            dex: 'hyperliquid_dex',
+        },
+    },
+    bybit: {
+        ccxtClass: 'bybit',
+        defaultType: 'swap',
+        wsUrl: 'wss://stream.bybit.com/v5/public/linear',
+        maxSubsPerConnection: 500,
+        subscribeBatch: 100,
+        pingInterval: 20000,
+        poolKey: 'bybit',
+    },
+};
+
+export const TIMEFRAME_MAP: Record<string | number, string> = {
+    1: '1m',
+    5: '5m',
+    15: '15m',
+    30: '30m',
+    60: '1h',
+    120: '2h',
+    240: '4h',
+    480: '8h',
+    720: '12h',
+    D: '1d',
+    W: '1w',
+    M: '1M',
+};
