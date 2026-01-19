@@ -1,5 +1,4 @@
 import { useMemo } from 'preact/hooks';
-import { X } from 'lucide-preact';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import { markets } from '../../../stores/exchange_store';
 import { selected_order_type } from '../../../stores/trade_store';
@@ -12,11 +11,7 @@ import { OrderSummary } from './order_summary';
 import { OrderButtons } from './order_buttons';
 import type { ExchangeSymbols } from './symbol_selector';
 
-interface TradeBlockProps {
-    on_remove?: () => void;
-}
-
-export function TradeBlock({ on_remove }: TradeBlockProps) {
+export function TradeBlock() {
     const order_type = selected_order_type.value;
     const current_markets = markets.value;
 
@@ -29,20 +24,7 @@ export function TradeBlock({ on_remove }: TradeBlockProps) {
     }, [current_markets]);
 
     return (
-        <div class="h-full flex flex-col group">
-            <div class="drag-handle flex items-center justify-between px-3 py-2 bg-theme-header border-b border-base-300/50 cursor-move">
-                <span class="text-xs font-medium text-base-content tracking-wide">TRADE</span>
-                {on_remove && (
-                    <button
-                        type="button"
-                        onClick={on_remove}
-                        class="text-base-content/40 hover:text-base-content transition-all opacity-0 group-hover:opacity-100"
-                    >
-                        <X class="w-4 h-4" />
-                    </button>
-                )}
-            </div>
-
+        <div class="h-full flex flex-col bg-theme-header">
             <TradeToolbar exchange_symbols={exchange_symbols} />
 
             <div class="flex-1 p-2 overflow-auto">

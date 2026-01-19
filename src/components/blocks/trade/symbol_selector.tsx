@@ -239,7 +239,7 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
             <button
                 type="button"
                 onClick={() => set_open(!open)}
-                class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-base-300 hover:bg-base-content/10 text-base-content transition-colors font-medium min-w-24 text-left"
+                class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-base-200 hover:bg-base-300 text-base-content transition-colors font-medium min-w-24 text-left"
             >
                 <span class="text-base-content/30">{get_exchange_icon(exchange)}</span>
                 <span>{format_symbol(symbol)}</span>
@@ -258,7 +258,7 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
                                 value={search}
                                 onInput={(e) => set_search((e.target as HTMLInputElement).value)}
                                 placeholder="Search symbols..."
-                                class="w-full px-2 py-1 text-xs bg-base-300 rounded border-none outline-none text-base-content"
+                                class="w-full px-2 py-1 text-xs bg-base-200 rounded border-none outline-none text-base-content"
                             />
                         </div>
                         <div class="flex items-center gap-1 px-1 pb-1">
@@ -318,7 +318,7 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
                                             return (
                                                 <div
                                                     key={`header-${item.exchange}`}
-                                                    class="flex items-center gap-1.5 px-2 text-xs bg-base-300 text-base-content/70"
+                                                    class="flex items-center gap-1.5 px-2 text-xs bg-base-200 text-base-content/70"
                                                     style={{ height: `${HEADER_HEIGHT}px` }}
                                                 >
                                                     {get_exchange_icon(item.exchange)}

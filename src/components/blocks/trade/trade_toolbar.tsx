@@ -8,7 +8,7 @@ interface TradeToolbarProps {
 
 export function TradeToolbar({ exchange_symbols }: TradeToolbarProps) {
     return (
-        <div class="flex items-center gap-2 px-2 py-1.5 border-b border-base-300/50">
+        <div class="drag-handle flex items-center gap-2 px-2 py-1.5 border-b border-base-300/50 cursor-move">
             <SymbolSelector exchange_symbols={exchange_symbols} />
             <LeverageSelector />
             <div class="ml-auto">

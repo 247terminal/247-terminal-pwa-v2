@@ -24,7 +24,7 @@ export function LeverageSelector() {
             <button
                 type="button"
                 onClick={() => set_open(!open)}
-                class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-base-300 hover:bg-base-content/10 transition-colors"
+                class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-base-200 hover:bg-base-300 transition-colors"
             >
                 <span class="font-medium text-base-content">{leverage}x</span>
             </button>
@@ -57,7 +57,7 @@ export function LeverageSelector() {
                                     class={`py-1 text-[10px] rounded transition-colors ${
                                         leverage === p
                                             ? 'bg-primary text-primary-content'
-                                            : 'bg-base-300 text-base-content/70 hover:text-base-content'
+                                            : 'bg-base-200 text-base-content/70 hover:text-base-content hover:bg-base-300'
                                     }`}
                                 >
                                     {p}x

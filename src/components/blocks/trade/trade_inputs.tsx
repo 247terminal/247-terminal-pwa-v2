@@ -38,14 +38,14 @@ export function PriceInput({
                     inputMode="decimal"
                     value={value}
                     onInput={handle_input}
-                    class="flex-1 bg-base-300 px-2 py-1.5 rounded text-xs text-base-content outline-none focus:ring-1 focus:ring-primary/50"
+                    class="flex-1 bg-base-200 px-2 py-1.5 rounded text-xs text-base-content outline-none focus:ring-1 focus:ring-primary/50"
                     placeholder={placeholder}
                 />
                 {show_last && on_last_click && (
                     <button
                         type="button"
                         onClick={on_last_click}
-                        class="px-2 py-1.5 text-[10px] bg-base-300 rounded text-base-content/60 hover:text-base-content hover:bg-base-content/10 transition-colors"
+                        class="px-2 py-1.5 text-[10px] bg-base-200 rounded text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors"
                     >
                         Last
                     </button>
@@ -96,13 +96,13 @@ export function QuantityInput({
                     inputMode="decimal"
                     value={value}
                     onInput={handle_input}
-                    class="flex-1 bg-base-300 px-2 py-1.5 rounded text-xs text-base-content outline-none focus:ring-1 focus:ring-primary/50"
+                    class="flex-1 bg-base-200 px-2 py-1.5 rounded text-xs text-base-content outline-none focus:ring-1 focus:ring-primary/50"
                     placeholder="0.00"
                 />
                 <button
                     type="button"
                     onClick={toggle_unit}
-                    class="px-2 py-1.5 text-[10px] bg-base-300 rounded text-base-content/60 hover:text-base-content hover:bg-base-content/10 transition-colors min-w-10"
+                    class="px-2 py-1.5 text-[10px] bg-base-200 rounded text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors min-w-10"
                 >
                     {size_unit === 'usd' ? 'USD' : coin_symbol}
                 </button>
@@ -139,7 +139,7 @@ export function TotalInput({ label = 'Total', value, on_change, suffix = 'USD' }
                     inputMode="decimal"
                     value={value}
                     onInput={handle_input}
-                    class="w-full bg-base-300 px-2 py-1.5 pr-10 rounded text-xs text-base-content outline-none focus:ring-1 focus:ring-primary/50"
+                    class="w-full bg-base-200 px-2 py-1.5 pr-10 rounded text-xs text-base-content outline-none focus:ring-1 focus:ring-primary/50"
                     placeholder="0.00"
                 />
                 <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-base-content/40">
@@ -260,7 +260,7 @@ export function SegmentSelector<T extends string>({
                         class={`flex-1 px-1.5 py-1 text-[10px] rounded transition-colors ${
                             value === opt.value
                                 ? 'bg-primary text-primary-content'
-                                : 'bg-base-300 text-base-content/60 hover:text-base-content'
+                                : 'bg-base-200 text-base-content/60 hover:text-base-content hover:bg-base-300'
                         }`}
                     >
                         {opt.label}
