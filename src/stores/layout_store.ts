@@ -25,7 +25,7 @@ export type DefaultRigTemplate = 'single_chart' | 'double_chart';
 function create_single_chart_rig(): Rig {
     const chart_id = `chart_${generate_id()}`;
     const news_id = `news_${generate_id()}`;
-    const positions_id = `positions_${generate_id()}`;
+    const account_id = `account_${generate_id()}`;
     const trade_id = `trade_${generate_id()}`;
 
     return {
@@ -34,14 +34,14 @@ function create_single_chart_rig(): Rig {
         blocks: [
             { id: chart_id, type: 'chart' },
             { id: news_id, type: 'news' },
-            { id: positions_id, type: 'positions' },
+            { id: account_id, type: 'account' },
             { id: trade_id, type: 'trade' },
         ],
         layouts: {
             lg: [
                 { i: chart_id, x: 0, y: 0, w: 12, h: 10, minW: 4, minH: 4 },
                 { i: news_id, x: 12, y: 0, w: 4, h: 16, minW: 2, minH: 3 },
-                { i: positions_id, x: 0, y: 10, w: 6, h: 6, minW: 3, minH: 3 },
+                { i: account_id, x: 0, y: 10, w: 6, h: 6, minW: 3, minH: 3 },
                 { i: trade_id, x: 6, y: 10, w: 6, h: 6, minW: 2, minH: 4 },
             ],
         },
@@ -53,7 +53,7 @@ function create_double_chart_rig(): Rig {
     const chart1_id = `chart_${generate_id()}`;
     const chart2_id = `chart_${generate_id()}`;
     const news_id = `news_${generate_id()}`;
-    const positions_id = `positions_${generate_id()}`;
+    const account_id = `account_${generate_id()}`;
     const trade_id = `trade_${generate_id()}`;
 
     return {
@@ -63,7 +63,7 @@ function create_double_chart_rig(): Rig {
             { id: chart1_id, type: 'chart' },
             { id: chart2_id, type: 'chart' },
             { id: news_id, type: 'news' },
-            { id: positions_id, type: 'positions' },
+            { id: account_id, type: 'account' },
             { id: trade_id, type: 'trade' },
         ],
         layouts: {
@@ -71,7 +71,7 @@ function create_double_chart_rig(): Rig {
                 { i: chart1_id, x: 0, y: 0, w: 6, h: 9, minW: 3, minH: 4 },
                 { i: chart2_id, x: 6, y: 0, w: 6, h: 9, minW: 3, minH: 4 },
                 { i: news_id, x: 12, y: 0, w: 4, h: 16, minW: 2, minH: 3 },
-                { i: positions_id, x: 0, y: 9, w: 6, h: 7, minW: 3, minH: 3 },
+                { i: account_id, x: 0, y: 9, w: 6, h: 7, minW: 3, minH: 3 },
                 { i: trade_id, x: 6, y: 9, w: 6, h: 7, minW: 2, minH: 4 },
             ],
         },

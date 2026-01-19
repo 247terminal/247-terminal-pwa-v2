@@ -6,7 +6,7 @@ import {
     type ResponsiveLayouts,
 } from 'react-grid-layout';
 import { Header } from '../components/layout/header';
-import { ChartBlock, NewsBlock, PositionsBlock, ChatBlock, TradeBlock } from '../components/blocks';
+import { ChartBlock, NewsBlock, ChatBlock, TradeBlock, AccountBlock } from '../components/blocks';
 import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_store';
 import { layout_locked, trigger_lock_shake } from '../stores/layout_lock_store';
 import { get_block_icon } from '../components/common/block_icons';
@@ -24,8 +24,8 @@ function render_block(type: BlockType, on_remove: () => void, locked: boolean) {
             return <ChartBlock on_remove={remove_handler} />;
         case 'news':
             return <NewsBlock on_remove={remove_handler} />;
-        case 'positions':
-            return <PositionsBlock on_remove={remove_handler} />;
+        case 'account':
+            return <AccountBlock on_remove={remove_handler} />;
         case 'chat':
             return <ChatBlock on_remove={remove_handler} />;
         case 'trade':
