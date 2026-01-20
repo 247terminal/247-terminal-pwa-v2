@@ -1,8 +1,10 @@
 import { memo } from 'preact/compat';
 import { useState, useMemo, useCallback } from 'preact/hooks';
+import { VList } from 'virtua';
 import type { Order } from '../../../types/account.types';
-import { orders_list, privacy_mode } from '../../../stores/account_store';
+import { orders_list, privacy_mode, cancel_order } from '../../../stores/account_store';
 import { get_market } from '../../../stores/exchange_store';
+import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
 import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
@@ -36,16 +38,31 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
     const qty_step = market?.qty_step ?? 0.001;
 
     const handle_cancel = useCallback(() => {
-        console.error('cancel order not implemented');
-    }, []);
+        cancel_order(order.exchange, order.id);
+    }, [order.exchange, order.id]);
+
+    const handle_symbol_click = useCallback(() => {
+        navigate_to_symbol(order.exchange, order.symbol);
+    }, [order.exchange, order.symbol]);
 
     return (
-        <div class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs">
+        <div
+            class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
+            role="row"
+        >
             <span
                 class={`absolute left-0 top-1 bottom-1 w-[2.5px] ${is_buy ? 'bg-success' : 'bg-error'}`}
+                aria-hidden="true"
             />
-            <div class="w-24 shrink-0 flex items-center gap-1.5">
-                <span class="text-base-content/40 shrink-0">
+            <div
+                class="w-24 shrink-0 flex items-center gap-1.5 cursor-pointer hover:opacity-80"
+                onClick={handle_symbol_click}
+                onKeyDown={(e) => e.key === 'Enter' && handle_symbol_click()}
+                role="button"
+                tabIndex={0}
+                aria-label={`Navigate to ${format_symbol(order.symbol)} chart`}
+            >
+                <span class="text-base-content/40 shrink-0" aria-hidden="true">
                     {get_exchange_icon(order.exchange)}
                 </span>
                 <div>
@@ -58,7 +75,7 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right">
+            <div class="w-20 shrink-0 text-right" role="cell">
                 <div class="text-base-content">
                     {mask_value(format_usd(order.size * order.price), is_private)}
                 </div>
@@ -71,21 +88,25 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right">
+            <div class="w-20 shrink-0 text-right" role="cell">
                 <div class="text-base-content">
                     {mask_value(format_price(order.price, tick_size), is_private)}
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right text-base-content/50 font-mono text-[10px]">
+            <div
+                class="w-20 shrink-0 text-right text-base-content/50 font-mono text-[10px]"
+                role="cell"
+            >
                 {order.id.slice(-8)}
             </div>
 
-            <div class="flex-1 flex justify-end">
+            <div class="flex-1 flex justify-end" role="cell">
                 <button
                     type="button"
                     onClick={handle_cancel}
                     class="px-1.5 py-0.5 text-[10px] rounded bg-error/20 hover:bg-error/40 text-error transition-colors"
+                    aria-label={`Cancel order ${order.id.slice(-8)}`}
                 >
                     Cancel
                 </button>
@@ -95,7 +116,7 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
 });
 
 function sort_orders(orders: Order[], key: OrderSortKey, direction: SortDirection): Order[] {
-    const sorted = [...orders].sort((a, b) => {
+    return orders.toSorted((a, b) => {
         let cmp = 0;
         switch (key) {
             case 'symbol':
@@ -113,7 +134,6 @@ function sort_orders(orders: Order[], key: OrderSortKey, direction: SortDirectio
         }
         return direction === 'asc' ? cmp : -cmp;
     });
-    return sorted;
 }
 
 export function OrdersTab() {
@@ -148,8 +168,11 @@ export function OrdersTab() {
     }
 
     return (
-        <div class="flex-1 overflow-auto">
-            <div class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 sticky top-0 bg-base-200">
+        <div class="flex-1 flex flex-col overflow-hidden" role="table" aria-label="Active orders">
+            <div
+                class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 bg-base-200"
+                role="row"
+            >
                 <SortHeader
                     label="Symbol"
                     sort_key="symbol"
@@ -185,11 +208,15 @@ export function OrdersTab() {
                     align="right"
                     width="w-20"
                 />
-                <div class="flex-1 text-right">Actions</div>
+                <div class="flex-1 text-right" role="columnheader">
+                    Actions
+                </div>
             </div>
-            {sorted_orders.map((order) => (
-                <OrderRow key={order.id} order={order} is_private={is_private} />
-            ))}
+            <VList class="flex-1" role="rowgroup">
+                {sorted_orders.map((order) => (
+                    <OrderRow key={order.id} order={order} is_private={is_private} />
+                ))}
+            </VList>
         </div>
     );
 }

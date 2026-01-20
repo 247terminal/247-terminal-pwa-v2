@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'preact/hooks';
 import { X } from 'lucide-preact';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
@@ -13,14 +13,14 @@ import { markets, get_market } from '../../stores/exchange_store';
 import { exchange_connection_status } from '../../stores/credentials_store';
 import { is_sub_minute_timeframe, type SubMinuteTimeframe } from '../../types/candle.types';
 import { start_candle_generation } from '../../services/candle_generator';
+import { register_navigation_handler } from '../../stores/chart_navigation_store';
 
 function get_default_exchange(connection_status: Record<ExchangeId, boolean>): ExchangeId {
-    const sorted = [...EXCHANGE_ORDER].sort((a, b) => {
+    return EXCHANGE_ORDER.toSorted((a, b) => {
         const a_connected = connection_status[a] ? 1 : 0;
         const b_connected = connection_status[b] ? 1 : 0;
         return b_connected - a_connected;
-    });
-    return sorted[0];
+    })[0];
 }
 
 interface ChartBlockProps {
@@ -37,6 +37,19 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
     const [data, set_data] = useState<OHLCV[]>([]);
     const [loading, set_loading] = useState(true);
 
+    const state_ref = useRef({ exchange, symbol });
+    state_ref.current = { exchange, symbol };
+
+    useEffect(() => {
+        return register_navigation_handler((request) => {
+            const { exchange: curr_ex, symbol: curr_sym } = state_ref.current;
+            if (request.exchange === curr_ex && request.symbol === curr_sym) return;
+            set_loading(true);
+            set_exchange(request.exchange);
+            set_symbol(request.symbol);
+        });
+    }, []);
+
     const current_markets = markets.value;
 
     const exchange_symbols = useMemo<ExchangeSymbols>(() => {
@@ -46,7 +59,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
             if (has_connected && !connection_status[ex]) continue;
             const symbols = Object.keys(current_markets[ex] || {});
             if (symbols.length > 0) {
-                result[ex] = symbols.sort();
+                result[ex] = symbols.toSorted();
             }
         }
         return result;
@@ -57,12 +70,10 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         [current_markets]
     );
 
-    const next_tick_size = useMemo(() => {
+    const [chart_tick_size, set_chart_tick_size] = useState(() => {
         const market = get_market(exchange, symbol);
         return market?.tick_size ?? 0.01;
-    }, [exchange, symbol, current_markets]);
-
-    const [chart_tick_size, set_chart_tick_size] = useState(next_tick_size);
+    });
 
     const current_key = `${exchange}:${symbol}:${timeframe}`;
 
@@ -95,7 +106,8 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
             try {
                 const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
                 if (cancelled) return;
-                set_chart_tick_size(next_tick_size);
+                const market = get_market(exchange, symbol);
+                set_chart_tick_size(market?.tick_size ?? 0.01);
                 set_data(ohlcv);
 
                 if (is_sub_minute_timeframe(timeframe) && ohlcv.length > 0) {
@@ -128,7 +140,7 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
             cancelled = true;
             if (cleanup_stream) cleanup_stream();
         };
-    }, [exchange, symbol, timeframe, next_tick_size]);
+    }, [exchange, symbol, timeframe]);
 
     const handle_symbol_change = useCallback(
         (ex: ExchangeId, s: string) => {
@@ -162,8 +174,9 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                         type="button"
                         onClick={on_remove}
                         class="px-3 text-base-content/40 hover:text-base-content transition-all opacity-0 group-hover:opacity-100"
+                        aria-label="Remove chart"
                     >
-                        <X class="w-4 h-4" />
+                        <X class="w-4 h-4" aria-hidden="true" />
                     </button>
                 )}
             </div>

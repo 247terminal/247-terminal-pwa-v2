@@ -1,9 +1,16 @@
 import { memo } from 'preact/compat';
-import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
-import { effect } from '@preact/signals';
+import { useState, useMemo, useCallback } from 'preact/hooks';
+import { useSignalEffect } from '@preact/signals';
+import { VList } from 'virtua';
 import type { Position } from '../../../types/account.types';
-import { positions_list, privacy_mode } from '../../../stores/account_store';
+import {
+    positions_list,
+    privacy_mode,
+    close_position,
+    open_tpsl_modal,
+} from '../../../stores/account_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
+import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
 import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
@@ -26,12 +33,9 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
     const ticker_signal = get_ticker_signal(position.exchange, position.symbol);
     const [ticker, set_ticker] = useState(ticker_signal.value);
 
-    useEffect(() => {
-        const dispose = effect(() => {
-            set_ticker(ticker_signal.value);
-        });
-        return dispose;
-    }, [ticker_signal]);
+    useSignalEffect(() => {
+        set_ticker(ticker_signal.value);
+    });
 
     const last_price = ticker?.last_price ?? position.last_price;
     const pnl = is_long
@@ -41,20 +45,35 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
     const pnl_color = pnl >= 0 ? 'text-success' : 'text-error';
 
     const handle_close = useCallback(() => {
-        console.error('close position not implemented');
-    }, []);
+        close_position(position.exchange, position.symbol);
+    }, [position.exchange, position.symbol]);
 
     const handle_tpsl = useCallback(() => {
-        console.error('tp/sl not implemented');
-    }, []);
+        open_tpsl_modal(position);
+    }, [position]);
+
+    const handle_symbol_click = useCallback(() => {
+        navigate_to_symbol(position.exchange, position.symbol);
+    }, [position.exchange, position.symbol]);
 
     return (
-        <div class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs">
+        <div
+            class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
+            role="row"
+        >
             <span
                 class={`absolute left-0 top-1 bottom-1 w-[2.5px] ${is_long ? 'bg-success' : 'bg-error'}`}
+                aria-hidden="true"
             />
-            <div class="w-24 shrink-0 flex items-center gap-1.5">
-                <span class="text-base-content/40 shrink-0">
+            <div
+                class="w-24 shrink-0 flex items-center gap-1.5 cursor-pointer hover:opacity-80"
+                onClick={handle_symbol_click}
+                onKeyDown={(e) => e.key === 'Enter' && handle_symbol_click()}
+                role="button"
+                tabIndex={0}
+                aria-label={`Navigate to ${format_symbol(position.symbol)} chart`}
+            >
+                <span class="text-base-content/40 shrink-0" aria-hidden="true">
                     {get_exchange_icon(position.exchange)}
                 </span>
                 <div>
@@ -67,7 +86,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right">
+            <div class="w-20 shrink-0 text-right" role="cell">
                 <div class="text-base-content">
                     {mask_value(format_usd(position.size * last_price), is_private)}
                 </div>
@@ -79,7 +98,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right">
+            <div class="w-20 shrink-0 text-right" role="cell">
                 <div class="text-base-content/70">
                     {mask_value(format_price(position.entry_price, tick_size), is_private)}
                 </div>
@@ -88,24 +107,25 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </div>
             </div>
 
-            <div class="w-16 shrink-0 text-right text-error/70">
+            <div class="w-16 shrink-0 text-right text-error/70" role="cell">
                 {position.liquidation_price
                     ? mask_value(format_price(position.liquidation_price, tick_size), is_private)
                     : '-'}
             </div>
 
-            <div class={`w-20 shrink-0 text-right ${pnl_color}`}>
+            <div class={`w-20 shrink-0 text-right ${pnl_color}`} role="cell">
                 <div>{mask_value(format_pnl(pnl), is_private)}</div>
                 <div class="text-[10px] opacity-70">
                     {mask_value(format_pct(pnl_pct), is_private)}
                 </div>
             </div>
 
-            <div class="flex-1 flex justify-end gap-1">
+            <div class="flex-1 flex justify-end gap-1" role="cell">
                 <button
                     type="button"
                     onClick={handle_tpsl}
                     class="px-1.5 py-0.5 text-[10px] rounded bg-base-300 hover:bg-base-content/20 text-base-content/70 hover:text-base-content transition-colors"
+                    aria-label={`Set take profit and stop loss for ${format_symbol(position.symbol)}`}
                 >
                     TP/SL
                 </button>
@@ -113,6 +133,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                     type="button"
                     onClick={handle_close}
                     class="px-1.5 py-0.5 text-[10px] rounded bg-error/20 hover:bg-error/40 text-error transition-colors"
+                    aria-label={`Close ${format_symbol(position.symbol)} position`}
                 >
                     Close
                 </button>
@@ -126,7 +147,7 @@ function sort_positions(
     key: PositionSortKey,
     direction: SortDirection
 ): Position[] {
-    const sorted = [...positions].sort((a, b) => {
+    return positions.toSorted((a, b) => {
         let cmp = 0;
         switch (key) {
             case 'symbol':
@@ -147,7 +168,6 @@ function sort_positions(
         }
         return direction === 'asc' ? cmp : -cmp;
     });
-    return sorted;
 }
 
 export function PositionsTab() {
@@ -182,8 +202,11 @@ export function PositionsTab() {
     }
 
     return (
-        <div class="flex-1 overflow-auto">
-            <div class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 sticky top-0 bg-base-200">
+        <div class="flex-1 flex flex-col overflow-hidden" role="table" aria-label="Open positions">
+            <div
+                class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 bg-base-200"
+                role="row"
+            >
                 <SortHeader
                     label="Symbol"
                     sort_key="symbol"
@@ -228,11 +251,15 @@ export function PositionsTab() {
                     align="right"
                     width="w-20"
                 />
-                <div class="flex-1 text-right">Actions</div>
+                <div class="flex-1 text-right" role="columnheader">
+                    Actions
+                </div>
             </div>
-            {sorted_positions.map((pos) => (
-                <PositionRow key={pos.id} position={pos} is_private={is_private} />
-            ))}
+            <VList class="flex-1" role="rowgroup">
+                {sorted_positions.map((pos) => (
+                    <PositionRow key={pos.id} position={pos} is_private={is_private} />
+                ))}
+            </VList>
         </div>
     );
 }

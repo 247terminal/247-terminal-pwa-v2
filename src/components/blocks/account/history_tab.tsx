@@ -1,7 +1,9 @@
 import { memo } from 'preact/compat';
 import { useState, useMemo, useCallback } from 'preact/hooks';
+import { VList } from 'virtua';
 import type { TradeHistory } from '../../../types/account.types';
 import { history, privacy_mode } from '../../../stores/account_store';
+import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
 import { format_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import {
@@ -25,13 +27,28 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
     const is_buy = trade.side === 'buy';
     const pnl_color = trade.realized_pnl >= 0 ? 'text-success' : 'text-error';
 
+    const handle_symbol_click = useCallback(() => {
+        navigate_to_symbol(trade.exchange, trade.symbol);
+    }, [trade.exchange, trade.symbol]);
+
     return (
-        <div class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs">
+        <div
+            class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
+            role="row"
+        >
             <span
                 class={`absolute left-0 top-1 bottom-1 w-[2.5px] ${is_buy ? 'bg-success' : 'bg-error'}`}
+                aria-hidden="true"
             />
-            <div class="w-20 shrink-0 flex items-center gap-1.5">
-                <span class="text-base-content/40 shrink-0">
+            <div
+                class="w-20 shrink-0 flex items-center gap-1.5 cursor-pointer hover:opacity-80"
+                onClick={handle_symbol_click}
+                onKeyDown={(e) => e.key === 'Enter' && handle_symbol_click()}
+                role="button"
+                tabIndex={0}
+                aria-label={`Navigate to ${format_symbol(trade.symbol)} chart`}
+            >
+                <span class="text-base-content/40 shrink-0" aria-hidden="true">
                     {get_exchange_icon(trade.exchange)}
                 </span>
                 <div class={`font-medium truncate ${is_buy ? 'text-success' : 'text-error'}`}>
@@ -42,15 +59,16 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
             <div
                 class="w-14 shrink-0 text-right text-base-content/50"
                 title={format_full_time(trade.closed_at)}
+                role="cell"
             >
                 {format_relative_time(trade.closed_at)}
             </div>
 
-            <div class="w-14 shrink-0 text-right">
+            <div class="w-14 shrink-0 text-right" role="cell">
                 <div class="text-base-content">{mask_value(trade.size.toString(), is_private)}</div>
             </div>
 
-            <div class="w-20 shrink-0 text-right">
+            <div class="w-20 shrink-0 text-right" role="cell">
                 <div class="text-base-content/70">
                     {mask_value(format_display_price(trade.entry_price), is_private)}
                 </div>
@@ -59,7 +77,7 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
                 </div>
             </div>
 
-            <div class={`flex-1 text-right ${pnl_color}`}>
+            <div class={`flex-1 text-right ${pnl_color}`} role="cell">
                 <div>{mask_value(format_pnl(trade.realized_pnl), is_private)}</div>
                 <div class="text-[10px] opacity-70">
                     {mask_value(format_pct(trade.realized_pnl_pct), is_private)}
@@ -74,7 +92,7 @@ function sort_history(
     key: HistorySortKey,
     direction: SortDirection
 ): TradeHistory[] {
-    const sorted = [...trades].sort((a, b) => {
+    return trades.toSorted((a, b) => {
         let cmp = 0;
         switch (key) {
             case 'symbol':
@@ -95,7 +113,6 @@ function sort_history(
         }
         return direction === 'asc' ? cmp : -cmp;
     });
-    return sorted;
 }
 
 export function HistoryTab() {
@@ -130,8 +147,11 @@ export function HistoryTab() {
     }
 
     return (
-        <div class="flex-1 overflow-auto">
-            <div class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 sticky top-0 bg-base-200">
+        <div class="flex-1 flex flex-col overflow-hidden" role="table" aria-label="Trade history">
+            <div
+                class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 bg-base-200"
+                role="row"
+            >
                 <SortHeader
                     label="Symbol"
                     sort_key="symbol"
@@ -177,9 +197,11 @@ export function HistoryTab() {
                     width="flex-1"
                 />
             </div>
-            {sorted_trades.map((trade) => (
-                <HistoryRow key={trade.id} trade={trade} is_private={is_private} />
-            ))}
+            <VList class="flex-1" role="rowgroup">
+                {sorted_trades.map((trade) => (
+                    <HistoryRow key={trade.id} trade={trade} is_private={is_private} />
+                ))}
+            </VList>
         </div>
     );
 }

@@ -131,7 +131,7 @@ export function add_history(trade: TradeHistory): void {
 
 export function add_history_batch(trades: TradeHistory[]): void {
     batch(() => {
-        const sorted = [...trades].sort((a, b) => b.closed_at - a.closed_at);
+        const sorted = trades.toSorted((a, b) => b.closed_at - a.closed_at);
         history.value = [...sorted, ...history.value].slice(0, HISTORY_LIMIT);
     });
 }
@@ -238,4 +238,22 @@ export async function refresh_account(exchange_id: ExchangeId): Promise<void> {
 
 export async function refresh_all_accounts(exchange_ids: ExchangeId[]): Promise<void> {
     await Promise.all(exchange_ids.map((id) => refresh_account(id)));
+}
+
+export const tpsl_modal_position = signal<Position | null>(null);
+
+export function open_tpsl_modal(position: Position): void {
+    tpsl_modal_position.value = position;
+}
+
+export function close_tpsl_modal(): void {
+    tpsl_modal_position.value = null;
+}
+
+export async function cancel_order(_exchange_id: ExchangeId, _order_id: string): Promise<void> {
+    return;
+}
+
+export async function close_position(_exchange_id: ExchangeId, _symbol: string): Promise<void> {
+    return;
 }
