@@ -14,9 +14,18 @@ import type { ExchangeId } from '@/types/credentials.types';
 
 const EXCHANGE_ORDER: ExchangeId[] = ['blofin', 'binance', 'hyperliquid', 'bybit'];
 
+function get_sorted_exchanges(connection_status: Record<ExchangeId, boolean>): ExchangeId[] {
+    return [...EXCHANGE_ORDER].sort((a, b) => {
+        const a_connected = connection_status[a] ? 1 : 0;
+        const b_connected = connection_status[b] ? 1 : 0;
+        return b_connected - a_connected;
+    });
+}
+
 export function Header() {
     const [open_exchange, set_open_exchange] = useState<ExchangeId | null>(null);
     const connection_status = exchange_connection_status.value;
+    const sorted_exchanges = get_sorted_exchanges(connection_status);
 
     function handle_command(command: string): void {
         console.log('Command submitted:', command);
@@ -33,7 +42,7 @@ export function Header() {
     return (
         <header class="h-10 bg-theme-header flex items-center px-3 shrink-0 relative">
             <div class="flex-1 flex items-center gap-1">
-                {EXCHANGE_ORDER.map((exchange_id) => (
+                {sorted_exchanges.map((exchange_id) => (
                     <ExchangeButton
                         key={exchange_id}
                         connected={connection_status[exchange_id]}
