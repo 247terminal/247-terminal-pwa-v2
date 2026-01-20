@@ -4,7 +4,7 @@ import { use_click_outside, use_escape_key } from '@/hooks';
 import {
     exchange_credentials,
     update_exchange_credentials,
-    disconnect_exchange,
+    disconnect_exchange as disconnect_exchange_credentials,
 } from '@/stores/credentials_store';
 import {
     validate_exchange_credentials,
@@ -12,6 +12,8 @@ import {
     EXCHANGE_LINKS,
     EXCHANGE_SETUP_GUIDES,
 } from '@/services/exchange/exchange.service';
+import { init_exchange, destroy_exchange } from '@/services/exchange/account';
+import { load_exchange } from '@/services/exchange/init';
 import { get_exchange_icon, get_exchange_logo } from '@/components/common/exchanges';
 import type { ExchangeId } from '@/types/credentials.types';
 
@@ -170,37 +172,40 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
         set_testing(true);
         set_error(null);
 
-        const result = await validate_exchange_credentials(exchange_id, {
+        const creds = {
             api_key: form_data.api_key,
             api_secret: form_data.api_secret,
             passphrase: form_data.passphrase || undefined,
             wallet_address: form_data.wallet_address || undefined,
             private_key: form_data.private_key || undefined,
-        });
+        };
 
-        set_testing(false);
+        const result = await validate_exchange_credentials(exchange_id, creds);
 
         if (!result.valid) {
-            set_error(result.error || 'Validation failed');
+            set_testing(false);
+            set_error(result.error || 'validation failed');
             return;
         }
 
+        init_exchange(exchange_id, creds);
+
         update_exchange_credentials(exchange_id, {
-            api_key: form_data.api_key,
-            api_secret: form_data.api_secret,
-            passphrase: form_data.passphrase || undefined,
-            wallet_address: form_data.wallet_address || undefined,
-            private_key: form_data.private_key || undefined,
+            ...creds,
             hedge_mode: form_data.hedge_mode,
             connected: true,
             last_validated: Date.now(),
         });
 
+        load_exchange(exchange_id).catch(console.error);
+
+        set_testing(false);
         handle_close();
     }
 
     function handle_disconnect(): void {
-        disconnect_exchange(exchange_id);
+        destroy_exchange(exchange_id);
+        disconnect_exchange_credentials(exchange_id);
         set_form_data({
             api_key: '',
             api_secret: '',
@@ -251,7 +256,15 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                         onClick={() => set_help_open(true)}
                         class="group relative flex-1 flex justify-center py-2 text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
                     >
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <svg
+                            class="w-5 h-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
                             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
                             <circle cx="12" cy="17" r="0.5" fill="currentColor" />
                         </svg>

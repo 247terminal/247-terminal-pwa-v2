@@ -4,7 +4,7 @@ import { TradingPage } from './pages/trading';
 import { ThemeToggle } from './components/common/theme_toggle';
 import { init_exchanges } from './services/exchange/init';
 
-init_exchanges();
+init_exchanges().catch(console.error);
 
 function HomePage() {
     return (

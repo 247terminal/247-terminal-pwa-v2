@@ -1,4 +1,5 @@
 import { signal, computed } from '@preact/signals';
+import { encrypt, decrypt, is_encrypted } from '@/utils/encryption';
 import type {
     UserCredentials,
     CredentialsState,
@@ -31,36 +32,50 @@ const DEFAULT_CREDENTIALS: UserCredentials = {
     },
 };
 
-function load_from_storage(): UserCredentials | null {
+export const credentials_state = signal<CredentialsState>({
+    credentials: DEFAULT_CREDENTIALS,
+    loaded: false,
+});
+
+async function load_from_storage(): Promise<UserCredentials | null> {
     try {
         const stored = localStorage.getItem(CREDENTIALS_STORAGE_KEY);
         if (!stored) return null;
+
+        if (is_encrypted(stored)) {
+            const decrypted = await decrypt(stored);
+            return JSON.parse(decrypted);
+        }
+
         return JSON.parse(stored);
     } catch (error) {
-        console.error('failed to load credentials: ', error);
+        console.error('failed to load credentials:', error);
         return null;
     }
 }
 
-function save_to_storage(credentials: UserCredentials): void {
+async function save_to_storage(credentials: UserCredentials): Promise<void> {
     try {
-        localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify(credentials));
+        const json = JSON.stringify(credentials);
+        const encrypted = await encrypt(json);
+        localStorage.setItem(CREDENTIALS_STORAGE_KEY, encrypted);
     } catch (error) {
-        console.error('failed to save credentials: ', error);
+        console.error('failed to save credentials:', error);
     }
 }
 
-const initial_credentials = load_from_storage() || DEFAULT_CREDENTIALS;
-
-export const credentials_state = signal<CredentialsState>({
-    credentials: initial_credentials,
-    loaded: true,
-});
+export async function init_credentials(): Promise<void> {
+    const stored = await load_from_storage();
+    credentials_state.value = {
+        credentials: stored || DEFAULT_CREDENTIALS,
+        loaded: true,
+    };
+}
 
 export const credentials = computed(() => credentials_state.value.credentials);
 
-export const exchange_credentials = computed(() => 
-    credentials.value?.exchanges ?? DEFAULT_CREDENTIALS.exchanges
+export const exchange_credentials = computed(
+    () => credentials.value?.exchanges ?? DEFAULT_CREDENTIALS.exchanges
 );
 
 export const exchange_connection_status = computed(() => {

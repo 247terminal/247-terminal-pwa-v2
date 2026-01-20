@@ -3,6 +3,7 @@ import type { StreamConfig, ExchangeStreamConfig } from '@/types/worker.types';
 interface AppConfig {
     api_base_url: string;
     ws_url: string;
+    credentials_key: string;
     environment: 'development' | 'production';
     is_dev: boolean;
     is_prod: boolean;
@@ -16,11 +17,11 @@ interface ProxyConfig {
 export const PROXY_CONFIG: Record<string, ProxyConfig | null> = {
     binance: {
         url: 'https://proxy1.247terminal.com/',
-        auth: '1d2738405e7ae534cf8b779b7552caf0795dcaf170ec263dc382db916a029f17',
+        auth: import.meta.env.VITE_PROXY_BINANCE_AUTH || '',
     },
     blofin: {
         url: 'https://proxy2.247terminal.com/',
-        auth: '5cbb9da977ea3740b4dcdfeea9b020c8f6de45c2d0314f549723e8a4207c288a',
+        auth: import.meta.env.VITE_PROXY_BLOFIN_AUTH || '',
     },
     bybit: null,
     hyperliquid: null,
@@ -33,6 +34,7 @@ function get_config(): AppConfig {
     return {
         api_base_url: env.VITE_API_URL || '',
         ws_url: env.VITE_WS_URL || '',
+        credentials_key: env.VITE_CREDENTIALS_KEY || '',
         environment,
         is_dev: environment === 'development',
         is_prod: environment === 'production',
