@@ -14,6 +14,7 @@ import {
 } from '@/services/exchange/exchange.service';
 import { init_exchange, destroy_exchange } from '@/services/exchange/account';
 import { load_exchange } from '@/services/exchange/init';
+import { refresh_account, clear_exchange_data } from '@/stores/account_store';
 import { get_exchange_icon, get_exchange_logo } from '@/components/common/exchanges';
 import type { ExchangeId } from '@/types/credentials.types';
 
@@ -162,7 +163,7 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
 
     if (!is_open) return null;
 
-    function update_field(field: string, value: string | boolean): void {
+    function update_field(field: string, value: string): void {
         set_form_data((prev) => ({ ...prev, [field]: value }));
     }
 
@@ -170,39 +171,45 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
         set_testing(true);
         set_error(null);
 
-        const creds = {
-            api_key: form_data.api_key,
-            api_secret: form_data.api_secret,
-            passphrase: form_data.passphrase || undefined,
-            wallet_address: form_data.wallet_address || undefined,
-            private_key: form_data.private_key || undefined,
-        };
+        try {
+            const creds = {
+                api_key: form_data.api_key,
+                api_secret: form_data.api_secret,
+                passphrase: form_data.passphrase || undefined,
+                wallet_address: form_data.wallet_address || undefined,
+                private_key: form_data.private_key || undefined,
+            };
 
-        const result = await validate_exchange_credentials(exchange_id, creds);
+            const result = await validate_exchange_credentials(exchange_id, creds);
 
-        if (!result.valid) {
+            if (!result.valid) {
+                set_error(result.error || 'validation failed');
+                return;
+            }
+
+            init_exchange(exchange_id, creds);
+
+            update_exchange_credentials(exchange_id, {
+                ...creds,
+                connected: true,
+                last_validated: Date.now(),
+            });
+
+            load_exchange(exchange_id).catch(console.error);
+            refresh_account(exchange_id).catch(console.error);
+
+            handle_close();
+        } catch (err) {
+            set_error(err instanceof Error ? err.message : 'connection failed');
+        } finally {
             set_testing(false);
-            set_error(result.error || 'validation failed');
-            return;
         }
-
-        init_exchange(exchange_id, creds);
-
-        update_exchange_credentials(exchange_id, {
-            ...creds,
-            connected: true,
-            last_validated: Date.now(),
-        });
-
-        load_exchange(exchange_id).catch(console.error);
-
-        set_testing(false);
-        handle_close();
     }
 
     function handle_disconnect(): void {
         destroy_exchange(exchange_id);
         disconnect_exchange_credentials(exchange_id);
+        clear_exchange_data(exchange_id);
         set_form_data({
             api_key: '',
             api_secret: '',

@@ -42,6 +42,9 @@ function create_exchange_instance(
                 ...proxy_options,
                 apiKey: credentials.api_key,
                 secret: credentials.api_secret,
+                options: {
+                    warnOnFetchOpenOrdersWithoutSymbol: false,
+                },
             });
         case 'bybit':
             return new ccxt.bybit({
@@ -155,14 +158,29 @@ export async function fetch_account_config(exchange_id: ExchangeId): Promise<Acc
 
 function map_balance(raw: ccxt.Balances, exchange_id: ExchangeId): Balance | null {
     const currency = exchange_id === 'hyperliquid' ? 'USDC' : 'USDT';
-    const account = raw[currency];
 
-    if (!account) return null;
+    let total = 0;
+    let available = 0;
+    let used = 0;
+
+    if (exchange_id === 'binance') {
+        const info = raw.info as Record<string, unknown>;
+        total = parseFloat(String(info?.totalMarginBalance ?? 0));
+        available = parseFloat(String(info?.availableBalance ?? 0));
+        used = total - available;
+    } else {
+        const account = raw[currency];
+        if (account) {
+            total = Number(account.total ?? 0);
+            available = Number(account.free ?? 0);
+            used = Number(account.used ?? 0);
+        }
+    }
 
     return {
-        total: Number(account.total ?? 0),
-        available: Number(account.free ?? 0),
-        used: Number(account.used ?? 0),
+        total,
+        available,
+        used,
         currency,
         last_updated: Date.now(),
     };
@@ -228,8 +246,7 @@ export async function fetch_balance(exchange_id: ExchangeId): Promise<Balance | 
     const exchange = get_exchange(exchange_id);
 
     try {
-        const params = exchange_id === 'bybit' ? { type: 'swap' } : {};
-        const raw = await exchange.fetchBalance(params);
+        const raw = await exchange.fetchBalance();
         return map_balance(raw, exchange_id);
     } catch (err) {
         console.error(`failed to fetch ${exchange_id} balance:`, err);

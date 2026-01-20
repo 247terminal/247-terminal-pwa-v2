@@ -15,8 +15,11 @@ import {
     init_credentials,
     exchange_connection_status,
     credentials_state,
+    get_exchange_credentials,
 } from '../../stores/credentials_store';
 import { init_default_exchange } from '../../stores/trade_store';
+import { refresh_account } from '../../stores/account_store';
+import { init_exchange } from './account';
 
 let initialized = false;
 
@@ -50,6 +53,22 @@ function get_connected_exchanges(): ExchangeId[] {
     return EXCHANGE_IDS.filter((ex) => status[ex]);
 }
 
+function init_connected_exchange_instances(connected: ExchangeId[]): void {
+    for (const ex of connected) {
+        const creds = get_exchange_credentials(ex);
+        if (creds.api_key || creds.wallet_address) {
+            init_exchange(ex, {
+                api_key: creds.api_key,
+                api_secret: creds.api_secret,
+                passphrase: creds.passphrase,
+                wallet_address: creds.wallet_address,
+                private_key: creds.private_key,
+            });
+            refresh_account(ex).catch(console.error);
+        }
+    }
+}
+
 export async function init_exchanges(): Promise<void> {
     if (initialized) return;
     initialized = true;
@@ -61,6 +80,11 @@ export async function init_exchanges(): Promise<void> {
     init_default_exchange();
 
     const connected = get_connected_exchanges();
+
+    if (connected.length > 0) {
+        init_connected_exchange_instances(connected);
+    }
+
     const exchanges_to_load = connected.length > 0 ? connected : EXCHANGE_IDS;
 
     for (const ex of exchanges_to_load) {
