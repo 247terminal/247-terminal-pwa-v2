@@ -4,6 +4,7 @@ import type { ExchangeId } from '@/types/exchange.types';
 import type { PositionMode, MarginMode, Balance } from '@/types/trading.types';
 import type { Position, Order } from '@/types/account.types';
 import type { ExchangeValidationCredentials } from './validators/types';
+import { get_market } from '@/stores/exchange_store';
 
 interface AccountConfig {
     position_mode: PositionMode;
@@ -186,16 +187,24 @@ function map_balance(raw: ccxt.Balances, exchange_id: ExchangeId): Balance | nul
     };
 }
 
+function get_contract_size(exchange_id: ExchangeId, symbol: string): number {
+    if (exchange_id !== 'blofin') return 1;
+    const market = get_market(exchange_id, symbol);
+    return market?.contract_size ?? 1;
+}
+
 function map_position(raw: ccxt.Position, exchange_id: ExchangeId): Position {
     const side: 'long' | 'short' = raw.side === 'short' ? 'short' : 'long';
     const margin_mode: MarginMode = raw.marginMode === 'isolated' ? 'isolated' : 'cross';
+    const contract_size = get_contract_size(exchange_id, raw.symbol);
+    const contracts = Math.abs(Number(raw.contracts ?? 0));
 
     return {
         id: raw.id || `${exchange_id}-${raw.symbol}-${side}`,
         exchange: exchange_id,
         symbol: raw.symbol,
         side,
-        size: Math.abs(Number(raw.contracts ?? 0)),
+        size: contracts * contract_size,
         entry_price: Number(raw.entryPrice ?? 0),
         last_price: Number(raw.markPrice ?? raw.entryPrice ?? 0),
         liquidation_price: raw.liquidationPrice ? Number(raw.liquidationPrice) : null,
@@ -228,16 +237,25 @@ const ORDER_STATUS_MAP: Record<string, Order['status']> = {
 };
 
 function map_order(raw: ccxt.Order, exchange_id: ExchangeId): Order {
+    const contract_size = get_contract_size(exchange_id, raw.symbol);
+    const raw_size = Number(raw.amount ?? 0);
+    const raw_filled = Number(raw.filled ?? 0);
+    const size = raw_size * contract_size;
+    const filled = raw_filled * contract_size;
+    const base_status = ORDER_STATUS_MAP[raw.status ?? 'open'] ?? 'open';
+    const status: Order['status'] =
+        base_status === 'open' && raw_filled > 0 && raw_filled < raw_size ? 'partial' : base_status;
+
     return {
         id: raw.id,
         exchange: exchange_id,
         symbol: raw.symbol,
         side: raw.side === 'buy' ? 'buy' : 'sell',
         type: ORDER_TYPE_MAP[raw.type ?? 'limit'] ?? 'limit',
-        size: Number(raw.amount ?? 0),
+        size,
         price: Number(raw.price ?? 0),
-        filled: Number(raw.filled ?? 0),
-        status: ORDER_STATUS_MAP[raw.status ?? 'open'] ?? 'open',
+        filled,
+        status,
         created_at: raw.timestamp ?? Date.now(),
     };
 }
@@ -272,8 +290,20 @@ export async function fetch_orders(exchange_id: ExchangeId): Promise<Order[]> {
     const exchange = get_exchange(exchange_id);
 
     try {
-        const raw = await exchange.fetchOpenOrders();
-        return raw.map((o: ccxt.Order) => map_order(o, exchange_id));
+        if (exchange_id === 'binance') {
+            const [regular, conditional] = await Promise.all([
+                exchange.fetchOpenOrders(),
+                exchange.fetchOpenOrders(undefined, undefined, undefined, { stop: true }),
+            ]);
+            const unique = new Map<string, ccxt.Order>();
+            for (const o of [...regular, ...conditional]) {
+                unique.set(o.id, o);
+            }
+            return Array.from(unique.values()).map((o) => map_order(o, exchange_id));
+        }
+
+        const orders = await exchange.fetchOpenOrders();
+        return orders.map((o: ccxt.Order) => map_order(o, exchange_id));
     } catch (err) {
         console.error(`failed to fetch ${exchange_id} orders:`, err);
         return [];

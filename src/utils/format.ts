@@ -14,3 +14,9 @@ export function format_price(price: number | null, tick_size: number, locale = f
     }
     return price.toFixed(precision);
 }
+
+export function format_size(size: number, qty_step: number): string {
+    if (size === 0) return '0';
+    const precision = tick_size_to_precision(qty_step);
+    return size.toFixed(precision);
+}

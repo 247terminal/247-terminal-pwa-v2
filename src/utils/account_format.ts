@@ -35,3 +35,16 @@ export function format_full_time(timestamp: number): string {
 export function mask_value(value: string, is_private: boolean): string {
     return is_private ? '***' : value;
 }
+
+export function format_usd(value: number): string {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(2)}K`;
+    return `$${value.toFixed(2)}`;
+}
+
+export function format_qty(value: number): string {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
+    if (value >= 1000) return `${(value / 1000).toFixed(2)}K`;
+    if (value >= 1) return value.toFixed(2);
+    return value.toPrecision(4);
+}
