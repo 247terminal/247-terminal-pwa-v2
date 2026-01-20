@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'preact/hooks';
-import { Eye, EyeOff, Radiation } from 'lucide-preact';
+import { Eye, EyeOff, RefreshCw, Radiation } from 'lucide-preact';
 import type { AccountTab } from '../../../types/account.types';
+import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import {
     active_tab,
     set_active_tab,
@@ -8,8 +9,10 @@ import {
     orders_count,
     privacy_mode,
     toggle_privacy,
-    nuke_positions,
+    loading,
+    refresh_all_accounts,
 } from '../../../stores/account_store';
+import { exchange_connection_status } from '../../../stores/credentials_store';
 
 interface TabButtonProps {
     tab: AccountTab;
@@ -39,20 +42,25 @@ function TabButton({ tab, label, count }: TabButtonProps) {
 }
 
 export function AccountToolbar() {
-    const [confirming_nuke, set_confirming_nuke] = useState(false);
+    const [refreshing, set_refreshing] = useState(false);
     const is_private = privacy_mode.value;
     const pos_count = positions_count.value;
     const ord_count = orders_count.value;
+    const is_loading = loading.value.balance || loading.value.positions || loading.value.orders;
 
-    const handle_nuke_click = useCallback(() => {
-        if (confirming_nuke) {
-            nuke_positions();
-            set_confirming_nuke(false);
-        } else {
-            set_confirming_nuke(true);
-            setTimeout(() => set_confirming_nuke(false), 3000);
+    const handle_refresh = useCallback(async () => {
+        if (refreshing || is_loading) return;
+        set_refreshing(true);
+        try {
+            const status = exchange_connection_status.value;
+            const connected = EXCHANGE_IDS.filter((ex) => status[ex]);
+            if (connected.length > 0) {
+                await refresh_all_accounts(connected);
+            }
+        } finally {
+            set_refreshing(false);
         }
-    }, [confirming_nuke]);
+    }, [refreshing, is_loading]);
 
     return (
         <div class="drag-handle flex items-center gap-1 px-2 py-1.5 border-b border-base-300/50 cursor-move">
@@ -73,13 +81,18 @@ export function AccountToolbar() {
 
             <button
                 type="button"
-                onClick={handle_nuke_click}
-                class={`p-1 rounded transition-colors ${
-                    confirming_nuke
-                        ? 'bg-error text-error-content'
-                        : 'text-base-content/50 hover:text-error hover:bg-base-300'
-                }`}
-                title={confirming_nuke ? 'Click again to confirm' : 'Close all positions'}
+                onClick={handle_refresh}
+                disabled={refreshing || is_loading}
+                class="p-1 rounded text-base-content/50 hover:text-base-content hover:bg-base-300 transition-colors disabled:opacity-50"
+                title="Refresh account data"
+            >
+                <RefreshCw class={`w-4 h-4 ${refreshing || is_loading ? 'animate-spin' : ''}`} />
+            </button>
+
+            <button
+                type="button"
+                class="p-1 rounded text-base-content/50 hover:text-error hover:bg-base-300 transition-colors"
+                title="Close all positions"
             >
                 <Radiation class="w-4 h-4" />
             </button>
