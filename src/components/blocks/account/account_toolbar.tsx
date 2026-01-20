@@ -55,7 +55,7 @@ export function AccountToolbar() {
     }, [confirming_nuke]);
 
     return (
-        <div class="drag-handle flex items-center gap-1 px-2 py-1 border-b border-base-300/50 cursor-move">
+        <div class="drag-handle flex items-center gap-1 px-2 py-1.5 border-b border-base-300/50 cursor-move">
             <TabButton tab="positions" label="Positions" count={pos_count} />
             <TabButton tab="orders" label="Orders" count={ord_count} />
             <TabButton tab="history" label="History" />
