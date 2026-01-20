@@ -5,7 +5,8 @@ import { HYPERLIQUID_CACHE_TTL } from '@/config';
 type HyperliquidExchange = InstanceType<typeof hyperliquid>;
 
 interface ClearinghouseState {
-    marginSummary?: { accountValue?: string; availableBalance?: string };
+    marginSummary?: { accountValue?: string; totalMarginUsed?: string };
+    withdrawable?: string;
     assetPositions?: Array<{
         position: {
             coin: string;
@@ -81,9 +82,12 @@ export async function fetch_balance(exchange: HyperliquidExchange): Promise<{
 } | null> {
     const state = await get_clearinghouse_state(exchange);
     if (!state?.marginSummary) return null;
+
     const margin = state.marginSummary;
     const total = parseFloat(margin.accountValue || '0');
-    const available = parseFloat(margin.availableBalance || '0');
+    const available =
+        parseFloat(state.withdrawable || '0') || total - parseFloat(margin.totalMarginUsed || '0');
+
     return {
         total,
         available,

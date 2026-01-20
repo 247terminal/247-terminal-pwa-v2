@@ -26,6 +26,16 @@ interface BybitBalanceResponse {
         list?: Array<{
             totalEquity: string;
             totalAvailableBalance: string;
+            totalWalletBalance: string;
+            coin?: Array<{
+                coin: string;
+                equity: string;
+                usdValue: string;
+                walletBalance: string;
+                availableToWithdraw: string;
+                totalOrderIM: string;
+                totalPositionIM: string;
+            }>;
         }>;
     };
 }
@@ -74,14 +84,27 @@ export async function fetch_balance(exchange: BybitExchange): Promise<{
     })) as BybitBalanceResponse;
     const list = response?.result?.list;
     if (!Array.isArray(list) || list.length === 0) return null;
+
     const account = list[0];
     const total = parseFloat(account.totalEquity || '0');
-    const available = parseFloat(account.totalAvailableBalance || '0');
+
+    let available = parseFloat(account.totalAvailableBalance || '0');
+    if (available === 0 && Array.isArray(account.coin)) {
+        for (const c of account.coin) {
+            const walletBal = parseFloat(c.walletBalance || '0');
+            const orderIM = parseFloat(c.totalOrderIM || '0');
+            const positionIM = parseFloat(c.totalPositionIM || '0');
+            if (walletBal > 0) {
+                available += walletBal - orderIM - positionIM;
+            }
+        }
+    }
+
     return {
         total,
         available,
         used: total - available,
-        currency: 'USDT',
+        currency: 'USD',
         last_updated: Date.now(),
     };
 }

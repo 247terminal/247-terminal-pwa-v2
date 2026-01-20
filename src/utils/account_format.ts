@@ -1,5 +1,7 @@
+const price_formatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+
 export function format_display_price(value: number): string {
-    if (value >= 1000) return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (value >= 1000) return price_formatter.format(value);
     if (value >= 1) return value.toFixed(4);
     return value.toPrecision(4);
 }
@@ -40,6 +42,15 @@ export function format_usd(value: number): string {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(2)}K`;
     return `$${value.toFixed(2)}`;
+}
+
+const usd_formatter = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
+export function format_usd_full(value: number): string {
+    return `$${usd_formatter.format(value)}`;
 }
 
 export function format_qty(value: number): string {

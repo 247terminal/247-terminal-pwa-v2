@@ -4,6 +4,13 @@ export const EXCHANGE_IDS: ExchangeId[] = ['binance', 'blofin', 'hyperliquid', '
 
 export const EXCHANGE_ORDER: ExchangeId[] = ['blofin', 'binance', 'hyperliquid', 'bybit'];
 
+export const EXCHANGE_DISPLAY_NAMES: Record<ExchangeId, string> = {
+    binance: 'Binance',
+    blofin: 'Blofin',
+    hyperliquid: 'Hyperliquid',
+    bybit: 'Bybit',
+};
+
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export interface SymbolData {

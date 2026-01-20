@@ -7,6 +7,7 @@ import { BlocksMenu } from '../common/blocks_menu';
 import { ThemeToggle } from '../common/theme_toggle';
 import { ConnectionStatus } from '../common/connection_status';
 import { LayoutLockToggle } from '../common/layout_lock_toggle';
+import { HeaderBalance } from '../common/header_balance';
 import { ExchangeButton } from '../common/exchange_button';
 import { ExchangePanel } from '../exchange/exchange_panel';
 import { exchange_connection_status } from '@/stores/credentials_store';
@@ -59,6 +60,7 @@ export function Header() {
             <div class="flex-1 flex items-center justify-end gap-2">
                 <LayoutLockToggle />
                 <ThemeToggle />
+                <HeaderBalance />
                 <BlocksMenu />
                 <RigSelector />
             </div>

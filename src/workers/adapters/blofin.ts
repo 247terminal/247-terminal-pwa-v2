@@ -19,10 +19,14 @@ interface BlofinPositionResponse {
 }
 
 interface BlofinBalanceResponse {
-    data?: Array<{
+    data?: {
         totalEquity: string;
-        availableBalance: string;
-    }>;
+        details?: Array<{
+            currency: string;
+            available: string;
+            equity: string;
+        }>;
+    };
 }
 
 interface BlofinOrderResponse {
@@ -60,10 +64,16 @@ export async function fetch_balance(exchange: BlofinExchange): Promise<{
 } | null> {
     const response = (await exchange.privateGetAccountBalance()) as BlofinBalanceResponse;
     const data = response?.data;
-    if (!Array.isArray(data) || data.length === 0) return null;
-    const account = data[0];
-    const total = parseFloat(account.totalEquity || '0');
-    const available = parseFloat(account.availableBalance || '0');
+    if (!data) return null;
+
+    const total = parseFloat(data.totalEquity || '0');
+    let available = 0;
+    if (Array.isArray(data.details)) {
+        for (const detail of data.details) {
+            available += parseFloat(detail.available || '0');
+        }
+    }
+
     return {
         total,
         available,

@@ -7,6 +7,9 @@ interface BinanceBalance {
     asset: string;
     balance: string;
     availableBalance: string;
+    crossWalletBalance: string;
+    crossUnPnl: string;
+    maxWithdrawAmount: string;
 }
 
 interface BinancePosition {
@@ -63,15 +66,34 @@ export async function fetch_balance(exchange: BinanceExchange): Promise<{
 } | null> {
     const response = (await exchange.fapiPrivateV2GetBalance()) as BinanceBalance[];
     if (!Array.isArray(response)) return null;
-    const usdt = response.find((b) => b.asset === 'USDT');
-    if (!usdt) return null;
-    const total = parseFloat(usdt.balance);
-    const available = parseFloat(usdt.availableBalance);
+
+    let total = 0;
+    let available = 0;
+    const bnfcr = response.find((b) => b.asset === 'BNFCR');
+
+    for (const b of response) {
+        const bal = parseFloat(b.balance || '0');
+        const unPnl = parseFloat(b.crossUnPnl || '0');
+        if (bal > 0) {
+            total += bal + unPnl;
+        }
+    }
+
+    if (bnfcr) {
+        available = parseFloat(bnfcr.availableBalance || '0');
+    } else {
+        for (const b of response) {
+            available += parseFloat(b.maxWithdrawAmount || '0');
+        }
+    }
+
+    if (total === 0 && available === 0) return null;
+
     return {
         total,
         available,
-        used: total - available,
-        currency: 'USDT',
+        used: Math.max(0, total - available),
+        currency: 'USD',
         last_updated: Date.now(),
     };
 }
