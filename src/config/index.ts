@@ -3,12 +3,28 @@ import type { StreamConfig, ExchangeStreamConfig } from '@/types/worker.types';
 interface AppConfig {
     api_base_url: string;
     ws_url: string;
-    proxy_url: string;
-    proxy_auth: string;
     environment: 'development' | 'production';
     is_dev: boolean;
     is_prod: boolean;
 }
+
+interface ProxyConfig {
+    url: string;
+    auth: string;
+}
+
+export const PROXY_CONFIG: Record<string, ProxyConfig | null> = {
+    binance: {
+        url: 'https://proxy1.247terminal.com/',
+        auth: '1d2738405e7ae534cf8b779b7552caf0795dcaf170ec263dc382db916a029f17',
+    },
+    blofin: {
+        url: 'https://proxy2.247terminal.com/',
+        auth: '5cbb9da977ea3740b4dcdfeea9b020c8f6de45c2d0314f549723e8a4207c288a',
+    },
+    bybit: null,
+    hyperliquid: null,
+};
 
 function get_config(): AppConfig {
     const env = import.meta.env;
@@ -17,10 +33,6 @@ function get_config(): AppConfig {
     return {
         api_base_url: env.VITE_API_URL || '',
         ws_url: env.VITE_WS_URL || '',
-        proxy_url: env.VITE_PROXY_URL || 'https://proxy2.247terminal.com/',
-        proxy_auth:
-            env.VITE_PROXY_AUTH ||
-            '5cbb9da977ea3740b4dcdfeea9b020c8f6de45c2d0314f549723e8a4207c288a',
         environment,
         is_dev: environment === 'development',
         is_prod: environment === 'production',
@@ -65,9 +77,9 @@ export const EXCHANGE_CONFIG: Record<string, ExchangeStreamConfig> = {
     blofin: {
         ccxtClass: 'blofin',
         defaultType: 'swap',
-        proxy: config.proxy_url,
+        proxy: PROXY_CONFIG.blofin?.url,
         headers: {
-            'x-proxy-auth': config.proxy_auth,
+            'x-proxy-auth': PROXY_CONFIG.blofin?.auth ?? '',
         },
         restUrl: 'https://openapi.blofin.com',
         wsUrl: 'wss://openapi.blofin.com/ws/public',

@@ -1,5 +1,5 @@
 import * as ccxt from 'ccxt';
-import { config } from '@/config';
+import { PROXY_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
 interface BlofinCredentials {
@@ -8,19 +8,21 @@ interface BlofinCredentials {
     passphrase: string;
 }
 
-export async function validate_blofin(credentials: BlofinCredentials): Promise<ExchangeValidationResult> {
+export async function validate_blofin(
+    credentials: BlofinCredentials
+): Promise<ExchangeValidationResult> {
     const { api_key, api_secret, passphrase } = credentials;
 
-    if (!api_key || !api_secret || !passphrase) return { valid: false, error: 'api key, secret, and passphrase are required' };
+    if (!api_key || !api_secret || !passphrase)
+        return { valid: false, error: 'api key, secret, and passphrase are required' };
 
+    const proxy = PROXY_CONFIG.blofin;
     const exchange = new ccxt.blofin({
         apiKey: api_key,
         secret: api_secret,
         password: passphrase,
-        proxy: config.proxy_url,
-        headers: {
-            'x-proxy-auth': config.proxy_auth,
-        },
+        proxy: proxy?.url,
+        headers: proxy ? { 'x-proxy-auth': proxy.auth } : undefined,
     });
 
     try {

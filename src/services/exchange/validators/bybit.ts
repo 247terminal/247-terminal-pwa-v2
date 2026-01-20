@@ -1,5 +1,4 @@
 import * as ccxt from 'ccxt';
-import { config } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
 interface BybitCredentials {
@@ -7,7 +6,9 @@ interface BybitCredentials {
     api_secret: string;
 }
 
-export async function validate_bybit(credentials: BybitCredentials): Promise<ExchangeValidationResult> {
+export async function validate_bybit(
+    credentials: BybitCredentials
+): Promise<ExchangeValidationResult> {
     const { api_key, api_secret } = credentials;
 
     if (!api_key || !api_secret) return { valid: false, error: 'api key and secret are required' };
@@ -15,10 +16,6 @@ export async function validate_bybit(credentials: BybitCredentials): Promise<Exc
     const exchange = new ccxt.bybit({
         apiKey: api_key,
         secret: api_secret,
-        proxy: config.proxy_url,
-        headers: {
-            'x-proxy-auth': config.proxy_auth,
-        },
     });
 
     try {
