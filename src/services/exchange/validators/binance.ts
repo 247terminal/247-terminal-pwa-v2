@@ -23,8 +23,9 @@ export async function validate_binance(
     });
 
     try {
-        const balance = await exchange.fetchBalance();
-        const usdt_balance = Number(balance['USDT']?.total ?? 0);
+        const response = await exchange.fapiPrivateV2GetBalance();
+        const usdt = response?.find((b: { asset: string }) => b.asset === 'USDT');
+        const usdt_balance = Number(usdt?.balance ?? 0);
 
         return { valid: true, error: null, balance: usdt_balance };
     } catch (err) {

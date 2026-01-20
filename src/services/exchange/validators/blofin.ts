@@ -26,8 +26,10 @@ export async function validate_blofin(
     });
 
     try {
-        const balance = await exchange.fetchBalance();
-        const usdt_balance = Number(balance['USDT']?.total ?? 0);
+        const response = await exchange.privateGetAccountBalance();
+        const details = response?.data?.details || [];
+        const usdt = details.find((b: { ccy: string }) => b.ccy === 'USDT');
+        const usdt_balance = Number(usdt?.equity ?? 0);
 
         return { valid: true, error: null, balance: usdt_balance };
     } catch (err) {

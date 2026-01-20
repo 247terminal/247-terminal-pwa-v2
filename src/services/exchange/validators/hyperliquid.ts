@@ -14,18 +14,18 @@ export async function validate_hyperliquid(credentials: HyperliquidCredentials):
 
     try {
         const formatted_key = private_key.startsWith('0x') ? private_key : `0x${private_key}`;
-        const account = privateKeyToAccount(formatted_key as `0x${string}`);
-        const derived_address = account.address;
-
-        if (derived_address.toLowerCase() !== wallet_address.toLowerCase()) return { valid: false, error: 'private key does not match wallet address' };
+        privateKeyToAccount(formatted_key as `0x${string}`);
 
         const exchange = new ccxt.hyperliquid({
             walletAddress: wallet_address,
             privateKey: formatted_key,
         });
 
-        const balance = await exchange.fetchBalance();
-        const usdt_balance = Number(balance['USDC']?.total ?? balance['USD']?.total ?? 0);
+        const response = await exchange.publicPostInfo({
+            type: 'clearinghouseState',
+            user: wallet_address,
+        });
+        const usdt_balance = Number(response?.marginSummary?.accountValue ?? 0);
 
         return { valid: true, error: null, balance: usdt_balance };
     } catch (err) {

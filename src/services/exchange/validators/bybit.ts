@@ -19,8 +19,10 @@ export async function validate_bybit(
     });
 
     try {
-        const balance = await exchange.fetchBalance({ type: 'swap' });
-        const usdt_balance = Number(balance['USDT']?.total ?? 0);
+        const response = await exchange.privateGetV5AccountWalletBalance({ accountType: 'UNIFIED' });
+        const coins = response?.result?.list?.[0]?.coin || [];
+        const usdt = coins.find((c: { coin: string }) => c.coin === 'USDT');
+        const usdt_balance = Number(usdt?.walletBalance ?? 0);
 
         return { valid: true, error: null, balance: usdt_balance };
     } catch (err) {
