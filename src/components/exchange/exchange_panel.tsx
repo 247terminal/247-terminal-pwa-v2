@@ -139,7 +139,6 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
         passphrase: credentials.passphrase || '',
         wallet_address: credentials.wallet_address || '',
         private_key: credentials.private_key || '',
-        hedge_mode: credentials.hedge_mode,
     });
 
     useEffect(() => {
@@ -150,7 +149,6 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
             passphrase: creds.passphrase || '',
             wallet_address: creds.wallet_address || '',
             private_key: creds.private_key || '',
-            hedge_mode: creds.hedge_mode,
         });
     }, [exchange_id]);
 
@@ -192,7 +190,6 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
 
         update_exchange_credentials(exchange_id, {
             ...creds,
-            hedge_mode: form_data.hedge_mode,
             connected: true,
             last_validated: Date.now(),
         });
@@ -212,7 +209,6 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
             passphrase: '',
             wallet_address: '',
             private_key: '',
-            hedge_mode: false,
         });
         set_error(null);
     }
@@ -316,23 +312,6 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                             placeholder="PRIVATE KEY"
                             on_change={(value) => update_field('private_key', value)}
                         />
-                    )}
-
-                    {fields.includes('hedge_mode') && (
-                        <label class="flex items-center justify-between cursor-pointer">
-                            <span class="text-xs text-base-content tracking-wide">HEDGE MODE</span>
-                            <input
-                                type="checkbox"
-                                class="toggle toggle-xs toggle-primary"
-                                checked={form_data.hedge_mode}
-                                onChange={(e) =>
-                                    update_field(
-                                        'hedge_mode',
-                                        (e.target as HTMLInputElement).checked
-                                    )
-                                }
-                            />
-                        </label>
                     )}
 
                     {error && <div class="text-xs text-error">{error}</div>}

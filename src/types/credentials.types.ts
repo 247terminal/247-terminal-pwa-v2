@@ -6,7 +6,6 @@ export interface ExchangeCredentials {
     passphrase?: string;
     wallet_address?: string;
     private_key?: string;
-    hedge_mode: boolean;
     connected: boolean;
     last_validated: number | null;
 }

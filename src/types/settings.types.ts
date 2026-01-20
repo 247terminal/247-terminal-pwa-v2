@@ -7,7 +7,6 @@ export interface ExchangeCredentials {
     walletaddress: string;
     private_key: string;
     enabled: boolean;
-    hedge_mode: boolean;
 }
 
 export interface ExchangeConfig {

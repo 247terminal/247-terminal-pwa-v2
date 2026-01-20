@@ -11,11 +11,10 @@ export interface ExchangeValidationRequest {
 export { validate_exchange_credentials } from './validators';
 export type { ExchangeValidationResult, ExchangeValidationCredentials } from './validators';
 
-
 export const EXCHANGE_FIELD_CONFIG: Record<ExchangeId, string[]> = {
-    bybit: ['api_key', 'api_secret', 'hedge_mode'],
-    binance: ['api_key', 'api_secret', 'hedge_mode'],
-    blofin: ['api_key', 'api_secret', 'passphrase', 'hedge_mode'],
+    bybit: ['api_key', 'api_secret'],
+    binance: ['api_key', 'api_secret'],
+    blofin: ['api_key', 'api_secret', 'passphrase'],
     hyperliquid: ['wallet_address', 'private_key'],
 };
 
@@ -30,24 +29,25 @@ export const EXCHANGE_NAMES: Record<ExchangeId, string> = {
     hyperliquid: 'HYPERLIQUID',
 };
 
-export const EXCHANGE_LINKS: Record<ExchangeId, { open_account: string; api_management: string }> = {
-    bybit: {
-        open_account: 'https://partner.bybit.com/b/140043',
-        api_management: 'https://www.bybit.com/app/user/api-management',
-    },
-    blofin: {
-        open_account: 'https://partner.blofin.com/d/247',
-        api_management: 'https://blofin.com/account/apis',
-    },
-    binance: {
-        open_account: 'https://www.binance.com/',
-        api_management: 'https://www.binance.com/en/my/settings/api-management',
-    },
-    hyperliquid: {
-        open_account: 'https://app.hyperliquid.xyz/join',
-        api_management: 'https://app.hyperliquid.xyz/API',
-    },
-};
+export const EXCHANGE_LINKS: Record<ExchangeId, { open_account: string; api_management: string }> =
+    {
+        bybit: {
+            open_account: 'https://partner.bybit.com/b/140043',
+            api_management: 'https://www.bybit.com/app/user/api-management',
+        },
+        blofin: {
+            open_account: 'https://partner.blofin.com/d/247',
+            api_management: 'https://blofin.com/account/apis',
+        },
+        binance: {
+            open_account: 'https://www.binance.com/',
+            api_management: 'https://www.binance.com/en/my/settings/api-management',
+        },
+        hyperliquid: {
+            open_account: 'https://app.hyperliquid.xyz/join',
+            api_management: 'https://app.hyperliquid.xyz/API',
+        },
+    };
 
 export const EXCHANGE_SETUP_GUIDES: Record<ExchangeId, { steps: string[]; notes: string[] }> = {
     bybit: {
@@ -76,9 +76,7 @@ export const EXCHANGE_SETUP_GUIDES: Record<ExchangeId, { steps: string[]; notes:
             'Enable Read and Trade permissions',
             'Copy API key, secret, and passphrase',
         ],
-        notes: [
-            'Check if your account has hedge-mode or one-way mode selected',
-        ],
+        notes: ['Check if your account has hedge-mode or one-way mode selected'],
     },
     binance: {
         steps: [

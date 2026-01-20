@@ -12,7 +12,6 @@ const CREDENTIALS_STORAGE_KEY = '247terminal_credentials';
 const DEFAULT_EXCHANGE_CREDENTIALS: ExchangeCredentials = {
     api_key: '',
     api_secret: '',
-    hedge_mode: false,
     connected: false,
     last_validated: null,
 };
