@@ -60,6 +60,7 @@ export const EXCHANGE_CONFIG: Record<string, ExchangeStreamConfig> = {
         },
         klineStreamsPerConnection: 200,
         poolKey: 'binance',
+        restUrl: 'https://fapi.binance.com',
     },
     blofin: {
         ccxtClass: 'blofin',
@@ -84,6 +85,7 @@ export const EXCHANGE_CONFIG: Record<string, ExchangeStreamConfig> = {
             cex: 'hyperliquid_cex',
             dex: 'hyperliquid_dex',
         },
+        restUrl: 'https://api.hyperliquid.xyz',
     },
     bybit: {
         ccxtClass: 'bybit',
@@ -93,6 +95,7 @@ export const EXCHANGE_CONFIG: Record<string, ExchangeStreamConfig> = {
         subscribeBatch: 100,
         pingInterval: 20000,
         poolKey: 'bybit',
+        restUrl: 'https://api.bybit.com',
     },
 };
 

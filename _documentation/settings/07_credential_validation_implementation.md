@@ -30,8 +30,10 @@ Use the **existing proxy** (`https://proxy2.247terminal.com/`) for exchanges tha
 
 | File | Action |
 |------|--------|
-| `src/config/index.ts` | **ALREADY UPDATED** - Added proxy_url and proxy_auth |
-| `src/services/exchange/crypto.ts` | **CREATE** - HMAC-SHA256 signing utilities |
+| `src/config/index.ts` | **MODIFY** - Add `restUrl` to EXCHANGE_CONFIG for binance, bybit, hyperliquid |
+| `src/types/worker.types.ts` | **MODIFY** - Add optional `restUrl` field to ExchangeStreamConfig |
+| `src/services/exchange/crypto.ts` | **ALREADY EXISTS** - HMAC-SHA256 signing utilities implemented |
+| `src/services/exchange/validators/types.ts` | **CREATE** - Shared validation types |
 | `src/services/exchange/validators/binance.ts` | **CREATE** - Binance validation |
 | `src/services/exchange/validators/bybit.ts` | **CREATE** - Bybit validation |
 | `src/services/exchange/validators/blofin.ts` | **CREATE** - BloFin validation |
@@ -47,7 +49,40 @@ Use the **existing proxy** (`https://proxy2.247terminal.com/`) for exchanges tha
 
 ## Implementation Details
 
-### 1. Crypto Utilities (`src/services/exchange/crypto.ts`)
+### 0. Config Updates (`src/config/index.ts`)
+
+**Status:** Add `restUrl` to `EXCHANGE_CONFIG` for exchanges that don't have it yet.
+
+BloFin already has `restUrl` defined. Add to binance, bybit, and hyperliquid:
+
+```typescript
+export const EXCHANGE_CONFIG: Record<string, ExchangeStreamConfig> = {
+    binance: {
+        // ... existing fields
+        restUrl: 'https://fapi.binance.com',
+    },
+    blofin: {
+        // ... existing fields (restUrl already present)
+        restUrl: 'https://openapi.blofin.com',
+    },
+    hyperliquid: {
+        // ... existing fields
+        restUrl: 'https://api.hyperliquid.xyz',
+    },
+    bybit: {
+        // ... existing fields
+        restUrl: 'https://api.bybit.com',
+    },
+};
+```
+
+**Note:** Update `ExchangeStreamConfig` type in `src/types/worker.types.ts` to include optional `restUrl` field if not already present.
+
+---
+
+### 1. Crypto Utilities (`src/services/exchange/crypto.ts`) - ALREADY EXISTS
+
+**Status:** Implementation complete. No changes required.
 
 ```typescript
 export async function hmac_sha256_hex(secret: string, message: string): Promise<string> {
@@ -108,7 +143,7 @@ export function generate_nonce(): string {
 
 ```typescript
 import { hmac_sha256_hex, get_timestamp } from '../crypto';
-import { config } from '@/config';
+import { config, EXCHANGE_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
 interface BinanceCredentials {
@@ -116,10 +151,9 @@ interface BinanceCredentials {
     api_secret: string;
 }
 
-const BASE_URL = 'https://fapi.binance.com';
-
 export async function validate_binance(credentials: BinanceCredentials): Promise<ExchangeValidationResult> {
     const { api_key, api_secret } = credentials;
+    const { restUrl } = EXCHANGE_CONFIG.binance;
 
     if (!api_key || !api_secret) {
         return { valid: false, error: 'api key and secret are required' };
@@ -130,7 +164,7 @@ export async function validate_binance(credentials: BinanceCredentials): Promise
     const query_string = `recvWindow=${recv_window}&timestamp=${timestamp}`;
 
     const signature = await hmac_sha256_hex(api_secret, query_string);
-    const target_url = `${BASE_URL}/fapi/v3/account?${query_string}&signature=${signature}`;
+    const target_url = `${restUrl}/fapi/v3/account?${query_string}&signature=${signature}`;
 
     try {
         const response = await fetch(`${config.proxy_url}${target_url}`, {
@@ -169,7 +203,7 @@ export async function validate_binance(credentials: BinanceCredentials): Promise
 
 ```typescript
 import { hmac_sha256_hex, get_timestamp } from '../crypto';
-import { config } from '@/config';
+import { config, EXCHANGE_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
 interface BybitCredentials {
@@ -177,10 +211,9 @@ interface BybitCredentials {
     api_secret: string;
 }
 
-const BASE_URL = 'https://api.bybit.com';
-
 export async function validate_bybit(credentials: BybitCredentials): Promise<ExchangeValidationResult> {
     const { api_key, api_secret } = credentials;
+    const { restUrl } = EXCHANGE_CONFIG.bybit;
 
     if (!api_key || !api_secret) {
         return { valid: false, error: 'api key and secret are required' };
@@ -194,7 +227,7 @@ export async function validate_bybit(credentials: BybitCredentials): Promise<Exc
     const signature = await hmac_sha256_hex(api_secret, sign_string);
 
     try {
-        const response = await fetch(`${config.proxy_url}${BASE_URL}/v5/user/query-api`, {
+        const response = await fetch(`${config.proxy_url}${restUrl}/v5/user/query-api`, {
             method: 'GET',
             headers: {
                 'X-BAPI-API-KEY': api_key,
@@ -230,7 +263,7 @@ export async function validate_bybit(credentials: BybitCredentials): Promise<Exc
 
 ```typescript
 import { hmac_sha256_base64, get_timestamp, generate_nonce } from '../crypto';
-import { config } from '@/config';
+import { config, EXCHANGE_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
 interface BlofinCredentials {
@@ -239,10 +272,9 @@ interface BlofinCredentials {
     passphrase: string;
 }
 
-const BASE_URL = 'https://openapi.blofin.com';
-
 export async function validate_blofin(credentials: BlofinCredentials): Promise<ExchangeValidationResult> {
     const { api_key, api_secret, passphrase } = credentials;
+    const { restUrl } = EXCHANGE_CONFIG.blofin;
 
     if (!api_key || !api_secret || !passphrase) {
         return { valid: false, error: 'api key, secret, and passphrase are required' };
@@ -258,7 +290,7 @@ export async function validate_blofin(credentials: BlofinCredentials): Promise<E
     const signature = await hmac_sha256_base64(api_secret, prehash);
 
     try {
-        const response = await fetch(`${config.proxy_url}${BASE_URL}${path}`, {
+        const response = await fetch(`${config.proxy_url}${restUrl}${path}`, {
             method: 'GET',
             headers: {
                 'ACCESS-KEY': api_key,
@@ -297,6 +329,7 @@ export async function validate_blofin(credentials: BlofinCredentials): Promise<E
 
 ```typescript
 import { privateKeyToAccount } from 'viem/accounts';
+import { EXCHANGE_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
 interface HyperliquidCredentials {
@@ -304,10 +337,9 @@ interface HyperliquidCredentials {
     private_key: string;
 }
 
-const INFO_URL = 'https://api.hyperliquid.xyz/info';
-
 export async function validate_hyperliquid(credentials: HyperliquidCredentials): Promise<ExchangeValidationResult> {
     const { wallet_address, private_key } = credentials;
+    const { restUrl } = EXCHANGE_CONFIG.hyperliquid;
 
     if (!wallet_address || !private_key) {
         return { valid: false, error: 'wallet address and private key are required' };
@@ -322,7 +354,7 @@ export async function validate_hyperliquid(credentials: HyperliquidCredentials):
             return { valid: false, error: 'private key does not match wallet address' };
         }
 
-        const balance = await fetch_account_balance(wallet_address);
+        const balance = await fetch_account_balance(wallet_address, restUrl);
 
         return { valid: true, error: null, balance };
     } catch (err) {
@@ -331,8 +363,8 @@ export async function validate_hyperliquid(credentials: HyperliquidCredentials):
     }
 }
 
-async function fetch_account_balance(wallet_address: string): Promise<number> {
-    const response = await fetch(INFO_URL, {
+async function fetch_account_balance(wallet_address: string, rest_url: string): Promise<number> {
+    const response = await fetch(`${rest_url}/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -443,11 +475,9 @@ export type { ExchangeValidationResult, ExchangeValidationCredentials } from './
 
 ## Dependencies
 
-### Required Package (for Hyperliquid)
+### Required Package (for Hyperliquid) - ALREADY INSTALLED
 
-```bash
-pnpm add viem
-```
+**Status:** `viem@2.44.4` is already installed in package.json. No action required.
 
 **Why viem?** Recommended by [Hyperliquid community TypeScript SDK](https://github.com/nktkas/hyperliquid). Modern, tree-shakeable (~40KB vs ethers ~120KB).
 
@@ -510,19 +540,21 @@ pnpm add viem
 ```
 src/
 ├── config/
-│   └── index.ts                 # Updated with proxy_url and proxy_auth
+│   └── index.ts                 # MODIFY - add restUrl to EXCHANGE_CONFIG
+├── types/
+│   └── worker.types.ts          # MODIFY - add restUrl to ExchangeStreamConfig
 └── services/exchange/
-    ├── crypto.ts                # HMAC-SHA256 utilities
-    ├── exchange.service.ts      # Updated to re-export from validators
-    ├── chart_data.ts            # Existing (unchanged)
-    ├── init.ts                  # Existing (unchanged)
-    └── validators/
-        ├── types.ts             # Shared types
-        ├── index.ts             # Unified export
-        ├── binance.ts           # Binance validation
-        ├── bybit.ts             # Bybit validation
-        ├── blofin.ts            # BloFin validation
-        └── hyperliquid.ts       # Hyperliquid validation
+    ├── crypto.ts                # ✓ EXISTS - HMAC-SHA256 utilities
+    ├── exchange.service.ts      # MODIFY - re-export from validators
+    ├── chart_data.ts            # ✓ EXISTS (unchanged)
+    ├── init.ts                  # ✓ EXISTS (unchanged)
+    └── validators/              # CREATE - new directory
+        ├── types.ts             # CREATE - shared types
+        ├── index.ts             # CREATE - unified export
+        ├── binance.ts           # CREATE - Binance validation
+        ├── bybit.ts             # CREATE - Bybit validation
+        ├── blofin.ts            # CREATE - BloFin validation
+        └── hyperliquid.ts       # CREATE - Hyperliquid validation
 ```
 
 ---
