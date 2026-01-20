@@ -1,0 +1,331 @@
+import binanceusdm from 'ccxt/js/src/pro/binanceusdm.js';
+import blofin from 'ccxt/js/src/pro/blofin.js';
+import bybit from 'ccxt/js/src/pro/bybit.js';
+import hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
+import { PROXY_CONFIG } from '@/config';
+import {
+    binance as binanceAdapter,
+    bybit as bybitAdapter,
+    blofin as blofinAdapter,
+    hyperliquid as hyperliquidAdapter,
+    type RawPosition,
+    type RawOrder,
+} from './adapters';
+import type { ExchangeId, CcxtExchange } from '@/types/worker.types';
+
+export interface ExchangeCredentials {
+    api_key?: string;
+    api_secret?: string;
+    passphrase?: string;
+    wallet_address?: string;
+    private_key?: string;
+}
+
+export interface MarketInfo {
+    contract_size?: number;
+}
+
+const ORDER_TYPE_MAP: Record<string, string> = {
+    limit: 'limit',
+    market: 'market',
+    stop: 'stop',
+    stop_market: 'stop',
+    take_profit: 'take_profit',
+    take_profit_market: 'take_profit',
+    stop_loss: 'stop_loss',
+    trailing_stop: 'stop',
+};
+
+export const authenticatedExchanges: Record<string, CcxtExchange> = {};
+
+function getProxyOptions(exchangeId: ExchangeId): {
+    proxy?: string;
+    headers?: Record<string, string>;
+} {
+    const proxy = PROXY_CONFIG[exchangeId];
+    if (!proxy) return {};
+    return {
+        proxy: proxy.url,
+        headers: { 'x-proxy-auth': proxy.auth },
+    };
+}
+
+export function createAuthenticatedExchange(
+    exchangeId: ExchangeId,
+    credentials: ExchangeCredentials
+): CcxtExchange {
+    const proxyOptions = getProxyOptions(exchangeId);
+
+    let instance: CcxtExchange;
+    switch (exchangeId) {
+        case 'binance':
+            instance = new binanceusdm({
+                ...proxyOptions,
+                apiKey: credentials.api_key,
+                secret: credentials.api_secret,
+                options: { warnOnFetchOpenOrdersWithoutSymbol: false },
+            }) as unknown as CcxtExchange;
+            break;
+        case 'bybit':
+            instance = new bybit({
+                apiKey: credentials.api_key,
+                secret: credentials.api_secret,
+            }) as unknown as CcxtExchange;
+            break;
+        case 'blofin':
+            instance = new blofin({
+                ...proxyOptions,
+                apiKey: credentials.api_key,
+                secret: credentials.api_secret,
+                password: credentials.passphrase,
+            }) as unknown as CcxtExchange;
+            break;
+        case 'hyperliquid':
+            instance = new hyperliquid({
+                walletAddress: credentials.wallet_address,
+                privateKey: credentials.private_key,
+            }) as unknown as CcxtExchange;
+            break;
+        default:
+            throw new Error(`unsupported exchange: ${exchangeId}`);
+    }
+
+    instance.markets = {};
+    instance.markets_by_id = {};
+    return instance;
+}
+
+function getAuthenticatedExchange(exchangeId: ExchangeId): CcxtExchange {
+    const instance = authenticatedExchanges[exchangeId];
+    if (!instance) {
+        throw new Error(`exchange ${exchangeId} not initialized`);
+    }
+    return instance;
+}
+
+export async function fetchAccountConfig(exchangeId: ExchangeId): Promise<{
+    position_mode: 'one_way' | 'hedge';
+    default_margin_mode: 'cross' | 'isolated';
+}> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+    let position_mode: 'one_way' | 'hedge' = 'one_way';
+
+    switch (exchangeId) {
+        case 'binance':
+            position_mode = await binanceAdapter.fetch_position_mode(exchange as never);
+            break;
+        case 'bybit':
+            position_mode = await bybitAdapter.fetch_position_mode(exchange as never);
+            break;
+        case 'blofin':
+            position_mode = await blofinAdapter.fetch_position_mode(exchange as never);
+            break;
+    }
+
+    return { position_mode, default_margin_mode: 'cross' };
+}
+
+function mapPosition(
+    raw: RawPosition,
+    exchangeId: ExchangeId,
+    marketMap: Record<string, MarketInfo>
+): {
+    id: string;
+    exchange: ExchangeId;
+    symbol: string;
+    side: 'long' | 'short';
+    size: number;
+    entry_price: number;
+    last_price: number;
+    liquidation_price: number | null;
+    unrealized_pnl: number;
+    unrealized_pnl_pct: number;
+    margin: number;
+    leverage: number;
+    margin_mode: 'cross' | 'isolated';
+    updated_at: number;
+} {
+    const side: 'long' | 'short' = raw.side === 'short' ? 'short' : 'long';
+    const margin_mode = raw.margin_mode;
+    const market = marketMap[raw.symbol];
+    const contract_size =
+        exchangeId === 'blofin' && market?.contract_size ? market.contract_size : 1;
+    const margin = Number(raw.initial_margin ?? 0);
+    const unrealized_pnl = Number(raw.unrealized_pnl ?? 0);
+    const unrealized_pnl_pct = margin > 0 ? (unrealized_pnl / margin) * 100 : 0;
+
+    return {
+        id: `${exchangeId}-${raw.symbol}-${side}`,
+        exchange: exchangeId,
+        symbol: raw.symbol,
+        side,
+        size: raw.contracts * contract_size,
+        entry_price: Number(raw.entry_price ?? 0),
+        last_price: Number(raw.mark_price ?? raw.entry_price ?? 0),
+        liquidation_price: raw.liquidation_price ? Number(raw.liquidation_price) : null,
+        unrealized_pnl,
+        unrealized_pnl_pct,
+        margin,
+        leverage: Number(raw.leverage ?? 1),
+        margin_mode,
+        updated_at: Date.now(),
+    };
+}
+
+function mapOrder(
+    raw: RawOrder,
+    exchangeId: ExchangeId,
+    marketMap: Record<string, MarketInfo>
+): {
+    id: string;
+    exchange: ExchangeId;
+    symbol: string;
+    side: 'buy' | 'sell';
+    type: string;
+    size: number;
+    price: number;
+    filled: number;
+    status: 'open' | 'partial';
+    created_at: number;
+} {
+    const market = marketMap[raw.symbol];
+    const contract_size =
+        exchangeId === 'blofin' && market?.contract_size ? market.contract_size : 1;
+    const size = raw.amount * contract_size;
+    const filled = raw.filled * contract_size;
+    const status: 'open' | 'partial' =
+        raw.filled > 0 && raw.filled < raw.amount ? 'partial' : 'open';
+
+    return {
+        id: raw.id,
+        exchange: exchangeId,
+        symbol: raw.symbol,
+        side: raw.side,
+        type: ORDER_TYPE_MAP[raw.type] ?? 'limit',
+        size,
+        price: raw.price,
+        filled,
+        status,
+        created_at: raw.timestamp,
+    };
+}
+
+export async function fetchBalance(exchangeId: ExchangeId): Promise<{
+    total: number;
+    available: number;
+    used: number;
+    currency: string;
+    last_updated: number;
+} | null> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.fetch_balance(exchange as never);
+            case 'bybit':
+                return await bybitAdapter.fetch_balance(exchange as never);
+            case 'blofin':
+                return await blofinAdapter.fetch_balance(exchange as never);
+            case 'hyperliquid':
+                return await hyperliquidAdapter.fetch_balance(exchange as never);
+            default:
+                return null;
+        }
+    } catch (err) {
+        console.error(`failed to fetch ${exchangeId} balance:`, (err as Error).message);
+        return null;
+    }
+}
+
+export async function fetchPositions(
+    exchangeId: ExchangeId,
+    marketMap: Record<string, MarketInfo>
+): Promise<ReturnType<typeof mapPosition>[]> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        let raw: RawPosition[] = [];
+
+        switch (exchangeId) {
+            case 'binance':
+                raw = await binanceAdapter.fetch_positions(exchange as never);
+                break;
+            case 'bybit':
+                raw = await bybitAdapter.fetch_positions(exchange as never);
+                break;
+            case 'blofin':
+                raw = await blofinAdapter.fetch_positions(exchange as never);
+                break;
+            case 'hyperliquid':
+                raw = await hyperliquidAdapter.fetch_positions(exchange as never);
+                break;
+        }
+
+        let count = 0;
+        for (let i = 0; i < raw.length; i++) {
+            if (Math.abs(raw[i].contracts) > 0) count++;
+        }
+        const result: ReturnType<typeof mapPosition>[] = new Array(count);
+        let idx = 0;
+        for (let i = 0; i < raw.length; i++) {
+            if (Math.abs(raw[i].contracts) > 0) {
+                result[idx++] = mapPosition(raw[i], exchangeId, marketMap);
+            }
+        }
+        return result;
+    } catch (err) {
+        console.error(`failed to fetch ${exchangeId} positions:`, (err as Error).message);
+        return [];
+    }
+}
+
+export async function fetchOrders(
+    exchangeId: ExchangeId,
+    marketMap: Record<string, MarketInfo>
+): Promise<ReturnType<typeof mapOrder>[]> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        let raw: RawOrder[] = [];
+
+        switch (exchangeId) {
+            case 'binance':
+                raw = await binanceAdapter.fetch_orders(exchange as never);
+                break;
+            case 'bybit':
+                raw = await bybitAdapter.fetch_orders(exchange as never);
+                break;
+            case 'blofin':
+                raw = await blofinAdapter.fetch_orders(exchange as never);
+                break;
+            case 'hyperliquid':
+                raw = await hyperliquidAdapter.fetch_orders(exchange as never);
+                break;
+        }
+
+        return raw.map((o) => mapOrder(o, exchangeId, marketMap));
+    } catch (err) {
+        console.error(`failed to fetch ${exchangeId} orders:`, (err as Error).message);
+        return [];
+    }
+}
+
+export async function fetchAccountData(
+    exchangeId: ExchangeId,
+    marketMap: Record<string, MarketInfo>
+): Promise<{
+    balance: Awaited<ReturnType<typeof fetchBalance>>;
+    positions: Awaited<ReturnType<typeof fetchPositions>>;
+    orders: Awaited<ReturnType<typeof fetchOrders>>;
+}> {
+    const [balance, positions, orders] = await Promise.all([
+        fetchBalance(exchangeId),
+        fetchPositions(exchangeId, marketMap),
+        fetchOrders(exchangeId, marketMap),
+    ]);
+
+    return { balance, positions, orders };
+}
+
+export { hyperliquidAdapter };

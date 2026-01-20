@@ -7,7 +7,7 @@ import {
     fetch_positions as fetch_positions_api,
     fetch_orders as fetch_orders_api,
     has_exchange,
-} from '../services/exchange/account';
+} from '../services/exchange/account_bridge';
 
 const PRIVACY_STORAGE_KEY = '247terminal_account_privacy';
 const HISTORY_LIMIT = 100;
@@ -180,7 +180,7 @@ export async function refresh_balance(exchange_id: ExchangeId): Promise<void> {
             update_balance(exchange_id, balance);
         }
     } catch (err) {
-        console.error(`[balance] ${exchange_id} error:`, err);
+        console.error(`failed to fetch ${exchange_id} balance:`, (err as Error).message);
     } finally {
         loading.value = { ...loading.value, balance: false };
     }
@@ -201,7 +201,7 @@ export async function refresh_positions(exchange_id: ExchangeId): Promise<void> 
         }
         positions.value = map;
     } catch (err) {
-        console.error(`[positions] ${exchange_id} error:`, err);
+        console.error(`failed to fetch ${exchange_id} positions:`, (err as Error).message);
     } finally {
         loading.value = { ...loading.value, positions: false };
     }
@@ -222,7 +222,7 @@ export async function refresh_orders(exchange_id: ExchangeId): Promise<void> {
         }
         orders.value = map;
     } catch (err) {
-        console.error(`[orders] ${exchange_id} error:`, err);
+        console.error(`failed to fetch ${exchange_id} orders:`, (err as Error).message);
     } finally {
         loading.value = { ...loading.value, orders: false };
     }

@@ -19,7 +19,7 @@ import {
 } from '../../stores/credentials_store';
 import { init_default_exchange } from '../../stores/trade_store';
 import { refresh_account } from '../../stores/account_store';
-import { init_exchange } from './account';
+import { init_exchange } from './account_bridge';
 
 let initialized = false;
 
@@ -34,16 +34,22 @@ export async function load_exchange(ex: ExchangeId): Promise<void> {
         if (tickersResult.status === 'fulfilled') {
             set_initial_tickers(ex, tickersResult.value);
         } else {
-            console.error(`failed to load ${ex} tickers:`, tickersResult.reason);
+            console.error(
+                `failed to load ${ex} tickers:`,
+                (tickersResult.reason as Error)?.message
+            );
         }
         if (fundingResult.status === 'fulfilled') {
             update_initial_funding(ex, fundingResult.value);
         } else {
-            console.error(`failed to load ${ex} funding:`, fundingResult.reason);
+            console.error(
+                `failed to load ${ex} funding:`,
+                (fundingResult.reason as Error)?.message
+            );
         }
         start_ticker_stream(ex);
     } catch (err) {
-        console.error(`failed to load ${ex} markets:`, err);
+        console.error(`failed to load ${ex} markets:`, (err as Error).message);
         set_markets(ex, []);
     }
 }
@@ -53,11 +59,11 @@ function get_connected_exchanges(): ExchangeId[] {
     return EXCHANGE_IDS.filter((ex) => status[ex]);
 }
 
-function init_connected_exchange_instances(connected: ExchangeId[]): void {
+async function init_connected_exchange_instances(connected: ExchangeId[]): Promise<void> {
     for (const ex of connected) {
         const creds = get_exchange_credentials(ex);
         if (creds.api_key || creds.wallet_address) {
-            init_exchange(ex, {
+            await init_exchange(ex, {
                 api_key: creds.api_key,
                 api_secret: creds.api_secret,
                 passphrase: creds.passphrase,
@@ -82,7 +88,7 @@ export async function init_exchanges(): Promise<void> {
     const connected = get_connected_exchanges();
 
     if (connected.length > 0) {
-        init_connected_exchange_instances(connected);
+        await init_connected_exchange_instances(connected);
     }
 
     const exchanges_to_load = connected.length > 0 ? connected : EXCHANGE_IDS;

@@ -11,6 +11,7 @@ import {
     update_bidask_batch,
     update_price_batch,
 } from '@/stores/exchange_store';
+import { WORKER_REQUEST_TIMEOUT } from '@/config';
 
 export type { MarketData, TickerInfo, OHLCV, ChartTimeframe };
 
@@ -27,7 +28,7 @@ let requestId = 0;
 const pendingRequests = new Map<number, PendingRequest>();
 const streamCallbacks = new Map<string, WorkerCallback>();
 
-function getWorker(): Worker {
+export function getWorker(): Worker {
     if (worker) return worker;
 
     worker = new Worker(new URL('../../workers/exchange.worker.ts', import.meta.url), {
@@ -72,13 +73,13 @@ function getWorker(): Worker {
     };
 
     worker.onerror = (err) => {
-        console.error('exchange worker error:', err);
+        console.error('exchange worker error:', err.message);
     };
 
     return worker;
 }
 
-function sendRequest<T>(
+export function sendRequest<T>(
     type: string,
     payload: Record<string, unknown>,
     signal?: AbortSignal
@@ -104,7 +105,7 @@ function sendRequest<T>(
                 cleanup();
                 reject(new Error('request timeout'));
             }
-        }, 30000);
+        }, WORKER_REQUEST_TIMEOUT);
 
         const pending: PendingRequest = {
             resolve: (value: unknown) => {

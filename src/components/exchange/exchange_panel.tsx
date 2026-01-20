@@ -12,7 +12,7 @@ import {
     EXCHANGE_LINKS,
     EXCHANGE_SETUP_GUIDES,
 } from '@/services/exchange/exchange.service';
-import { init_exchange, destroy_exchange } from '@/services/exchange/account';
+import { init_exchange, destroy_exchange } from '@/services/exchange/account_bridge';
 import { load_exchange } from '@/services/exchange/init';
 import { refresh_account, clear_exchange_data } from '@/stores/account_store';
 import { get_exchange_icon, get_exchange_logo } from '@/components/common/exchanges';
@@ -187,7 +187,7 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
                 return;
             }
 
-            init_exchange(exchange_id, creds);
+            await init_exchange(exchange_id, creds);
 
             update_exchange_credentials(exchange_id, {
                 ...creds,
@@ -206,8 +206,8 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
         }
     }
 
-    function handle_disconnect(): void {
-        destroy_exchange(exchange_id);
+    async function handle_disconnect(): Promise<void> {
+        await destroy_exchange(exchange_id);
         disconnect_exchange_credentials(exchange_id);
         clear_exchange_data(exchange_id);
         set_form_data({

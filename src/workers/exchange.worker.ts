@@ -3,8 +3,6 @@ import blofin from 'ccxt/js/src/pro/blofin.js';
 import bybit from 'ccxt/js/src/pro/bybit.js';
 import hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
 import {
-    EXCHANGE_CONFIG,
-    VALID_SETTLE,
     BATCH_INTERVALS,
     WS_STREAM_LIMIT,
     WS_RECONNECT_DELAY,
@@ -14,32 +12,58 @@ import {
 import { createTickerEntry } from './stream_utils';
 import { startBinanceNativeStream, stopBinanceNativeStream } from './streams/binance';
 import { startBybitNativeStream, stopBybitNativeStream } from './streams/bybit';
-import {
-    startBlofinNativeStream,
-    stopBlofinNativeStream,
-    fetchBlofinFundingRates,
-} from './streams/blofin';
+import { startBlofinNativeStream, stopBlofinNativeStream } from './streams/blofin';
 import { startCexStream, stopCexStream } from './streams/hyperliquid_cex';
 import { startDexStream, stopDexStream } from './streams/hyperliquid_dex';
+import {
+    authenticatedExchanges,
+    createAuthenticatedExchange,
+    fetchAccountConfig,
+    fetchBalance,
+    fetchPositions,
+    fetchOrders,
+    fetchAccountData,
+    hyperliquidAdapter,
+    type ExchangeCredentials,
+    type MarketInfo as AccountMarketInfo,
+} from './account_worker';
+import {
+    registerExchangeClass,
+    getExchange,
+    loadMarkets,
+    getSwapSymbols,
+    isLinearSwap,
+    fetchMarkets,
+    fetchTickers,
+    fetchFundingRates,
+    fetchOHLCV,
+} from './data_fetchers';
 import type {
     ExchangeId,
     WorkerMessage,
-    MarketInfo,
     TickerEntry,
     CcxtExchange,
-    CcxtMarket,
     TickerStreamState,
     CcxtTickerData,
 } from '@/types/worker.types';
 
-const EXCHANGE_CLASSES = {
-    binanceusdm,
-    blofin,
-    bybit,
-    hyperliquid,
-} as const;
+registerExchangeClass(
+    'binanceusdm',
+    binanceusdm as unknown as new (options: Record<string, unknown>) => CcxtExchange
+);
+registerExchangeClass(
+    'blofin',
+    blofin as unknown as new (options: Record<string, unknown>) => CcxtExchange
+);
+registerExchangeClass(
+    'bybit',
+    bybit as unknown as new (options: Record<string, unknown>) => CcxtExchange
+);
+registerExchangeClass(
+    'hyperliquid',
+    hyperliquid as unknown as new (options: Record<string, unknown>) => CcxtExchange
+);
 
-const exchanges: Record<string, CcxtExchange> = {};
 const activeStreams = new Map<string, boolean>();
 const tickerStreams = new Map<string, TickerStreamState>();
 
@@ -55,156 +79,6 @@ function getTickerUpdateArray(exchangeId: string, size: number): TickerEntry[] {
         tickerUpdatePool.set(exchangeId, arr);
     }
     return arr;
-}
-
-function getExchange(exchangeId: ExchangeId): CcxtExchange {
-    if (exchanges[exchangeId]) return exchanges[exchangeId];
-
-    const config = EXCHANGE_CONFIG[exchangeId];
-    if (!config) throw new Error(`unknown exchange: ${exchangeId}`);
-
-    const ExchangeClass = EXCHANGE_CLASSES[config.ccxtClass as keyof typeof EXCHANGE_CLASSES];
-    if (!ExchangeClass) throw new Error(`ccxt class not found: ${config.ccxtClass}`);
-
-    const exchangeOptions: Record<string, unknown> = {
-        enableRateLimit: false,
-        options: { defaultType: config.defaultType },
-    };
-
-    if (config.proxy) exchangeOptions.proxy = config.proxy;
-    if (config.headers) exchangeOptions.headers = config.headers;
-
-    exchanges[exchangeId] = new ExchangeClass(exchangeOptions) as unknown as CcxtExchange;
-    return exchanges[exchangeId];
-}
-
-async function loadMarkets(exchangeId: ExchangeId): Promise<Record<string, CcxtMarket>> {
-    const exchange = getExchange(exchangeId);
-    if (!exchange.markets || Object.keys(exchange.markets).length === 0) {
-        await exchange.loadMarkets();
-    }
-    return exchange.markets;
-}
-
-function getSwapSymbols(exchange: CcxtExchange): string[] {
-    return Object.values(exchange.markets)
-        .filter(isLinearSwap)
-        .map((m) => m.symbol);
-}
-
-function isLinearSwap(market: CcxtMarket): boolean {
-    const isActive = market.active || market.info?.isPreListing;
-    return Boolean(isActive && market.type === 'swap' && VALID_SETTLE.has(market.settle));
-}
-
-function isLinearSwapForExchange(market: CcxtMarket, exchangeId: ExchangeId): boolean {
-    if (!isLinearSwap(market)) return false;
-    if (exchangeId === 'bybit') return market.settle === 'USDT';
-    return true;
-}
-
-async function fetchMarkets(exchangeId: ExchangeId): Promise<MarketInfo[]> {
-    const markets = await loadMarkets(exchangeId);
-    return Object.values(markets)
-        .filter((m) => isLinearSwapForExchange(m, exchangeId))
-        .map((market) => ({
-            symbol: market.symbol,
-            base: market.base || '',
-            quote: market.quote || '',
-            settle: market.settle || market.quote || '',
-            active: market.active,
-            type: market.type,
-            tick_size: market.precision?.price ?? 0.01,
-            min_qty: market.limits?.amount?.min ?? 0.001,
-            max_qty: market.limits?.amount?.max ?? 1000000,
-            qty_step: market.precision?.amount ?? 0.001,
-            contract_size: market.contractSize ?? 1,
-            max_leverage: market.limits?.leverage?.max ?? null,
-        }))
-        .sort((a, b) => a.symbol.localeCompare(b.symbol));
-}
-
-async function fetchTickers(
-    exchangeId: ExchangeId
-): Promise<
-    Record<string, { last_price: number; price_24h: number | null; volume_24h: number | null }>
-> {
-    const exchange = getExchange(exchangeId);
-    await loadMarkets(exchangeId);
-
-    const tickers = await exchange.fetchTickers();
-
-    const result: Record<
-        string,
-        { last_price: number; price_24h: number | null; volume_24h: number | null }
-    > = {};
-
-    for (const [symbol, ticker] of Object.entries(tickers)) {
-        const market = exchange.markets[symbol];
-        if (!market || !isLinearSwap(market)) continue;
-
-        result[symbol] = {
-            last_price: ticker.last ?? ticker.close ?? 0,
-            price_24h: ticker.open ?? ticker.previousClose ?? null,
-            volume_24h: ticker.quoteVolume ?? ticker.baseVolume ?? null,
-        };
-    }
-
-    return result;
-}
-
-async function fetchFundingRates(
-    exchangeId: ExchangeId
-): Promise<Record<string, { funding_rate: number | null; next_funding_time: number | null }>> {
-    const exchange = getExchange(exchangeId);
-    const symbols = getSwapSymbols(exchange);
-    if (!symbols || symbols.length === 0) return {};
-
-    if (exchangeId === 'blofin') {
-        return fetchBlofinFundingRates(exchange);
-    }
-
-    const fundingRates = await exchange.fetchFundingRates(symbols);
-    const result: Record<
-        string,
-        { funding_rate: number | null; next_funding_time: number | null }
-    > = {};
-
-    for (const [symbol, funding] of Object.entries(fundingRates)) {
-        const market = exchange.markets[symbol];
-        if (!market || !isLinearSwap(market)) continue;
-
-        result[symbol] = {
-            funding_rate: funding.fundingRate ?? null,
-            next_funding_time: funding.fundingTimestamp ?? funding.nextFundingTimestamp ?? null,
-        };
-    }
-
-    return result;
-}
-
-async function fetchOHLCV(
-    exchangeId: ExchangeId,
-    symbol: string,
-    timeframe: string,
-    limit = 500
-): Promise<
-    { time: number; open: number; high: number; low: number; close: number; volume: number }[]
-> {
-    const exchange = getExchange(exchangeId);
-    await loadMarkets(exchangeId);
-
-    const ccxtTimeframe = TIMEFRAME_MAP[timeframe] || timeframe;
-    const ohlcv = await exchange.fetchOHLCV(symbol, ccxtTimeframe, undefined, limit);
-
-    return ohlcv.map((candle) => ({
-        time: Math.floor(candle[0] / 1000),
-        open: candle[1],
-        high: candle[2],
-        low: candle[3],
-        close: candle[4],
-        volume: candle[5],
-    }));
 }
 
 async function startOHLCVStream(
@@ -438,6 +312,57 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             case 'STOP_TICKER_STREAM':
                 stopTickerStream(payload?.exchangeId as ExchangeId);
                 result = { stopped: true };
+                break;
+            case 'INIT_EXCHANGE': {
+                const exchangeId = payload?.exchangeId as ExchangeId;
+                const credentials = payload?.credentials as ExchangeCredentials;
+                const oldExchange = authenticatedExchanges[exchangeId];
+                if (oldExchange?.close) {
+                    oldExchange.close().catch(() => {});
+                }
+                authenticatedExchanges[exchangeId] = createAuthenticatedExchange(
+                    exchangeId,
+                    credentials
+                );
+                result = { initialized: true };
+                break;
+            }
+            case 'DESTROY_EXCHANGE': {
+                const exchangeId = payload?.exchangeId as ExchangeId;
+                const oldExchange = authenticatedExchanges[exchangeId];
+                if (oldExchange?.close) {
+                    oldExchange.close().catch(() => {});
+                }
+                delete authenticatedExchanges[exchangeId];
+                if (exchangeId === 'hyperliquid') {
+                    hyperliquidAdapter.clear_cache();
+                }
+                result = { destroyed: true };
+                break;
+            }
+            case 'FETCH_BALANCE':
+                result = await fetchBalance(payload?.exchangeId as ExchangeId);
+                break;
+            case 'FETCH_POSITIONS':
+                result = await fetchPositions(
+                    payload?.exchangeId as ExchangeId,
+                    (payload?.marketMap as Record<string, AccountMarketInfo>) || {}
+                );
+                break;
+            case 'FETCH_ORDERS':
+                result = await fetchOrders(
+                    payload?.exchangeId as ExchangeId,
+                    (payload?.marketMap as Record<string, AccountMarketInfo>) || {}
+                );
+                break;
+            case 'FETCH_ACCOUNT_CONFIG':
+                result = await fetchAccountConfig(payload?.exchangeId as ExchangeId);
+                break;
+            case 'FETCH_ACCOUNT_DATA':
+                result = await fetchAccountData(
+                    payload?.exchangeId as ExchangeId,
+                    (payload?.marketMap as Record<string, AccountMarketInfo>) || {}
+                );
                 break;
             default:
                 throw new Error(`unknown message type: ${type}`);

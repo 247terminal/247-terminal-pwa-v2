@@ -50,6 +50,9 @@ export const BATCH_INTERVALS = {
 export const WS_STREAM_LIMIT = 200;
 export const WS_RECONNECT_DELAY = 5000;
 export const OHLCV_RETRY_DELAY = 2000;
+export const WORKER_REQUEST_TIMEOUT = 30000;
+export const MARKET_MAP_CACHE_TTL = 60000;
+export const HYPERLIQUID_CACHE_TTL = 100;
 
 export const VALID_SETTLE = new Set(['USDT', 'USDC', 'USDH', 'USDE']);
 export const VALID_QUOTES = new Set(['USDT', 'USDC']);
