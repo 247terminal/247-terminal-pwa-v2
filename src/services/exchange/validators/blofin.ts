@@ -2,19 +2,21 @@ import * as ccxt from 'ccxt';
 import { config } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
-interface BinanceCredentials {
+interface BlofinCredentials {
     api_key: string;
     api_secret: string;
+    passphrase: string;
 }
 
-export async function validate_binance(credentials: BinanceCredentials): Promise<ExchangeValidationResult> {
-    const { api_key, api_secret } = credentials;
+export async function validate_blofin(credentials: BlofinCredentials): Promise<ExchangeValidationResult> {
+    const { api_key, api_secret, passphrase } = credentials;
 
-    if (!api_key || !api_secret) return { valid: false, error: 'api key and secret are required' };
+    if (!api_key || !api_secret || !passphrase) return { valid: false, error: 'api key, secret, and passphrase are required' };
 
-    const exchange = new ccxt.binanceusdm({
+    const exchange = new ccxt.blofin({
         apiKey: api_key,
         secret: api_secret,
+        password: passphrase,
         proxy: config.proxy_url,
         headers: {
             'x-proxy-auth': config.proxy_auth,

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide details the implementation of native API credential validation for each supported exchange (Binance, Bybit, BloFin, Hyperliquid). The approach uses each exchange's official API endpoints with proper HMAC-SHA256 signing, rather than relying on CCXT.
+This guide details the implementation of credential validation for each supported exchange (Binance, Bybit, BloFin, Hyperliquid). The approach uses **CCXT's unified API** to handle authentication, signing, and API calls consistently across all exchanges.
 
 ## Architecture Decision
 
@@ -14,7 +14,7 @@ This guide details the implementation of native API credential validation for ea
 
 ### Solution
 
-Use the **existing proxy** (`https://proxy2.247terminal.com/`) for exchanges that block CORS. The proxy forwards requests without storing credentials, and all traffic is HTTPS encrypted.
+Use the **existing proxy** (`https://proxy2.247terminal.com/`) for exchanges that block CORS. CCXT can be configured with a proxy URL. The proxy forwards requests without storing credentials, and all traffic is HTTPS encrypted.
 
 **CORS Status by Exchange:**
 - **Binance Futures** - Blocks CORS (needs proxy)
@@ -30,9 +30,6 @@ Use the **existing proxy** (`https://proxy2.247terminal.com/`) for exchanges tha
 
 | File | Action |
 |------|--------|
-| `src/config/index.ts` | **MODIFY** - Add `restUrl` to EXCHANGE_CONFIG for binance, bybit, hyperliquid |
-| `src/types/worker.types.ts` | **MODIFY** - Add optional `restUrl` field to ExchangeStreamConfig |
-| `src/services/exchange/crypto.ts` | **ALREADY EXISTS** - HMAC-SHA256 signing utilities implemented |
 | `src/services/exchange/validators/types.ts` | **CREATE** - Shared validation types |
 | `src/services/exchange/validators/binance.ts` | **CREATE** - Binance validation |
 | `src/services/exchange/validators/bybit.ts` | **CREATE** - Bybit validation |
@@ -47,348 +44,29 @@ Use the **existing proxy** (`https://proxy2.247terminal.com/`) for exchanges tha
 
 ---
 
+## Dependencies
+
+### CCXT - ALREADY INSTALLED
+
+**Status:** `ccxt@4.5.32` is already installed in package.json. No action required.
+
+CCXT handles:
+- API authentication and signing for all exchanges
+- Request/response formatting
+- Error handling and retries
+- Rate limiting
+
+### viem - ALREADY INSTALLED
+
+**Status:** `viem@2.44.4` is already installed in package.json. No action required.
+
+Used for Hyperliquid wallet address derivation from private key.
+
+---
+
 ## Implementation Details
 
-### 0. Config Updates (`src/config/index.ts`)
-
-**Status:** Add `restUrl` to `EXCHANGE_CONFIG` for exchanges that don't have it yet.
-
-BloFin already has `restUrl` defined. Add to binance, bybit, and hyperliquid:
-
-```typescript
-export const EXCHANGE_CONFIG: Record<string, ExchangeStreamConfig> = {
-    binance: {
-        // ... existing fields
-        restUrl: 'https://fapi.binance.com',
-    },
-    blofin: {
-        // ... existing fields (restUrl already present)
-        restUrl: 'https://openapi.blofin.com',
-    },
-    hyperliquid: {
-        // ... existing fields
-        restUrl: 'https://api.hyperliquid.xyz',
-    },
-    bybit: {
-        // ... existing fields
-        restUrl: 'https://api.bybit.com',
-    },
-};
-```
-
-**Note:** Update `ExchangeStreamConfig` type in `src/types/worker.types.ts` to include optional `restUrl` field if not already present.
-
----
-
-### 1. Crypto Utilities (`src/services/exchange/crypto.ts`) - ALREADY EXISTS
-
-**Status:** Implementation complete. No changes required.
-
-```typescript
-export async function hmac_sha256_hex(secret: string, message: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const key_data = encoder.encode(secret);
-    const message_data = encoder.encode(message);
-
-    const crypto_key = await crypto.subtle.importKey(
-        'raw',
-        key_data,
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-    );
-
-    const signature = await crypto.subtle.sign('HMAC', crypto_key, message_data);
-    const hash_array = Array.from(new Uint8Array(signature));
-
-    return hash_array.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-export async function hmac_sha256_base64(secret: string, message: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const key_data = encoder.encode(secret);
-    const message_data = encoder.encode(message);
-
-    const crypto_key = await crypto.subtle.importKey(
-        'raw',
-        key_data,
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-    );
-
-    const signature = await crypto.subtle.sign('HMAC', crypto_key, message_data);
-
-    return btoa(String.fromCharCode(...new Uint8Array(signature)));
-}
-
-export function get_timestamp(): number {
-    return Date.now();
-}
-
-export function generate_nonce(): string {
-    return crypto.randomUUID();
-}
-```
-
----
-
-### 2. Binance Validator (`src/services/exchange/validators/binance.ts`)
-
-**Endpoint:** `GET https://fapi.binance.com/fapi/v3/account`
-
-**Signature Format:** HMAC-SHA256 of query string parameters (hex encoded)
-
-**CORS:** Requires proxy
-
-```typescript
-import { hmac_sha256_hex, get_timestamp } from '../crypto';
-import { config, EXCHANGE_CONFIG } from '@/config';
-import type { ExchangeValidationResult } from './types';
-
-interface BinanceCredentials {
-    api_key: string;
-    api_secret: string;
-}
-
-export async function validate_binance(credentials: BinanceCredentials): Promise<ExchangeValidationResult> {
-    const { api_key, api_secret } = credentials;
-    const { restUrl } = EXCHANGE_CONFIG.binance;
-
-    if (!api_key || !api_secret) {
-        return { valid: false, error: 'api key and secret are required' };
-    }
-
-    const timestamp = get_timestamp();
-    const recv_window = 5000;
-    const query_string = `recvWindow=${recv_window}&timestamp=${timestamp}`;
-
-    const signature = await hmac_sha256_hex(api_secret, query_string);
-    const target_url = `${restUrl}/fapi/v3/account?${query_string}&signature=${signature}`;
-
-    try {
-        const response = await fetch(`${config.proxy_url}${target_url}`, {
-            method: 'GET',
-            headers: {
-                'X-MBX-APIKEY': api_key,
-                'x-proxy-auth': config.proxy_auth,
-            },
-        });
-
-        if (!response.ok) {
-            const error_data = await response.json();
-            return { valid: false, error: error_data.msg || 'validation failed' };
-        }
-
-        const data = await response.json();
-        const usdt_balance = data.assets?.find((a: { asset: string }) => a.asset === 'USDT');
-        const balance = parseFloat(usdt_balance?.walletBalance || '0');
-
-        return { valid: true, error: null, balance };
-    } catch (err) {
-        return { valid: false, error: err instanceof Error ? err.message : 'network error' };
-    }
-}
-```
-
----
-
-### 3. Bybit Validator (`src/services/exchange/validators/bybit.ts`)
-
-**Endpoint:** `GET https://api.bybit.com/v5/user/query-api`
-
-**Signature Format:** HMAC-SHA256 of `timestamp + api_key + recv_window + query_string` (hex encoded)
-
-**CORS:** Requires proxy
-
-```typescript
-import { hmac_sha256_hex, get_timestamp } from '../crypto';
-import { config, EXCHANGE_CONFIG } from '@/config';
-import type { ExchangeValidationResult } from './types';
-
-interface BybitCredentials {
-    api_key: string;
-    api_secret: string;
-}
-
-export async function validate_bybit(credentials: BybitCredentials): Promise<ExchangeValidationResult> {
-    const { api_key, api_secret } = credentials;
-    const { restUrl } = EXCHANGE_CONFIG.bybit;
-
-    if (!api_key || !api_secret) {
-        return { valid: false, error: 'api key and secret are required' };
-    }
-
-    const timestamp = get_timestamp();
-    const recv_window = 5000;
-    const query_string = '';
-
-    const sign_string = `${timestamp}${api_key}${recv_window}${query_string}`;
-    const signature = await hmac_sha256_hex(api_secret, sign_string);
-
-    try {
-        const response = await fetch(`${config.proxy_url}${restUrl}/v5/user/query-api`, {
-            method: 'GET',
-            headers: {
-                'X-BAPI-API-KEY': api_key,
-                'X-BAPI-TIMESTAMP': timestamp.toString(),
-                'X-BAPI-RECV-WINDOW': recv_window.toString(),
-                'X-BAPI-SIGN': signature,
-                'x-proxy-auth': config.proxy_auth,
-            },
-        });
-
-        const data = await response.json();
-
-        if (data.retCode !== 0) {
-            return { valid: false, error: data.retMsg || 'validation failed' };
-        }
-
-        return { valid: true, error: null };
-    } catch (err) {
-        return { valid: false, error: err instanceof Error ? err.message : 'network error' };
-    }
-}
-```
-
----
-
-### 4. BloFin Validator (`src/services/exchange/validators/blofin.ts`)
-
-**Endpoint:** `GET https://openapi.blofin.com/api/v1/user/query-apikey`
-
-**Signature Format:** Base64 of raw HMAC-SHA256 bytes (NOT hex string) of `timestamp + method + path + body`
-
-**CORS:** Requires proxy
-
-```typescript
-import { hmac_sha256_base64, get_timestamp, generate_nonce } from '../crypto';
-import { config, EXCHANGE_CONFIG } from '@/config';
-import type { ExchangeValidationResult } from './types';
-
-interface BlofinCredentials {
-    api_key: string;
-    api_secret: string;
-    passphrase: string;
-}
-
-export async function validate_blofin(credentials: BlofinCredentials): Promise<ExchangeValidationResult> {
-    const { api_key, api_secret, passphrase } = credentials;
-    const { restUrl } = EXCHANGE_CONFIG.blofin;
-
-    if (!api_key || !api_secret || !passphrase) {
-        return { valid: false, error: 'api key, secret, and passphrase are required' };
-    }
-
-    const path = '/api/v1/user/query-apikey';
-    const method = 'GET';
-    const timestamp = get_timestamp().toString();
-    const nonce = generate_nonce();
-    const body = '';
-
-    const prehash = `${timestamp}${method}${path}${body}`;
-    const signature = await hmac_sha256_base64(api_secret, prehash);
-
-    try {
-        const response = await fetch(`${config.proxy_url}${restUrl}${path}`, {
-            method: 'GET',
-            headers: {
-                'ACCESS-KEY': api_key,
-                'ACCESS-SIGN': signature,
-                'ACCESS-TIMESTAMP': timestamp,
-                'ACCESS-NONCE': nonce,
-                'ACCESS-PASSPHRASE': passphrase,
-                'x-proxy-auth': config.proxy_auth,
-            },
-        });
-
-        const data = await response.json();
-
-        if (data.code !== '0') {
-            return { valid: false, error: data.msg || 'validation failed' };
-        }
-
-        return { valid: true, error: null };
-    } catch (err) {
-        return { valid: false, error: err instanceof Error ? err.message : 'network error' };
-    }
-}
-```
-
----
-
-### 5. Hyperliquid Validator (`src/services/exchange/validators/hyperliquid.ts`)
-
-**Validation Method:** Two-step validation:
-1. Derive address from private key and compare with provided wallet address (proves ownership)
-2. Call the public info endpoint to verify account exists and get balance
-
-**Info Endpoint:** `POST https://api.hyperliquid.xyz/info` (no authentication required, just wallet address)
-
-**CORS:** Allows direct calls (no proxy needed)
-
-```typescript
-import { privateKeyToAccount } from 'viem/accounts';
-import { EXCHANGE_CONFIG } from '@/config';
-import type { ExchangeValidationResult } from './types';
-
-interface HyperliquidCredentials {
-    wallet_address: string;
-    private_key: string;
-}
-
-export async function validate_hyperliquid(credentials: HyperliquidCredentials): Promise<ExchangeValidationResult> {
-    const { wallet_address, private_key } = credentials;
-    const { restUrl } = EXCHANGE_CONFIG.hyperliquid;
-
-    if (!wallet_address || !private_key) {
-        return { valid: false, error: 'wallet address and private key are required' };
-    }
-
-    try {
-        const formatted_key = private_key.startsWith('0x') ? private_key : `0x${private_key}`;
-        const account = privateKeyToAccount(formatted_key as `0x${string}`);
-        const derived_address = account.address;
-
-        if (derived_address.toLowerCase() !== wallet_address.toLowerCase()) {
-            return { valid: false, error: 'private key does not match wallet address' };
-        }
-
-        const balance = await fetch_account_balance(wallet_address, restUrl);
-
-        return { valid: true, error: null, balance };
-    } catch (err) {
-        const message = err instanceof Error ? err.message : 'validation failed';
-        return { valid: false, error: message };
-    }
-}
-
-async function fetch_account_balance(wallet_address: string, rest_url: string): Promise<number> {
-    const response = await fetch(`${rest_url}/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            type: 'clearinghouseState',
-            user: wallet_address,
-        }),
-    });
-
-    if (!response.ok) {
-        throw new Error('failed to fetch account info');
-    }
-
-    const data = await response.json();
-    const account_value = parseFloat(data.marginSummary?.accountValue || '0');
-
-    return account_value;
-}
-```
-
-**Note:** Uses viem for secp256k1 key derivation. This is the library recommended by the [Hyperliquid community TypeScript SDK](https://github.com/nktkas/hyperliquid).
-
----
-
-### 6. Shared Types (`src/services/exchange/validators/types.ts`)
+### 1. Shared Types (`src/services/exchange/validators/types.ts`)
 
 ```typescript
 export interface ExchangeValidationResult {
@@ -408,7 +86,193 @@ export interface ExchangeValidationCredentials {
 
 ---
 
-### 7. Unified Validator Export (`src/services/exchange/validators/index.ts`)
+### 2. Binance Validator (`src/services/exchange/validators/binance.ts`)
+
+Uses CCXT's `binanceusdm` class for USDT-M Futures.
+
+```typescript
+import * as ccxt from 'ccxt';
+import { config } from '@/config';
+import type { ExchangeValidationResult } from './types';
+
+interface BinanceCredentials {
+    api_key: string;
+    api_secret: string;
+}
+
+export async function validate_binance(credentials: BinanceCredentials): Promise<ExchangeValidationResult> {
+    const { api_key, api_secret } = credentials;
+
+    if (!api_key || !api_secret) {
+        return { valid: false, error: 'api key and secret are required' };
+    }
+
+    const exchange = new ccxt.binanceusdm({
+        apiKey: api_key,
+        secret: api_secret,
+        proxy: config.proxy_url,
+        headers: {
+            'x-proxy-auth': config.proxy_auth,
+        },
+    });
+
+    try {
+        const balance = await exchange.fetchBalance();
+        const usdt_balance = Number(balance['USDT']?.total ?? 0);
+
+        return { valid: true, error: null, balance: usdt_balance };
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'validation failed';
+        return { valid: false, error: message };
+    }
+}
+```
+
+---
+
+### 3. Bybit Validator (`src/services/exchange/validators/bybit.ts`)
+
+Uses CCXT's `bybit` class.
+
+```typescript
+import * as ccxt from 'ccxt';
+import { config } from '@/config';
+import type { ExchangeValidationResult } from './types';
+
+interface BybitCredentials {
+    api_key: string;
+    api_secret: string;
+}
+
+export async function validate_bybit(credentials: BybitCredentials): Promise<ExchangeValidationResult> {
+    const { api_key, api_secret } = credentials;
+
+    if (!api_key || !api_secret) {
+        return { valid: false, error: 'api key and secret are required' };
+    }
+
+    const exchange = new ccxt.bybit({
+        apiKey: api_key,
+        secret: api_secret,
+        proxy: config.proxy_url,
+        headers: {
+            'x-proxy-auth': config.proxy_auth,
+        },
+    });
+
+    try {
+        const balance = await exchange.fetchBalance({ type: 'swap' });
+        const usdt_balance = Number(balance['USDT']?.total ?? 0);
+
+        return { valid: true, error: null, balance: usdt_balance };
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'validation failed';
+        return { valid: false, error: message };
+    }
+}
+```
+
+---
+
+### 4. BloFin Validator (`src/services/exchange/validators/blofin.ts`)
+
+Uses CCXT's `blofin` class. Requires passphrase.
+
+```typescript
+import * as ccxt from 'ccxt';
+import { config } from '@/config';
+import type { ExchangeValidationResult } from './types';
+
+interface BlofinCredentials {
+    api_key: string;
+    api_secret: string;
+    passphrase: string;
+}
+
+export async function validate_blofin(credentials: BlofinCredentials): Promise<ExchangeValidationResult> {
+    const { api_key, api_secret, passphrase } = credentials;
+
+    if (!api_key || !api_secret || !passphrase) {
+        return { valid: false, error: 'api key, secret, and passphrase are required' };
+    }
+
+    const exchange = new ccxt.blofin({
+        apiKey: api_key,
+        secret: api_secret,
+        password: passphrase,
+        proxy: config.proxy_url,
+        headers: {
+            'x-proxy-auth': config.proxy_auth,
+        },
+    });
+
+    try {
+        const balance = await exchange.fetchBalance();
+        const usdt_balance = Number(balance['USDT']?.total ?? 0);
+
+        return { valid: true, error: null, balance: usdt_balance };
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'validation failed';
+        return { valid: false, error: message };
+    }
+}
+```
+
+---
+
+### 5. Hyperliquid Validator (`src/services/exchange/validators/hyperliquid.ts`)
+
+Hyperliquid uses wallet-based authentication. Validation is two-step:
+1. Derive address from private key using viem and compare with provided wallet address
+2. Use CCXT to fetch balance (proves account exists)
+
+```typescript
+import * as ccxt from 'ccxt';
+import { privateKeyToAccount } from 'viem/accounts';
+import type { ExchangeValidationResult } from './types';
+
+interface HyperliquidCredentials {
+    wallet_address: string;
+    private_key: string;
+}
+
+export async function validate_hyperliquid(credentials: HyperliquidCredentials): Promise<ExchangeValidationResult> {
+    const { wallet_address, private_key } = credentials;
+
+    if (!wallet_address || !private_key) {
+        return { valid: false, error: 'wallet address and private key are required' };
+    }
+
+    try {
+        const formatted_key = private_key.startsWith('0x') ? private_key : `0x${private_key}`;
+        const account = privateKeyToAccount(formatted_key as `0x${string}`);
+        const derived_address = account.address;
+
+        if (derived_address.toLowerCase() !== wallet_address.toLowerCase()) {
+            return { valid: false, error: 'private key does not match wallet address' };
+        }
+
+        const exchange = new ccxt.hyperliquid({
+            walletAddress: wallet_address,
+            privateKey: formatted_key,
+        });
+
+        const balance = await exchange.fetchBalance();
+        const usdt_balance = Number(balance['USDC']?.total ?? balance['USD']?.total ?? 0);
+
+        return { valid: true, error: null, balance: usdt_balance };
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'validation failed';
+        return { valid: false, error: message };
+    }
+}
+```
+
+**Note:** Hyperliquid allows CORS, so no proxy is needed.
+
+---
+
+### 6. Unified Validator Export (`src/services/exchange/validators/index.ts`)
 
 ```typescript
 import { validate_binance } from './binance';
@@ -458,9 +322,9 @@ export async function validate_exchange_credentials(
 
 ---
 
-### 8. Update Exchange Service (`src/services/exchange/exchange.service.ts`)
+### 7. Update Exchange Service (`src/services/exchange/exchange.service.ts`)
 
-Replace the existing `validate_exchange_credentials` function import:
+Replace the existing `validate_exchange_credentials` function:
 
 ```typescript
 // Remove the existing validate_exchange_credentials function
@@ -473,48 +337,12 @@ export type { ExchangeValidationResult, ExchangeValidationCredentials } from './
 
 ---
 
-## Dependencies
-
-### Required Package (for Hyperliquid) - ALREADY INSTALLED
-
-**Status:** `viem@2.44.4` is already installed in package.json. No action required.
-
-**Why viem?** Recommended by [Hyperliquid community TypeScript SDK](https://github.com/nktkas/hyperliquid). Modern, tree-shakeable (~40KB vs ethers ~120KB).
-
----
-
-## Error Codes Reference
-
-### Binance
-| Code | Message |
-|------|---------|
-| -1021 | Timestamp outside recvWindow |
-| -1022 | Signature invalid |
-| -2015 | Invalid API key, IP, or permissions |
-
-### Bybit
-| retCode | Meaning |
-|---------|---------|
-| 10003 | Invalid API key |
-| 10004 | Invalid sign |
-| 10005 | Permission denied |
-
-### BloFin
-| Code | Meaning |
-|------|---------|
-| 50111 | Invalid API key |
-| 50113 | Invalid signature |
-| 50114 | Invalid passphrase |
-
----
-
 ## Security Considerations
 
-1. **Secrets never leave the browser** - All signing happens client-side
+1. **Secrets never leave the browser** - All signing happens client-side via CCXT
 2. **No backend storage** - Credentials stored in localStorage only
 3. **HTTPS required** - All API calls use HTTPS
-4. **Timestamp validation** - Prevents replay attacks
-5. **Nonce usage** - BloFin requires unique nonces per request
+4. **Proxy is stateless** - Proxy forwards requests without logging credentials
 
 ---
 
@@ -539,12 +367,8 @@ export type { ExchangeValidationResult, ExchangeValidationCredentials } from './
 
 ```
 src/
-├── config/
-│   └── index.ts                 # MODIFY - add restUrl to EXCHANGE_CONFIG
-├── types/
-│   └── worker.types.ts          # MODIFY - add restUrl to ExchangeStreamConfig
 └── services/exchange/
-    ├── crypto.ts                # ✓ EXISTS - HMAC-SHA256 utilities
+    ├── crypto.ts                # ✓ EXISTS (unchanged, used elsewhere)
     ├── exchange.service.ts      # MODIFY - re-export from validators
     ├── chart_data.ts            # ✓ EXISTS (unchanged)
     ├── init.ts                  # ✓ EXISTS (unchanged)
@@ -580,10 +404,10 @@ src/
 |----------|--------|-------|
 | File structure | ✅ | Services in `src/services/exchange/validators/` |
 | Separation of concerns | ✅ | Each validator is a separate module |
-| TypeScript interfaces | ✅ | All props and results typed with `Exchange` prefix |
+| TypeScript interfaces | ✅ | All props and results typed |
 | Naming conventions | ✅ | PascalCase for types, snake_case for functions |
-| Config centralization | ✅ | All config in `src/config/index.ts` |
-| DRY principle | ✅ | Shared crypto utilities, unified export |
+| Config centralization | ✅ | Proxy config from `src/config/index.ts` |
+| DRY principle | ✅ | CCXT handles all signing logic |
 | Modularity | ✅ | Feature-based organization |
 | Explicit return types | ✅ | All functions have return types |
 
@@ -591,12 +415,7 @@ src/
 
 ## Sources
 
-- [Binance Futures API - Account Endpoints](https://developers.binance.com/docs/derivatives/usds-margined-futures/account/rest-api/Account-Information-V3)
-- [Bybit API - Get API Key Info](https://bybit-exchange.github.io/docs/v5/user/apikey-info)
-- [BloFin API Documentation](https://docs.blofin.com/index.html)
-- [BloFin Python SDK - Signature Implementation](https://github.com/blofin/blofin-sdk-python)
-- [Hyperliquid API Docs](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api)
-- [Hyperliquid Official Python SDK](https://github.com/hyperliquid-dex/hyperliquid-python-sdk)
-- [Hyperliquid Community TypeScript SDK](https://github.com/nktkas/hyperliquid)
-- [Hyperliquid clearinghouseState](https://docs.chainstack.com/reference/hyperliquid-info-clearinghousestate)
+- [CCXT Documentation](https://docs.ccxt.com/)
+- [CCXT GitHub](https://github.com/ccxt/ccxt)
 - [viem Documentation](https://viem.sh/)
+- [Hyperliquid Community TypeScript SDK](https://github.com/nktkas/hyperliquid)

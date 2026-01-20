@@ -1,12 +1,4 @@
-import { get_auth_headers } from '@/services/auth/auth.service';
 import type { ExchangeId } from '@/types/credentials.types';
-import { config } from '@/config';
-
-export interface ExchangeValidationResult {
-    valid: boolean;
-    error: string | null;
-    balance?: number;
-}
 
 export interface ExchangeValidationRequest {
     api_key: string;
@@ -16,37 +8,9 @@ export interface ExchangeValidationRequest {
     private_key?: string;
 }
 
-export async function validate_exchange_credentials(
-    exchange_id: ExchangeId,
-    credentials: ExchangeValidationRequest
-): Promise<ExchangeValidationResult> {
-    try {
-        const response = await fetch(`${config.api_base_url}/v1/app/exchange/validate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...get_auth_headers(),
-            },
-            body: JSON.stringify({
-                exchange: exchange_id,
-                ...credentials,
-            }),
-        });
+export { validate_exchange_credentials } from './validators';
+export type { ExchangeValidationResult, ExchangeValidationCredentials } from './validators';
 
-        if (!response.ok) {
-            const error = await response.json();
-            return { valid: false, error: error.message || 'validation failed' };
-        }
-
-        const result = await response.json();
-        return { valid: true, error: null, balance: result.data?.balance };
-    } catch (error) {
-        return {
-            valid: false,
-            error: error instanceof Error ? error.message : 'network error',
-        };
-    }
-}
 
 export const EXCHANGE_FIELD_CONFIG: Record<ExchangeId, string[]> = {
     bybit: ['api_key', 'api_secret', 'hedge_mode'],
