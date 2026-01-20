@@ -877,45 +877,89 @@ Auth: EIP-712 signature (r, s, v) + nonce
 
 ## 9. Implementation Phases (Detailed)
 
-### Phase 1.0 - Store Setup
+### Phase 1.0 - Store Setup ✅ DONE
 
-1. Create `account_store.ts` with `ExchangeAccountState` structure
-2. Add signals for `accounts`, `active_exchange`
-3. Create getters: `get_balance()`, `get_positions()`, `get_orders()`
+**Files:**
+- `src/stores/account_store.ts` - Signals for balances, positions, orders
+- `src/types/trading.types.ts` - Balance, PositionMode, MarginMode types
+- `src/types/account.types.ts` - Position, Order types
 
-### Phase 1.1 - Exchange Connection
+**Architecture:**
+```
+account_store.ts
+├── balances: Map<ExchangeId, Balance>
+├── positions: Map<string, Position>
+├── orders: Map<string, Order>
+├── loading: { balance, positions, orders }
+└── computed: total_balance, total_available, positions_list, orders_list
+```
 
-1. Validate credentials (existing)
-2. Fetch position mode (hedge vs one-way)
-3. Store in `accounts[exchange].config.position_mode`
+### Phase 1.1 - Exchange Connection ✅ DONE
 
-### Phase 1.2 - Market Data Extension
+**Files:**
+- `src/services/exchange/account.ts` - Exchange instance management, CCXT wrappers
+- `src/services/exchange/validators/` - Credential validation per exchange
 
-1. Fetch instrument info with size limits
-2. Parse `max_market_qty`, `min_qty`, `qty_step` per symbol
-3. Store in `accounts[exchange].symbol_settings`
+**Flow:**
+1. `init_exchange(exchange_id, credentials)` - Creates authenticated CCXT instance
+2. `fetch_account_config(exchange_id)` - Gets position_mode (hedge/one_way) from exchange API
+3. Position mode auto-detected via API (no manual toggle needed)
 
-### Phase 1.3 - Balance Fetch
+### Phase 1.2 - Market Data Extension ✅ DONE (via existing markets fetch)
 
-1. Implement `fetchBalance()` wrapper
-2. Map to `Balance` interface
-3. Store in `accounts[exchange].balance`
-4. Add `refresh_balance(exchange)` action
+**Files:**
+- `src/workers/exchange.worker.ts` - Fetches markets via CCXT
+- `src/stores/exchange_store.ts` - Stores in `markets` signal
 
-### Phase 1.4 - Position Fetch
+**Already fetched per symbol:**
+- `min_qty`, `max_qty`, `qty_step` from `market.limits.amount`
+- `tick_size` from `market.precision.price`
+- `contract_size`, `max_leverage`
 
-1. Implement `fetchPositions()` wrapper
-2. Map to `Position[]` interface
-3. Include `margin_mode` from response
-4. Store in `accounts[exchange].positions`
-5. Add `refresh_positions(exchange)` action
+**Access:** `get_market(exchange_id, symbol)` returns `MarketData` with all limits
 
-### Phase 1.5 - Order Fetch
+### Phase 1.3 - Balance Fetch ✅ DONE
 
-1. Implement `fetchOpenOrders()` wrapper
-2. Map to `Order[]` interface
-3. Store in `accounts[exchange].open_orders`
-4. Add `refresh_orders(exchange)` action
+**Files:**
+- `src/services/exchange/account.ts` - `fetch_balance()`, `map_balance()`
+- `src/stores/account_store.ts` - `refresh_balance()`, `update_balance()`
+
+**Flow:**
+1. `fetch_balance(exchange_id)` calls CCXT `fetchBalance()`
+2. `map_balance()` extracts USDT/USDC: `{ total, available, used, currency }`
+3. `refresh_balance(exchange_id)` updates store signal
+
+**Trigger:** Called on connect and can be manually refreshed
+
+### Phase 1.4 - Position Fetch ✅ DONE
+
+**Files:**
+- `src/services/exchange/account.ts` - `fetch_positions()`, `map_position()`
+- `src/stores/account_store.ts` - `refresh_positions()`, `update_positions_batch()`
+
+**Position mapping:**
+```typescript
+{
+  id, exchange, symbol, side, size, entry_price, last_price,
+  liquidation_price, unrealized_pnl, unrealized_pnl_pct,
+  margin, leverage, margin_mode, updated_at
+}
+```
+
+### Phase 1.5 - Order Fetch ✅ DONE
+
+**Files:**
+- `src/services/exchange/account.ts` - `fetch_orders()`, `map_order()`
+- `src/stores/account_store.ts` - `refresh_orders()`, `update_orders_batch()`
+
+**Order mapping:**
+```typescript
+{
+  id, exchange, symbol, side, type, size, price, filled, status, created_at
+}
+```
+
+**Combined refresh:** `refresh_account(exchange_id)` fetches all three in parallel
 
 ### Phase 2.0 - Leverage Management
 
@@ -982,54 +1026,83 @@ Auth: EIP-712 signature (r, s, v) + nonce
 
 ---
 
-## 10. Initial Connection Flow
+## 10. Initial Connection Flow (Actual Implementation)
+
+### Manual Connect (exchange_panel.tsx)
 
 ```typescript
-async function initializeExchange(exchange_id: ExchangeId, credentials: Credentials) {
-    // 1. Authenticate
-    await validateCredentials(exchange_id, credentials);
+async function handle_test() {
+    // 1. Validate credentials via direct API call
+    const result = await validate_exchange_credentials(exchange_id, creds);
+    if (!result.valid) return;
 
-    // 2. Fetch account configuration
-    const position_mode = await fetchPositionMode(exchange_id);
+    // 2. Create authenticated CCXT instance (cached)
+    init_exchange(exchange_id, creds);
 
-    // 3. Fetch market info with size limits
-    const markets = await fetchMarkets(exchange_id);
-    const symbol_settings = parseSymbolSettings(markets);
+    // 3. Save credentials to encrypted localStorage
+    update_exchange_credentials(exchange_id, { ...creds, connected: true });
 
-    // 4. Initialize account state
-    accounts[exchange_id] = {
-        exchange_id,
-        connected: true,
-        config: { position_mode, default_margin_mode: 'cross' },
-        symbol_settings,
-        balance: null,
-        positions: [],
-        open_orders: [],
-        ws_connected: false,
-        ws_last_ping: 0,
-    };
+    // 4. Load market data (fire-and-forget)
+    load_exchange(exchange_id);  // markets, tickers, funding → exchange_store
 
-    // 5. Fetch initial trading data (parallel)
-    const [balance, positions, orders] = await Promise.all([
-        fetchBalance(exchange_id),
-        fetchPositions(exchange_id),
-        fetchOpenOrders(exchange_id),
-    ]);
-
-    // 6. Update store
-    accounts[exchange_id].balance = balance;
-    accounts[exchange_id].positions = positions;
-    accounts[exchange_id].open_orders = orders;
-
-    // 7. Connect WebSocket for updates
-    await connectPrivateWebSocket(exchange_id, {
-        onPositionUpdate: () => refreshPositions(exchange_id),
-        onOrderUpdate: () => refreshOrders(exchange_id),
-        onBalanceUpdate: () => refreshBalance(exchange_id),
-    });
-
-    return accounts[exchange_id];
+    // 5. Fetch account data (fire-and-forget)
+    refresh_account(exchange_id);  // balance, positions, orders → account_store
 }
+```
+
+### App Startup (init.ts)
+
+```typescript
+async function init_exchanges() {
+    // 1. Load encrypted credentials from localStorage
+    await init_credentials();
+
+    // 2. Set default exchange to first connected
+    init_default_exchange();
+
+    // 3. For each connected exchange:
+    for (const ex of connected_exchanges) {
+        // Create CCXT instance from stored credentials
+        init_exchange(ex, get_exchange_credentials(ex));
+        // Fetch balance, positions, orders
+        refresh_account(ex);
+    }
+
+    // 4. Load market data for connected (or all if none connected)
+    for (const ex of exchanges_to_load) {
+        load_exchange(ex);  // markets, tickers, funding, start ticker stream
+    }
+}
+```
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Exchange Connection                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  credentials_store ──► init_exchange() ──► CCXT Instance        │
+│       (encrypted)         (account.ts)      (Map cached)        │
+│                                                                  │
+│  ┌──────────────────┐    ┌──────────────────┐                   │
+│  │  Market Data     │    │  Account Data    │                   │
+│  │  (worker thread) │    │  (main thread)   │                   │
+│  ├──────────────────┤    ├──────────────────┤                   │
+│  │ fetch_markets()  │    │ fetch_balance()  │                   │
+│  │ fetch_tickers()  │    │ fetch_positions()│                   │
+│  │ fetch_funding()  │    │ fetch_orders()   │                   │
+│  └────────┬─────────┘    └────────┬─────────┘                   │
+│           │                       │                              │
+│           ▼                       ▼                              │
+│  ┌──────────────────┐    ┌──────────────────┐                   │
+│  │  exchange_store  │    │  account_store   │                   │
+│  ├──────────────────┤    ├──────────────────┤                   │
+│  │ markets signal   │    │ balances signal  │                   │
+│  │ ticker signals   │    │ positions signal │                   │
+│  └──────────────────┘    │ orders signal    │                   │
+│                          └──────────────────┘                   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
