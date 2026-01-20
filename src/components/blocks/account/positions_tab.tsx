@@ -1,5 +1,5 @@
 import { memo } from 'preact/compat';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
 import { effect } from '@preact/signals';
 import type { Position } from '../../../types/account.types';
 import { positions_list, privacy_mode } from '../../../stores/account_store';
@@ -8,6 +8,9 @@ import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
 import { format_pnl, format_pct, format_usd, mask_value } from '../../../utils/account_format';
+import { SortHeader, type SortDirection } from './sort_header';
+
+type PositionSortKey = 'symbol' | 'size' | 'entry' | 'liq' | 'pnl';
 
 interface PositionRowProps {
     position: Position;
@@ -37,29 +40,29 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
     const pnl_pct = position.margin > 0 ? (pnl / position.margin) * 100 : 0;
     const pnl_color = pnl >= 0 ? 'text-success' : 'text-error';
 
-    const handle_close = () => {
+    const handle_close = useCallback(() => {
         console.error('close position not implemented');
-    };
+    }, []);
 
-    const handle_tpsl = () => {
+    const handle_tpsl = useCallback(() => {
         console.error('tp/sl not implemented');
-    };
+    }, []);
 
     return (
-        <div class="relative flex items-center gap-2 px-2 py-1.5 border-b border-base-300/30 hover:bg-base-300/30 transition-colors text-xs">
+        <div class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs">
             <span
-                class={`absolute left-0 top-1 bottom-1 w-0.5 rounded-full ${is_long ? 'bg-success' : 'bg-error'}`}
+                class={`absolute left-0 top-1 bottom-1 w-[2.5px] ${is_long ? 'bg-success' : 'bg-error'}`}
             />
             <div class="w-24 shrink-0 flex items-center gap-1.5">
                 <span class="text-base-content/40 shrink-0">
                     {get_exchange_icon(position.exchange)}
                 </span>
                 <div>
-                    <div class="font-medium text-base-content truncate">
+                    <div class={`font-medium truncate ${is_long ? 'text-success' : 'text-error'}`}>
                         {format_symbol(position.symbol)}
                     </div>
-                    <div class="text-[10px] text-base-content/50">
-                        {position.leverage}x {position.side.toUpperCase()}
+                    <div class="text-[10px] text-base-content/50 capitalize">
+                        {position.margin_mode} {position.leverage}x
                     </div>
                 </div>
             </div>
@@ -118,9 +121,57 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
     );
 });
 
+function sort_positions(
+    positions: Position[],
+    key: PositionSortKey,
+    direction: SortDirection
+): Position[] {
+    const sorted = [...positions].sort((a, b) => {
+        let cmp = 0;
+        switch (key) {
+            case 'symbol':
+                cmp = a.symbol.localeCompare(b.symbol);
+                break;
+            case 'size':
+                cmp = a.size * a.last_price - b.size * b.last_price;
+                break;
+            case 'entry':
+                cmp = a.entry_price - b.entry_price;
+                break;
+            case 'liq':
+                cmp = (a.liquidation_price ?? 0) - (b.liquidation_price ?? 0);
+                break;
+            case 'pnl':
+                cmp = a.unrealized_pnl - b.unrealized_pnl;
+                break;
+        }
+        return direction === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+}
+
 export function PositionsTab() {
     const positions = positions_list.value;
     const is_private = privacy_mode.value;
+    const [sort_key, set_sort_key] = useState<PositionSortKey>('pnl');
+    const [sort_direction, set_sort_direction] = useState<SortDirection>('desc');
+
+    const handle_sort = useCallback(
+        (key: PositionSortKey) => {
+            if (key === sort_key) {
+                set_sort_direction((d) => (d === 'asc' ? 'desc' : 'asc'));
+            } else {
+                set_sort_key(key);
+                set_sort_direction('desc');
+            }
+        },
+        [sort_key]
+    );
+
+    const sorted_positions = useMemo(
+        () => sort_positions(positions, sort_key, sort_direction),
+        [positions, sort_key, sort_direction]
+    );
 
     if (positions.length === 0) {
         return (
@@ -133,14 +184,53 @@ export function PositionsTab() {
     return (
         <div class="flex-1 overflow-auto">
             <div class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 sticky top-0 bg-base-200">
-                <div class="w-24 shrink-0">Symbol</div>
-                <div class="w-20 shrink-0 text-right">Size</div>
-                <div class="w-20 shrink-0 text-right">Entry/Last</div>
-                <div class="w-16 shrink-0 text-right">Liq</div>
-                <div class="w-20 shrink-0 text-right">uPNL</div>
+                <SortHeader
+                    label="Symbol"
+                    sort_key="symbol"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    width="w-24"
+                />
+                <SortHeader
+                    label="Size"
+                    sort_key="size"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-20"
+                />
+                <SortHeader
+                    label="Entry/Last"
+                    sort_key="entry"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-20"
+                />
+                <SortHeader
+                    label="Liq"
+                    sort_key="liq"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-16"
+                />
+                <SortHeader
+                    label="uPNL"
+                    sort_key="pnl"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-20"
+                />
                 <div class="flex-1 text-right">Actions</div>
             </div>
-            {positions.map((pos) => (
+            {sorted_positions.map((pos) => (
                 <PositionRow key={pos.id} position={pos} is_private={is_private} />
             ))}
         </div>

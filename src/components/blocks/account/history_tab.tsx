@@ -1,7 +1,9 @@
 import { memo } from 'preact/compat';
+import { useState, useMemo, useCallback } from 'preact/hooks';
 import type { TradeHistory } from '../../../types/account.types';
 import { history, privacy_mode } from '../../../stores/account_store';
 import { format_symbol } from '../../chart/symbol_row';
+import { get_exchange_icon } from '../../common/exchanges';
 import {
     format_display_price,
     format_pnl,
@@ -10,6 +12,9 @@ import {
     format_full_time,
     mask_value,
 } from '../../../utils/account_format';
+import { SortHeader, type SortDirection } from './sort_header';
+
+type HistorySortKey = 'symbol' | 'time' | 'size' | 'entry' | 'pnl';
 
 interface HistoryRowProps {
     trade: TradeHistory;
@@ -21,13 +26,16 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
     const pnl_color = trade.realized_pnl >= 0 ? 'text-success' : 'text-error';
 
     return (
-        <div class="flex items-center gap-2 px-2 py-1.5 border-b border-base-300/30 hover:bg-base-300/30 transition-colors text-xs">
-            <div class="w-20 shrink-0">
-                <div class="flex items-center gap-1.5">
-                    <span
-                        class={`w-1.5 h-1.5 rounded-full ${is_buy ? 'bg-success' : 'bg-error'}`}
-                    />
-                    <span class="font-medium text-base-content">{format_symbol(trade.symbol)}</span>
+        <div class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs">
+            <span
+                class={`absolute left-0 top-1 bottom-1 w-[2.5px] ${is_buy ? 'bg-success' : 'bg-error'}`}
+            />
+            <div class="w-20 shrink-0 flex items-center gap-1.5">
+                <span class="text-base-content/40 shrink-0">
+                    {get_exchange_icon(trade.exchange)}
+                </span>
+                <div class={`font-medium truncate ${is_buy ? 'text-success' : 'text-error'}`}>
+                    {format_symbol(trade.symbol)}
                 </div>
             </div>
 
@@ -61,9 +69,57 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
     );
 });
 
+function sort_history(
+    trades: TradeHistory[],
+    key: HistorySortKey,
+    direction: SortDirection
+): TradeHistory[] {
+    const sorted = [...trades].sort((a, b) => {
+        let cmp = 0;
+        switch (key) {
+            case 'symbol':
+                cmp = a.symbol.localeCompare(b.symbol);
+                break;
+            case 'time':
+                cmp = a.closed_at - b.closed_at;
+                break;
+            case 'size':
+                cmp = a.size - b.size;
+                break;
+            case 'entry':
+                cmp = a.entry_price - b.entry_price;
+                break;
+            case 'pnl':
+                cmp = a.realized_pnl - b.realized_pnl;
+                break;
+        }
+        return direction === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+}
+
 export function HistoryTab() {
     const trades = history.value;
     const is_private = privacy_mode.value;
+    const [sort_key, set_sort_key] = useState<HistorySortKey>('time');
+    const [sort_direction, set_sort_direction] = useState<SortDirection>('desc');
+
+    const handle_sort = useCallback(
+        (key: HistorySortKey) => {
+            if (key === sort_key) {
+                set_sort_direction((d) => (d === 'asc' ? 'desc' : 'asc'));
+            } else {
+                set_sort_key(key);
+                set_sort_direction('desc');
+            }
+        },
+        [sort_key]
+    );
+
+    const sorted_trades = useMemo(
+        () => sort_history(trades, sort_key, sort_direction),
+        [trades, sort_key, sort_direction]
+    );
 
     if (trades.length === 0) {
         return (
@@ -76,13 +132,52 @@ export function HistoryTab() {
     return (
         <div class="flex-1 overflow-auto">
             <div class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 sticky top-0 bg-base-200">
-                <div class="w-20 shrink-0">Symbol</div>
-                <div class="w-14 shrink-0 text-right">Time</div>
-                <div class="w-14 shrink-0 text-right">Size</div>
-                <div class="w-20 shrink-0 text-right">Entry/Close</div>
-                <div class="flex-1 text-right">PNL</div>
+                <SortHeader
+                    label="Symbol"
+                    sort_key="symbol"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    width="w-20"
+                />
+                <SortHeader
+                    label="Time"
+                    sort_key="time"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-14"
+                />
+                <SortHeader
+                    label="Size"
+                    sort_key="size"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-14"
+                />
+                <SortHeader
+                    label="Entry/Close"
+                    sort_key="entry"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-20"
+                />
+                <SortHeader
+                    label="PNL"
+                    sort_key="pnl"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="flex-1"
+                />
             </div>
-            {trades.map((trade) => (
+            {sorted_trades.map((trade) => (
                 <HistoryRow key={trade.id} trade={trade} is_private={is_private} />
             ))}
         </div>

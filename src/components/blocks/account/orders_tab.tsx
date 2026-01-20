@@ -1,4 +1,5 @@
 import { memo } from 'preact/compat';
+import { useState, useMemo, useCallback } from 'preact/hooks';
 import type { Order } from '../../../types/account.types';
 import { orders_list, privacy_mode } from '../../../stores/account_store';
 import { get_market } from '../../../stores/exchange_store';
@@ -6,16 +7,20 @@ import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
 import { format_usd, mask_value } from '../../../utils/account_format';
+import { SortHeader, type SortDirection } from './sort_header';
+
+type OrderSortKey = 'symbol' | 'size' | 'price' | 'id';
+
+const ORDER_TYPE_LABELS: Record<Order['type'], string> = {
+    limit: 'Limit',
+    market: 'Market',
+    stop: 'Stop',
+    take_profit: 'TP',
+    stop_loss: 'SL',
+};
 
 function format_order_type(type: Order['type']): string {
-    const labels: Record<Order['type'], string> = {
-        limit: 'Limit',
-        market: 'Market',
-        stop: 'Stop',
-        take_profit: 'TP',
-        stop_loss: 'SL',
-    };
-    return labels[type];
+    return ORDER_TYPE_LABELS[type];
 }
 
 interface OrderRowProps {
@@ -30,21 +35,21 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
     const tick_size = market?.tick_size ?? 0.01;
     const qty_step = market?.qty_step ?? 0.001;
 
-    const handle_cancel = () => {
+    const handle_cancel = useCallback(() => {
         console.error('cancel order not implemented');
-    };
+    }, []);
 
     return (
-        <div class="relative flex items-center gap-2 px-2 py-1.5 border-b border-base-300/30 hover:bg-base-300/30 transition-colors text-xs">
+        <div class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs">
             <span
-                class={`absolute left-0 top-1 bottom-1 w-0.5 rounded-full ${is_buy ? 'bg-success' : 'bg-error'}`}
+                class={`absolute left-0 top-1 bottom-1 w-[2.5px] ${is_buy ? 'bg-success' : 'bg-error'}`}
             />
             <div class="w-24 shrink-0 flex items-center gap-1.5">
                 <span class="text-base-content/40 shrink-0">
                     {get_exchange_icon(order.exchange)}
                 </span>
                 <div>
-                    <div class="font-medium text-base-content truncate">
+                    <div class={`font-medium truncate ${is_buy ? 'text-success' : 'text-error'}`}>
                         {format_symbol(order.symbol)}
                     </div>
                     <div class="text-[10px] text-base-content/50">
@@ -89,9 +94,50 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
     );
 });
 
+function sort_orders(orders: Order[], key: OrderSortKey, direction: SortDirection): Order[] {
+    const sorted = [...orders].sort((a, b) => {
+        let cmp = 0;
+        switch (key) {
+            case 'symbol':
+                cmp = a.symbol.localeCompare(b.symbol);
+                break;
+            case 'size':
+                cmp = a.size * a.price - b.size * b.price;
+                break;
+            case 'price':
+                cmp = a.price - b.price;
+                break;
+            case 'id':
+                cmp = a.id.localeCompare(b.id);
+                break;
+        }
+        return direction === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+}
+
 export function OrdersTab() {
     const orders = orders_list.value;
     const is_private = privacy_mode.value;
+    const [sort_key, set_sort_key] = useState<OrderSortKey>('symbol');
+    const [sort_direction, set_sort_direction] = useState<SortDirection>('asc');
+
+    const handle_sort = useCallback(
+        (key: OrderSortKey) => {
+            if (key === sort_key) {
+                set_sort_direction((d) => (d === 'asc' ? 'desc' : 'asc'));
+            } else {
+                set_sort_key(key);
+                set_sort_direction('desc');
+            }
+        },
+        [sort_key]
+    );
+
+    const sorted_orders = useMemo(
+        () => sort_orders(orders, sort_key, sort_direction),
+        [orders, sort_key, sort_direction]
+    );
 
     if (orders.length === 0) {
         return (
@@ -104,13 +150,44 @@ export function OrdersTab() {
     return (
         <div class="flex-1 overflow-auto">
             <div class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 sticky top-0 bg-base-200">
-                <div class="w-24 shrink-0">Symbol</div>
-                <div class="w-20 shrink-0 text-right">Size</div>
-                <div class="w-20 shrink-0 text-right">Price</div>
-                <div class="w-20 shrink-0 text-right">ID</div>
+                <SortHeader
+                    label="Symbol"
+                    sort_key="symbol"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    width="w-24"
+                />
+                <SortHeader
+                    label="Size"
+                    sort_key="size"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-20"
+                />
+                <SortHeader
+                    label="Price"
+                    sort_key="price"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-20"
+                />
+                <SortHeader
+                    label="ID"
+                    sort_key="id"
+                    current_key={sort_key}
+                    direction={sort_direction}
+                    on_sort={handle_sort}
+                    align="right"
+                    width="w-20"
+                />
                 <div class="flex-1 text-right">Actions</div>
             </div>
-            {orders.map((order) => (
+            {sorted_orders.map((order) => (
                 <OrderRow key={order.id} order={order} is_private={is_private} />
             ))}
         </div>
