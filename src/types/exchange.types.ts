@@ -2,6 +2,8 @@ export type ExchangeId = 'binance' | 'blofin' | 'hyperliquid' | 'bybit';
 
 export const EXCHANGE_IDS: ExchangeId[] = ['binance', 'blofin', 'hyperliquid', 'bybit'];
 
+export const EXCHANGE_ORDER: ExchangeId[] = ['blofin', 'binance', 'hyperliquid', 'bybit'];
+
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export interface SymbolData {

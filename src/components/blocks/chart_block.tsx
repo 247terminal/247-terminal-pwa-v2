@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
 import { X } from 'lucide-preact';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
-import { EXCHANGE_IDS, type ExchangeId } from '../../types/exchange.types';
+import { EXCHANGE_ORDER, type ExchangeId } from '../../types/exchange.types';
 import {
     fetch_ohlcv,
     watch_ohlcv,
@@ -10,15 +10,28 @@ import {
     type OHLCV,
 } from '../../services/exchange/chart_data';
 import { markets, get_market } from '../../stores/exchange_store';
+import { exchange_connection_status } from '../../stores/credentials_store';
 import { is_sub_minute_timeframe, type SubMinuteTimeframe } from '../../types/candle.types';
 import { start_candle_generation } from '../../services/candle_generator';
+
+function get_default_exchange(connection_status: Record<ExchangeId, boolean>): ExchangeId {
+    const sorted = [...EXCHANGE_ORDER].sort((a, b) => {
+        const a_connected = connection_status[a] ? 1 : 0;
+        const b_connected = connection_status[b] ? 1 : 0;
+        return b_connected - a_connected;
+    });
+    return sorted[0];
+}
 
 interface ChartBlockProps {
     on_remove?: () => void;
 }
 
 export function ChartBlock({ on_remove }: ChartBlockProps) {
-    const [exchange, set_exchange] = useState<ExchangeId>('binance');
+    const connection_status = exchange_connection_status.value;
+    const [exchange, set_exchange] = useState<ExchangeId>(() =>
+        get_default_exchange(connection_status)
+    );
     const [symbol, set_symbol] = useState('BTC/USDT:USDT');
     const [timeframe, set_timeframe] = useState<Timeframe>('1');
     const [data, set_data] = useState<OHLCV[]>([]);
@@ -27,12 +40,17 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
     const current_markets = markets.value;
 
     const exchange_symbols = useMemo<ExchangeSymbols>(() => {
+        const has_connected = Object.values(connection_status).some(Boolean);
         const result: ExchangeSymbols = {};
-        for (const ex of EXCHANGE_IDS) {
-            result[ex] = Object.keys(current_markets[ex] || {}).sort();
+        for (const ex of EXCHANGE_ORDER) {
+            if (has_connected && !connection_status[ex]) continue;
+            const symbols = Object.keys(current_markets[ex] || {});
+            if (symbols.length > 0) {
+                result[ex] = symbols.sort();
+            }
         }
         return result;
-    }, [current_markets]);
+    }, [current_markets, connection_status]);
 
     const has_any_markets = useMemo(
         () => Object.values(current_markets).some((m) => Object.keys(m).length > 0),

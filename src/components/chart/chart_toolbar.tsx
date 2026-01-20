@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks';
-import { EXCHANGE_IDS, type ExchangeId } from '../../types/exchange.types';
+import { type ExchangeId } from '../../types/exchange.types';
 import type { Timeframe } from '../../types/candle.types';
 import { get_exchange_icon } from '../common/exchanges';
 import { favourites, toggle_favourite } from '../../stores/symbol_favourites';
@@ -93,16 +93,22 @@ export function ChartToolbar({
         }
     }, [symbol_open]);
 
+    const available_exchanges = useMemo(() => {
+        return (Object.keys(exchange_symbols) as ExchangeId[]).filter(
+            (ex) => (exchange_symbols[ex]?.length ?? 0) > 0
+        );
+    }, [exchange_symbols]);
+
     const all_symbols = useMemo(() => {
         const result: SymbolWithExchange[] = [];
-        for (const ex of EXCHANGE_IDS) {
+        for (const ex of available_exchanges) {
             const symbols = exchange_symbols[ex] || [];
             for (const s of symbols) {
                 result.push({ exchange: ex, symbol: s });
             }
         }
         return result;
-    }, [exchange_symbols]);
+    }, [exchange_symbols, available_exchanges]);
 
     const favourites_list = favourites.value;
 
@@ -158,18 +164,18 @@ export function ChartToolbar({
             return sort_direction === 'asc' ? cmp : -cmp;
         });
 
-        const groups = EXCHANGE_IDS.reduce(
+        const groups = available_exchanges.reduce(
             (acc, ex) => ({ ...acc, [ex]: [] }),
             {} as Record<ExchangeId, SymbolWithExchange[]>
         );
         for (const item of sorted) {
-            groups[item.exchange].push(item);
+            groups[item.exchange]?.push(item);
         }
 
         const items: ListItem[] = [];
-        for (const ex of EXCHANGE_IDS) {
+        for (const ex of available_exchanges) {
             const group = groups[ex];
-            if (group.length === 0) continue;
+            if (!group || group.length === 0) continue;
 
             items.push({ type: 'header', exchange: ex, count: group.length });
 
@@ -183,7 +189,15 @@ export function ChartToolbar({
         }
 
         return items;
-    }, [all_symbols, active_filter, symbol_search, sort_field, sort_direction, favourites_list]);
+    }, [
+        all_symbols,
+        active_filter,
+        symbol_search,
+        sort_field,
+        sort_direction,
+        favourites_list,
+        available_exchanges,
+    ]);
 
     const total_height = useMemo(() => {
         return flat_list.reduce(
@@ -314,7 +328,7 @@ export function ChartToolbar({
                                     ★ ({favourites_count})
                                 </button>
                                 <div class="flex items-center gap-0.5 ml-auto">
-                                    {EXCHANGE_IDS.map((ex) => (
+                                    {available_exchanges.map((ex) => (
                                         <button
                                             type="button"
                                             key={ex}

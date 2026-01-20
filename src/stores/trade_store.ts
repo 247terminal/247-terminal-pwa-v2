@@ -1,5 +1,5 @@
 import { signal, computed } from '@preact/signals';
-import type { ExchangeId } from '../types/exchange.types';
+import { EXCHANGE_ORDER, type ExchangeId } from '../types/exchange.types';
 import type {
     TradeFormState,
     OrderType,
@@ -9,10 +9,21 @@ import type {
     TwapOrderForm,
 } from '../types/trade.types';
 import { get_market, get_ticker } from './exchange_store';
+import { exchange_connection_status } from './credentials_store';
+
+function get_default_exchange(): ExchangeId {
+    const status = exchange_connection_status.value;
+    const sorted = [...EXCHANGE_ORDER].sort((a, b) => {
+        const a_connected = status[a] ? 1 : 0;
+        const b_connected = status[b] ? 1 : 0;
+        return b_connected - a_connected;
+    });
+    return sorted[0];
+}
 
 function create_initial_state(): TradeFormState {
     return {
-        exchange: 'binance',
+        exchange: EXCHANGE_ORDER[0],
         symbol: 'BTC/USDT:USDT',
         order_type: 'market',
         leverage: 10,
@@ -142,5 +153,12 @@ export function fill_last_price(
         update_limit_form({ [field]: price });
     } else if (order_type === 'scale' && (field === 'price_from' || field === 'price_to')) {
         update_scale_form({ [field]: price });
+    }
+}
+
+export function init_default_exchange(): void {
+    const default_exchange = get_default_exchange();
+    if (trade_state.value.exchange !== default_exchange) {
+        set_exchange(default_exchange);
     }
 }

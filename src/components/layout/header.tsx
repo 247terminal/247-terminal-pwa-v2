@@ -10,9 +10,7 @@ import { LayoutLockToggle } from '../common/layout_lock_toggle';
 import { ExchangeButton } from '../common/exchange_button';
 import { ExchangePanel } from '../exchange/exchange_panel';
 import { exchange_connection_status } from '@/stores/credentials_store';
-import type { ExchangeId } from '@/types/credentials.types';
-
-const EXCHANGE_ORDER: ExchangeId[] = ['blofin', 'binance', 'hyperliquid', 'bybit'];
+import { EXCHANGE_ORDER, type ExchangeId } from '@/types/exchange.types';
 
 function get_sorted_exchanges(connection_status: Record<ExchangeId, boolean>): ExchangeId[] {
     return [...EXCHANGE_ORDER].sort((a, b) => {

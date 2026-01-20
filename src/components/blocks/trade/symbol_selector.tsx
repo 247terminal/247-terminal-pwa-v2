@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks';
 import { memo } from 'preact/compat';
-import { EXCHANGE_IDS, type ExchangeId } from '../../../types/exchange.types';
+import { EXCHANGE_ORDER, type ExchangeId } from '../../../types/exchange.types';
 import { get_exchange_icon } from '../../common/exchanges';
 import { favourites, toggle_favourite } from '../../../stores/symbol_favourites';
 import { get_ticker, get_market } from '../../../stores/exchange_store';
@@ -9,6 +9,7 @@ import {
     selected_symbol,
     set_exchange_symbol,
 } from '../../../stores/trade_store';
+import { exchange_connection_status } from '../../../stores/credentials_store';
 import { format_symbol } from '../../chart/symbol_row';
 import { format_price } from '../../../utils/format';
 
@@ -110,6 +111,17 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
 
     const exchange = selected_exchange.value;
     const symbol = selected_symbol.value;
+    const connection_status = exchange_connection_status.value;
+
+    const sorted_exchanges = useMemo(() => {
+        return [...EXCHANGE_ORDER]
+            .filter((ex) => (exchange_symbols[ex]?.length ?? 0) > 0)
+            .sort((a, b) => {
+                const a_connected = connection_status[a] ? 1 : 0;
+                const b_connected = connection_status[b] ? 1 : 0;
+                return b_connected - a_connected;
+            });
+    }, [exchange_symbols, connection_status]);
 
     useEffect(() => {
         if (open) {
@@ -122,14 +134,14 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
 
     const all_symbols = useMemo(() => {
         const result: SymbolWithExchange[] = [];
-        for (const ex of EXCHANGE_IDS) {
+        for (const ex of sorted_exchanges) {
             const symbols = exchange_symbols[ex] || [];
             for (const s of symbols) {
                 result.push({ exchange: ex, symbol: s });
             }
         }
         return result;
-    }, [exchange_symbols]);
+    }, [exchange_symbols, sorted_exchanges]);
 
     const favourites_list = favourites.value;
 
@@ -155,25 +167,25 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
             );
         }
 
-        const groups = EXCHANGE_IDS.reduce(
+        const groups = sorted_exchanges.reduce(
             (acc, ex) => ({ ...acc, [ex]: [] }),
             {} as Record<ExchangeId, SymbolWithExchange[]>
         );
         for (const item of filtered) {
-            groups[item.exchange].push(item);
+            groups[item.exchange]?.push(item);
         }
 
         const items: ListItem[] = [];
-        for (const ex of EXCHANGE_IDS) {
+        for (const ex of sorted_exchanges) {
             const group = groups[ex];
-            if (group.length === 0) continue;
+            if (!group || group.length === 0) continue;
             items.push({ type: 'header', exchange: ex, count: group.length });
             for (const item of group) {
                 items.push({ type: 'symbol', exchange: item.exchange, symbol: item.symbol });
             }
         }
         return items;
-    }, [all_symbols, active_filter, search, favourites_list]);
+    }, [all_symbols, active_filter, search, favourites_list, sorted_exchanges]);
 
     const total_height = useMemo(() => {
         return flat_list.reduce(
@@ -285,7 +297,7 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
                                 ★
                             </button>
                             <div class="flex items-center gap-0.5 ml-auto">
-                                {EXCHANGE_IDS.map((ex) => (
+                                {sorted_exchanges.map((ex) => (
                                     <button
                                         type="button"
                                         key={ex}
