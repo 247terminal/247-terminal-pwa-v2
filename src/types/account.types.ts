@@ -13,6 +13,7 @@ export interface Position {
     unrealized_pnl_pct: number;
     margin: number;
     leverage: number;
+    margin_mode: 'cross' | 'isolated';
     updated_at: number;
 }
 
