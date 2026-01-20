@@ -1,8 +1,10 @@
 import { memo } from 'preact/compat';
+import { useState, useEffect } from 'preact/hooks';
+import { effect } from '@preact/signals';
 import type { Position } from '../../../types/account.types';
 import { positions_list, privacy_mode } from '../../../stores/account_store';
-import { get_market } from '../../../stores/exchange_store';
-import { format_symbol } from '../../chart/symbol_row';
+import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
+import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
 import { format_pnl, format_pct, format_usd, mask_value } from '../../../utils/account_format';
@@ -14,10 +16,26 @@ interface PositionRowProps {
 
 const PositionRow = memo(function PositionRow({ position, is_private }: PositionRowProps) {
     const is_long = position.side === 'long';
-    const pnl_color = position.unrealized_pnl >= 0 ? 'text-success' : 'text-error';
     const market = get_market(position.exchange, position.symbol);
     const tick_size = market?.tick_size ?? 0.01;
     const qty_step = market?.qty_step ?? 0.001;
+
+    const ticker_signal = get_ticker_signal(position.exchange, position.symbol);
+    const [ticker, set_ticker] = useState(ticker_signal.value);
+
+    useEffect(() => {
+        const dispose = effect(() => {
+            set_ticker(ticker_signal.value);
+        });
+        return dispose;
+    }, [ticker_signal]);
+
+    const last_price = ticker?.last_price ?? position.last_price;
+    const pnl = is_long
+        ? (last_price - position.entry_price) * position.size
+        : (position.entry_price - last_price) * position.size;
+    const pnl_pct = position.margin > 0 ? (pnl / position.margin) * 100 : 0;
+    const pnl_color = pnl >= 0 ? 'text-success' : 'text-error';
 
     const handle_close = () => {
         console.error('close position not implemented');
@@ -48,10 +66,13 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
 
             <div class="w-20 shrink-0 text-right">
                 <div class="text-base-content">
-                    {mask_value(format_usd(position.size * position.last_price), is_private)}
+                    {mask_value(format_usd(position.size * last_price), is_private)}
                 </div>
                 <div class="text-[10px] text-base-content/50">
-                    {mask_value(format_size(position.size, qty_step), is_private)}
+                    {mask_value(
+                        `${format_size(position.size, qty_step)} ${parse_symbol(position.symbol).base}`,
+                        is_private
+                    )}
                 </div>
             </div>
 
@@ -60,22 +81,20 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                     {mask_value(format_price(position.entry_price, tick_size), is_private)}
                 </div>
                 <div class="text-base-content">
-                    {mask_value(format_price(position.last_price, tick_size), is_private)}
+                    {mask_value(format_price(last_price, tick_size), is_private)}
                 </div>
-                {position.liquidation_price && (
-                    <div class="text-error/70 text-[10px]">
-                        {mask_value(
-                            format_price(position.liquidation_price, tick_size),
-                            is_private
-                        )}
-                    </div>
-                )}
+            </div>
+
+            <div class="w-16 shrink-0 text-right text-error/70">
+                {position.liquidation_price
+                    ? mask_value(format_price(position.liquidation_price, tick_size), is_private)
+                    : '-'}
             </div>
 
             <div class={`w-20 shrink-0 text-right ${pnl_color}`}>
-                <div>{mask_value(format_pnl(position.unrealized_pnl), is_private)}</div>
+                <div>{mask_value(format_pnl(pnl), is_private)}</div>
                 <div class="text-[10px] opacity-70">
-                    {mask_value(format_pct(position.unrealized_pnl_pct), is_private)}
+                    {mask_value(format_pct(pnl_pct), is_private)}
                 </div>
             </div>
 
@@ -117,6 +136,7 @@ export function PositionsTab() {
                 <div class="w-24 shrink-0">Symbol</div>
                 <div class="w-20 shrink-0 text-right">Size</div>
                 <div class="w-20 shrink-0 text-right">Entry/Last</div>
+                <div class="w-16 shrink-0 text-right">Liq</div>
                 <div class="w-20 shrink-0 text-right">uPNL</div>
                 <div class="flex-1 text-right">Actions</div>
             </div>

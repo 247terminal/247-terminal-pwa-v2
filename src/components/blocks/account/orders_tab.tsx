@@ -2,7 +2,7 @@ import { memo } from 'preact/compat';
 import type { Order } from '../../../types/account.types';
 import { orders_list, privacy_mode } from '../../../stores/account_store';
 import { get_market } from '../../../stores/exchange_store';
-import { format_symbol } from '../../chart/symbol_row';
+import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
 import { format_usd, mask_value } from '../../../utils/account_format';
@@ -58,7 +58,10 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
                     {mask_value(format_usd(order.size * order.price), is_private)}
                 </div>
                 <div class="text-[10px] text-base-content/50">
-                    {mask_value(format_size(order.size, qty_step), is_private)}
+                    {mask_value(
+                        `${format_size(order.size, qty_step)} ${parse_symbol(order.symbol).base}`,
+                        is_private
+                    )}
                     {order.status === 'partial' && ` · ${fill_pct.toFixed(0)}%`}
                 </div>
             </div>
