@@ -10,6 +10,7 @@ import { LayoutLockToggle } from '../common/layout_lock_toggle';
 import { HeaderBalance } from '../common/header_balance';
 import { ExchangeButton } from '../common/exchange_button';
 import { ExchangePanel } from '../exchange/exchange_panel';
+import { SettingsDrawer } from '../settings/settings_drawer';
 import { exchange_connection_status } from '@/stores/credentials_store';
 import { EXCHANGE_ORDER, type ExchangeId } from '@/types/exchange.types';
 
@@ -23,6 +24,7 @@ function get_sorted_exchanges(connection_status: Record<ExchangeId, boolean>): E
 
 export function Header() {
     const [open_exchange, set_open_exchange] = useState<ExchangeId | null>(null);
+    const [settings_open, set_settings_open] = useState(false);
     const connection_status = exchange_connection_status.value;
     const sorted_exchanges = get_sorted_exchanges(connection_status);
 
@@ -55,7 +57,7 @@ export function Header() {
             <div class="flex items-center gap-3">
                 <ConnectionStatus />
                 <CommandBar on_submit={handle_command} />
-                <SettingsButton on_click={() => console.log('Settings clicked')} />
+                <SettingsButton on_click={() => set_settings_open(true)} />
             </div>
             <div class="flex-1 flex items-center justify-end gap-2">
                 <LayoutLockToggle />
@@ -72,6 +74,8 @@ export function Header() {
                     on_close={handle_panel_close}
                 />
             )}
+
+            <SettingsDrawer is_open={settings_open} on_close={() => set_settings_open(false)} />
         </header>
     );
 }

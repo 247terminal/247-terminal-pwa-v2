@@ -1,98 +1,120 @@
-import type { ExchangeId } from '@/types/exchange.types';
+import type { ExchangeId } from './exchange.types';
 
-export interface ExchangeCredentials {
-    api_key: string;
-    api_secret: string;
-    passphrase: string;
-    walletaddress: string;
-    private_key: string;
-    enabled: boolean;
-}
-
-export interface ExchangeConfig {
+export interface ExchangePreferences {
     preferred: ExchangeId;
-    exchanges: Record<ExchangeId, ExchangeCredentials>;
+    enabled_exchanges: ExchangeId[];
 }
 
-export interface TradingSizes {
-    size_1: number;
-    size_2: number;
-    size_3: number;
-    size_4: number;
-    active_count: number;
+export interface TradingSettings {
+    sizes: [number, number, number, number];
+    size_count: 1 | 2 | 3 | 4;
+    slippage: number | 'MARKET';
+    auto_tp_enabled: boolean;
+    auto_tp_value: number;
+    auto_tp_limit: boolean;
+    auto_sl_enabled: boolean;
+    auto_sl_value: number;
+    unique_shortcuts: boolean;
 }
 
-export interface KeyboardShortcut {
+export interface TerminalSettings {
+    auto_login: boolean;
+    push_notifications: boolean;
+    notification_filter: 'all' | 'critical' | 'special' | 'both';
+    full_size_media: boolean;
+    disable_media: boolean;
+    freeze_on_hover: boolean;
+    share_trades: boolean;
+    show_profit: boolean;
+}
+
+export interface ChartSettings {
+    default_timeframe: string;
+    order_history: boolean;
+    up_candle_color: string;
+    down_candle_color: string;
+    chart_tickers: string[];
+    favorite_tickers: string[];
+}
+
+export interface NewsProviderToggles {
+    phoenix_enabled: boolean;
+    tree_enabled: boolean;
+    synoptic_enabled: boolean;
+    groq_enabled: boolean;
+}
+
+export interface NewsDisplaySettings {
+    deduplicator: boolean;
+    text_shortener: boolean;
+    directional_highlight: boolean;
+    price_movement_highlight: boolean;
+    price_movement_threshold: number;
+    price_movement_notification: boolean;
+    hide_tickerless: boolean;
+    translation_enabled: boolean;
+    translation_language: string;
+    delay_threshold: number;
+    history_limit: number;
+    auto_clear_seconds: number;
+    font_size: number;
+}
+
+export interface KeywordSettings {
+    blacklisted_words: string[];
+    blacklisted_coins: string[];
+    critical_words: string[];
+    special_words: string[];
+    custom_mappings: string[];
+    blacklisted_sources: string[];
+}
+
+export interface CustomWebSocket {
+    id: string;
+    name: string;
+    url: string;
+    login_message: string;
+    title_key: string;
+    body_key: string;
+    icon_key: string;
+    timestamp_key: string;
+    link_key: string;
+}
+
+export interface BottingSettings {
+    enabled: boolean;
+    cooldown_hours: number;
+    mobile_notification_enabled: boolean;
+    ntfy_topic: string;
+    auto_pause_enabled: boolean;
+    auto_pause_timeframe: string;
+    auto_pause_threshold: number;
+}
+
+export interface ShortcutBinding {
     modifier_1: 'CTRL' | 'SHIFT' | 'NONE';
     modifier_2: 'CTRL' | 'SHIFT' | 'NONE';
     key: string;
 }
 
-export interface KeyboardShortcuts {
-    buy_1: KeyboardShortcut;
-    sell_1: KeyboardShortcut;
-    buy_2: KeyboardShortcut;
-    sell_2: KeyboardShortcut;
-    buy_3: KeyboardShortcut;
-    sell_3: KeyboardShortcut;
-    buy_4: KeyboardShortcut;
-    sell_4: KeyboardShortcut;
-    nuke: KeyboardShortcut;
+export interface ShortcutSettings {
+    disabled: boolean;
+    nuke_all: ShortcutBinding;
+    bindings: Record<string, ShortcutBinding>;
 }
 
-export interface NewsFilters {
-    blacklisted_sources: string[];
-    blacklisted_coins: string[];
-    critical_keywords: string[];
-    custom_keywords: string[];
-}
-
-export interface NewsSources {
-    tree_enabled: boolean;
-    tree_key: string;
-    phoenix_enabled: boolean;
-    phoenix_key: string;
-    synoptic_enabled: boolean;
-    synoptic_key: string;
-}
-
-export interface NewsDisplay {
-    font_size: number;
-    items_threshold: number;
-    deduplicator: boolean;
-    directional_highlight: boolean;
-    full_images: boolean;
-    disable_media: boolean;
-}
-
-export interface ChartPreferences {
-    default_timeframe: string;
-    up_candle_color: string;
-    down_candle_color: string;
-}
-
-export interface UIPreferences {
-    desktop_notifications: boolean;
-    auto_login: boolean;
-    privacy_mode: boolean;
-}
-
-export interface AppSettings {
-    exchange: ExchangeConfig;
-    trading_sizes: TradingSizes;
-    slippage: string;
-    auto_tp_enabled: boolean;
-    auto_tp_percent: number;
-    auto_sl_enabled: boolean;
-    auto_sl_percent: number;
-    keyboard: KeyboardShortcuts;
-    news_sources: NewsSources;
-    news_filters: NewsFilters;
-    news_display: NewsDisplay;
-    chart: ChartPreferences;
-    ui: UIPreferences;
-    license: string;
-    uid: string;
+export interface UserSettings {
+    exchange: ExchangePreferences;
+    trading: TradingSettings;
+    terminal: TerminalSettings;
+    chart: ChartSettings;
+    news_providers: NewsProviderToggles;
+    news_display: NewsDisplaySettings;
+    keywords: KeywordSettings;
+    custom_websockets: CustomWebSocket[];
+    botting: BottingSettings;
+    shortcuts: ShortcutSettings;
+    ui_zoom: number;
 }
 
 export interface EncryptedSettings {
@@ -101,11 +123,11 @@ export interface EncryptedSettings {
     data: string;
 }
 
-export type SettingsSection =
-    | 'exchange'
-    | 'trading'
-    | 'keyboard'
-    | 'news'
-    | 'chart'
-    | 'ui'
-    | 'backup';
+export type SettingsStatus = 'loading' | 'ready' | 'saving' | 'error';
+
+export interface SettingsState {
+    status: SettingsStatus;
+    settings: UserSettings | null;
+    error: string | null;
+    last_synced: number | null;
+}

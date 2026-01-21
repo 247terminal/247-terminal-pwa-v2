@@ -1,6 +1,11 @@
 import { signal, computed } from '@preact/signals';
 import type { Block, BlockType, BlockLayout, Rig, RigsState } from '../types/layout.types';
 import { BLOCK_DEFAULTS } from '../types/layout.types';
+import {
+    debounced_sync_layouts,
+    fetch_layouts_from_server,
+    merge_layouts,
+} from '@/services/layout/layout_sync.service';
 
 const STORAGE_KEY = '247terminal_rigs';
 
@@ -94,6 +99,7 @@ export function create_rig_from_template(template: DefaultRigTemplate): string {
 
     rigs_state.value = new_state;
     save_to_storage(new_state);
+    debounced_sync_layouts(new_state);
 
     return new_rig.id;
 }
@@ -221,7 +227,10 @@ function update_active_rig(updater: (rig: Rig) => Rig): void {
     const active = state.rigs[state.active_rig_id];
     if (!active) return;
 
-    const updated_rig = updater(active);
+    const updated_rig = {
+        ...updater(active),
+        updated_at: Date.now(),
+    };
     const new_state: RigsState = {
         ...state,
         rigs: {
@@ -232,6 +241,7 @@ function update_active_rig(updater: (rig: Rig) => Rig): void {
 
     rigs_state.value = new_state;
     save_to_storage(new_state);
+    debounced_sync_layouts(new_state);
 }
 
 export function add_block(type: BlockType): string {
@@ -295,6 +305,7 @@ export function create_rig(name: string): string {
 
     rigs_state.value = new_state;
     save_to_storage(new_state);
+    debounced_sync_layouts(new_state);
 
     return new_rig.id;
 }
@@ -307,7 +318,7 @@ export function delete_rig(id: string): boolean {
         return false;
     }
 
-    const { [id]: removed, ...remaining_rigs } = state.rigs;
+    const { [id]: _removed, ...remaining_rigs } = state.rigs;
     const new_active_id =
         id === state.active_rig_id ? Object.keys(remaining_rigs)[0] : state.active_rig_id;
 
@@ -318,6 +329,7 @@ export function delete_rig(id: string): boolean {
 
     rigs_state.value = new_state;
     save_to_storage(new_state);
+    debounced_sync_layouts(new_state);
 
     return true;
 }
@@ -331,12 +343,13 @@ export function rename_rig(id: string, new_name: string): void {
         ...state,
         rigs: {
             ...state.rigs,
-            [id]: { ...rig, name: new_name },
+            [id]: { ...rig, name: new_name, updated_at: Date.now() },
         },
     };
 
     rigs_state.value = new_state;
     save_to_storage(new_state);
+    debounced_sync_layouts(new_state);
 }
 
 export function switch_rig(id: string): void {
@@ -356,6 +369,7 @@ export function reset_to_default_rigs(): void {
     const new_state = get_default_state();
     rigs_state.value = new_state;
     save_to_storage(new_state);
+    debounced_sync_layouts(new_state);
 }
 
 export function duplicate_rig(id: string): string | null {
@@ -380,6 +394,17 @@ export function duplicate_rig(id: string): string | null {
 
     rigs_state.value = new_state;
     save_to_storage(new_state);
+    debounced_sync_layouts(new_state);
 
     return new_rig.id;
+}
+
+export async function init_layouts(): Promise<void> {
+    const local = load_from_storage() || get_default_state();
+    const server = await fetch_layouts_from_server();
+
+    const final_state = server ? merge_layouts(local, server) : local;
+
+    rigs_state.value = final_state;
+    save_to_storage(final_state);
 }
