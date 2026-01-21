@@ -30,10 +30,10 @@ export function NewsTradingSection() {
                             key={opt.value}
                             type="button"
                             onClick={() => set_setting('trading', 'button_style', opt.value)}
-                            class={`flex-1 h-7 rounded text-xs font-medium transition-colors border ${
+                            class={`flex-1 h-7 rounded text-xs font-medium transition-colors ${
                                 trading.button_style === opt.value
-                                    ? 'bg-primary text-primary-content border-primary'
-                                    : 'bg-transparent text-base-content/60 border-primary/30 hover:border-primary/50 hover:text-base-content'
+                                    ? 'bg-primary/10 text-primary/80'
+                                    : 'bg-base-200 text-base-content/50 hover:bg-base-300 hover:text-base-content/70'
                             }`}
                         >
                             {opt.label}
@@ -50,10 +50,10 @@ export function NewsTradingSection() {
                             key={count}
                             type="button"
                             onClick={() => set_setting('trading', 'size_count', count)}
-                            class={`flex-1 h-7 rounded text-xs font-medium transition-colors border ${
+                            class={`flex-1 h-7 rounded text-xs font-medium transition-colors ${
                                 trading.size_count === count
-                                    ? 'bg-primary text-primary-content border-primary'
-                                    : 'bg-transparent text-base-content/60 border-primary/30 hover:border-primary/50 hover:text-base-content'
+                                    ? 'bg-primary/10 text-primary/80'
+                                    : 'bg-base-200 text-base-content/50 hover:bg-base-300 hover:text-base-content/70'
                             }`}
                         >
                             {count}
@@ -67,10 +67,10 @@ export function NewsTradingSection() {
                 <div class="w-3/4 flex gap-2 min-w-0">
                     {get_visible_sizes().map((size, index) => (
                         <div key={index} class="relative flex-1 min-w-0">
-                            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-base-content/50 z-10 pointer-events-none">$</span>
+                            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-base-content/40 z-10 pointer-events-none">$</span>
                             <input
                                 type="number"
-                                class="w-full h-7 pl-5 pr-2 text-left text-xs bg-base-100 border border-primary/30 rounded focus:border-primary focus:outline-none"
+                                class="w-full h-7 pl-5 pr-2 text-left text-xs bg-base-200 text-base-content rounded focus:outline-none"
                                 value={size}
                                 min={1}
                                 onInput={(e) =>

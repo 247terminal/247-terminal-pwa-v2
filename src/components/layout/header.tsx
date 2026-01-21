@@ -60,9 +60,9 @@ export function Header() {
                 <SettingsButton on_click={() => set_settings_open(true)} is_active={settings_open} />
             </div>
             <div class="flex-1 flex items-center justify-end gap-2">
-                <LayoutLockToggle />
-                <ThemeToggle />
                 <HeaderBalance />
+                <ThemeToggle />
+                <LayoutLockToggle />
                 <BlocksMenu />
                 <RigSelector />
             </div>
