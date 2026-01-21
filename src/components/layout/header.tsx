@@ -57,7 +57,7 @@ export function Header() {
             <div class="flex items-center gap-3">
                 <ConnectionStatus />
                 <CommandBar on_submit={handle_command} />
-                <SettingsButton on_click={() => set_settings_open(true)} />
+                <SettingsButton on_click={() => set_settings_open(true)} is_active={settings_open} />
             </div>
             <div class="flex-1 flex items-center justify-end gap-2">
                 <LayoutLockToggle />

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'preact/hooks';
-import { X, ChevronDown, Loader2 } from 'lucide-preact';
+import { ChevronDown, Newspaper, DollarSign } from 'lucide-preact';
 import { use_click_outside, use_escape_key } from '@/hooks';
-import { settings_status } from '@/stores/settings_store';
+import { NewsTradingSection } from './news_trading_section';
 import { TradingSection } from './trading_section';
 import { TerminalSection } from './terminal_section';
 import { ChartSection } from './chart_section';
@@ -12,6 +12,7 @@ import { BottingSection } from './botting_section';
 import { BackupSection } from './backup_section';
 
 type SectionId =
+    | 'news_trading'
     | 'trading'
     | 'terminal'
     | 'chart'
@@ -29,6 +30,7 @@ interface SettingsDrawerProps {
 interface AccordionSectionProps {
     id: SectionId;
     title: string;
+    icon?: preact.ComponentChildren;
     expanded_section: SectionId | null;
     on_toggle: (id: SectionId) => void;
     children: preact.ComponentChildren;
@@ -37,6 +39,7 @@ interface AccordionSectionProps {
 function AccordionSection({
     id,
     title,
+    icon,
     expanded_section,
     on_toggle,
     children,
@@ -48,40 +51,26 @@ function AccordionSection({
             <button
                 type="button"
                 onClick={() => on_toggle(id)}
-                class="w-full flex items-center justify-between px-4 py-3 hover:bg-base-200/50 transition-colors"
+                class={`w-full flex items-center justify-between px-4 py-3 transition-colors ${
+                    is_expanded ? 'bg-primary/10' : 'hover:bg-base-200/50'
+                }`}
             >
-                <span class="text-xs font-medium tracking-wide text-base-content">{title}</span>
+                <div class="flex items-center gap-2">
+                    {icon && <span class="text-primary">{icon}</span>}
+                    <span class="text-xs font-medium tracking-wide text-base-content">{title}</span>
+                </div>
                 <ChevronDown
                     class={`w-4 h-4 text-base-content/40 transition-transform ${is_expanded ? 'rotate-180' : ''}`}
                 />
             </button>
-            {is_expanded && <div class="px-4 pb-4">{children}</div>}
+            {is_expanded && <div class="px-4 pt-3 pb-4">{children}</div>}
         </div>
     );
 }
 
-function SyncIndicator() {
-    const status = settings_status.value;
-
-    if (status === 'saving') {
-        return (
-            <div class="flex items-center gap-1.5 text-primary">
-                <Loader2 class="w-3 h-3 animate-spin" />
-                <span class="text-xs">Syncing...</span>
-            </div>
-        );
-    }
-
-    if (status === 'error') {
-        return <span class="text-xs text-error">Sync failed</span>;
-    }
-
-    return null;
-}
-
 export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
     const drawer_ref = useRef<HTMLDivElement>(null);
-    const [expanded_section, set_expanded_section] = useState<SectionId | null>('trading');
+    const [expanded_section, set_expanded_section] = useState<SectionId | null>('news_trading');
 
     const handle_close = useCallback(() => {
         on_close();
@@ -101,28 +90,23 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
             <div class="absolute inset-0 bg-black/40" />
             <div
                 ref={drawer_ref}
-                class="absolute top-0 right-0 h-full w-80 bg-base-100 shadow-xl flex flex-col animate-slide-in-right"
+                class="absolute top-0 right-0 h-full w-1/4 min-w-80 bg-base-100 shadow-xl flex flex-col animate-slide-in-right"
             >
-                <div class="flex items-center justify-between px-4 py-3 border-b border-base-300">
-                    <span class="text-sm font-semibold tracking-wide text-base-content">
-                        SETTINGS
-                    </span>
-                    <div class="flex items-center gap-3">
-                        <SyncIndicator />
-                        <button
-                            type="button"
-                            onClick={handle_close}
-                            class="p-1 text-base-content/40 hover:text-base-content transition-colors"
-                        >
-                            <X class="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-
                 <div class="flex-1 overflow-y-auto">
+                    <AccordionSection
+                        id="news_trading"
+                        title="NEWS TRADING"
+                        icon={<Newspaper class="w-4 h-4" />}
+                        expanded_section={expanded_section}
+                        on_toggle={toggle_section}
+                    >
+                        <NewsTradingSection />
+                    </AccordionSection>
+
                     <AccordionSection
                         id="trading"
                         title="TRADING"
+                        icon={<DollarSign class="w-4 h-4" />}
                         expanded_section={expanded_section}
                         on_toggle={toggle_section}
                     >

@@ -11,7 +11,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
     trading: {
         sizes: [100, 500, 1000, 5000],
         size_count: 4,
-        slippage: 3,
+        button_style: 'standard',
+        slippage: 'MARKET',
         auto_tp_enabled: false,
         auto_tp_value: 5,
         auto_tp_limit: false,

@@ -7,7 +7,8 @@ export interface ExchangePreferences {
 
 export interface TradingSettings {
     sizes: [number, number, number, number];
-    size_count: 1 | 2 | 3 | 4;
+    size_count: 1 | 2 | 4;
+    button_style: 'swipe' | 'standard';
     slippage: number | 'MARKET';
     auto_tp_enabled: boolean;
     auto_tp_value: number;

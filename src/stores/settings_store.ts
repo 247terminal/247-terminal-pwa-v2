@@ -67,9 +67,7 @@ export function update_settings<K extends keyof UserSettings>(
     section: K,
     updates: Partial<UserSettings[K]>
 ): void {
-    const current = settings_state.value.settings;
-    if (!current) return;
-
+    const current = settings_state.value.settings ?? DEFAULT_SETTINGS;
     const current_section = current[section];
     const new_settings: UserSettings = {
         ...current,
@@ -90,9 +88,7 @@ export function set_setting<K extends keyof UserSettings>(
     key: keyof UserSettings[K],
     value: UserSettings[K][keyof UserSettings[K]]
 ): void {
-    const current = settings_state.value.settings;
-    if (!current) return;
-
+    const current = settings_state.value.settings ?? DEFAULT_SETTINGS;
     const current_section = current[section];
     const new_settings: UserSettings = {
         ...current,
