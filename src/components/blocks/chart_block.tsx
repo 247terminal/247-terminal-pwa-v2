@@ -3,6 +3,7 @@ import { X } from 'lucide-preact';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
 import { EXCHANGE_ORDER, type ExchangeId } from '../../types/exchange.types';
+import type { ChartSettings, ChartBlockProps } from '../../types/chart.types';
 import {
     fetch_ohlcv,
     watch_ohlcv,
@@ -14,6 +15,7 @@ import { exchange_connection_status } from '../../stores/credentials_store';
 import { is_sub_minute_timeframe, type SubMinuteTimeframe } from '../../types/candle.types';
 import { start_candle_generation } from '../../services/candle_generator';
 import { register_navigation_handler } from '../../stores/chart_navigation_store';
+import { STORAGE_CONSTANTS } from '../../config/chart.constants';
 
 function get_default_exchange(connection_status: Record<ExchangeId, boolean>): ExchangeId {
     return EXCHANGE_ORDER.toSorted((a, b) => {
@@ -23,17 +25,70 @@ function get_default_exchange(connection_status: Record<ExchangeId, boolean>): E
     })[0];
 }
 
-interface ChartBlockProps {
-    on_remove?: () => void;
+let settings_cache: Record<string, ChartSettings> | null = null;
+let save_timeout: ReturnType<typeof setTimeout> | null = null;
+
+function get_all_settings(): Record<string, ChartSettings> {
+    if (settings_cache) return settings_cache;
+    try {
+        const stored = localStorage.getItem(STORAGE_CONSTANTS.CHART_SETTINGS_KEY);
+        settings_cache = stored ? JSON.parse(stored) : {};
+    } catch {
+        settings_cache = {};
+    }
+    return settings_cache!;
 }
 
-export function ChartBlock({ on_remove }: ChartBlockProps) {
+function load_chart_settings(id: string, default_exchange: ExchangeId): ChartSettings {
+    const all_settings = get_all_settings();
+    if (all_settings[id]) {
+        return all_settings[id];
+    }
+    return {
+        exchange: default_exchange,
+        symbol: 'BTC/USDT:USDT',
+        timeframe: '1',
+        volume_visible: true,
+        grid_visible: true,
+    };
+}
+
+function save_chart_settings(id: string, settings: ChartSettings): void {
+    const all_settings = get_all_settings();
+    all_settings[id] = settings;
+    settings_cache = all_settings;
+
+    if (save_timeout) clearTimeout(save_timeout);
+    save_timeout = setTimeout(() => {
+        try {
+            localStorage.setItem(
+                STORAGE_CONSTANTS.CHART_SETTINGS_KEY,
+                JSON.stringify(all_settings)
+            );
+        } catch {}
+    }, STORAGE_CONSTANTS.DEBOUNCE_MS);
+}
+
+export function ChartBlock({ id, on_remove }: ChartBlockProps) {
     const connection_status = exchange_connection_status.value;
-    const [exchange, set_exchange] = useState<ExchangeId>(() =>
-        get_default_exchange(connection_status)
+    const default_exchange = get_default_exchange(connection_status);
+
+    const [settings, set_settings] = useState<ChartSettings>(() =>
+        load_chart_settings(id, default_exchange)
     );
-    const [symbol, set_symbol] = useState('BTC/USDT:USDT');
-    const [timeframe, set_timeframe] = useState<Timeframe>('1');
+
+    const { exchange, symbol, timeframe, volume_visible, grid_visible } = settings;
+
+    const update_settings = useCallback(
+        (updates: Partial<ChartSettings>) => {
+            set_settings((prev) => {
+                const next = { ...prev, ...updates };
+                save_chart_settings(id, next);
+                return next;
+            });
+        },
+        [id]
+    );
     const [data, set_data] = useState<OHLCV[]>([]);
     const [loading, set_loading] = useState(true);
 
@@ -45,10 +100,9 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
             const { exchange: curr_ex, symbol: curr_sym } = state_ref.current;
             if (request.exchange === curr_ex && request.symbol === curr_sym) return;
             set_loading(true);
-            set_exchange(request.exchange);
-            set_symbol(request.symbol);
+            update_settings({ exchange: request.exchange, symbol: request.symbol });
         });
-    }, []);
+    }, [update_settings]);
 
     const current_markets = markets.value;
 
@@ -119,9 +173,8 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                         ohlcv[ohlcv.length - 1]
                     );
                 }
-            } catch (err) {
+            } catch {
                 if (cancelled) return;
-                console.error('failed to load chart data:', err);
                 set_data([]);
             } finally {
                 if (!cancelled) {
@@ -146,16 +199,32 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
         (ex: ExchangeId, s: string) => {
             if (ex === exchange && s === symbol) return;
             set_loading(true);
-            set_exchange(ex);
-            set_symbol(s);
+            update_settings({ exchange: ex, symbol: s });
         },
-        [exchange, symbol]
+        [exchange, symbol, update_settings]
     );
 
-    const handle_timeframe_change = useCallback((tf: Timeframe) => {
-        set_loading(true);
-        set_timeframe(tf);
-    }, []);
+    const handle_timeframe_change = useCallback(
+        (tf: Timeframe) => {
+            set_loading(true);
+            update_settings({ timeframe: tf });
+        },
+        [update_settings]
+    );
+
+    const handle_volume_toggle = useCallback(
+        (visible: boolean) => {
+            update_settings({ volume_visible: visible });
+        },
+        [update_settings]
+    );
+
+    const handle_grid_toggle = useCallback(
+        (visible: boolean) => {
+            update_settings({ grid_visible: visible });
+        },
+        [update_settings]
+    );
 
     return (
         <div class="h-full flex flex-col group">
@@ -186,6 +255,11 @@ export function ChartBlock({ on_remove }: ChartBlockProps) {
                     data_key={current_key}
                     loading={loading}
                     tick_size={chart_tick_size}
+                    timeframe={timeframe}
+                    volume_visible={volume_visible}
+                    grid_visible={grid_visible}
+                    on_volume_toggle={handle_volume_toggle}
+                    on_grid_toggle={handle_grid_toggle}
                 />
             </div>
         </div>

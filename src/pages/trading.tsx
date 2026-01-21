@@ -11,17 +11,15 @@ import { blocks, layouts, update_layouts, remove_block } from '../stores/layout_
 import { layout_locked, trigger_lock_shake } from '../stores/layout_lock_store';
 import { get_block_icon } from '../components/common/block_icons';
 import type { BlockType } from '../types/layout.types';
+import type { GridOverlayProps } from '../types/chart.types';
+import { GRID_CONSTANTS } from '../config/chart.constants';
 import 'react-grid-layout/css/styles.css';
 
-const GRID_ROWS = 16;
-const MARGIN = 8;
-const HEADER_HEIGHT = 40;
-
-function render_block(type: BlockType, on_remove: () => void, locked: boolean) {
+function render_block(type: BlockType, id: string, on_remove: () => void, locked: boolean) {
     const remove_handler = locked ? undefined : on_remove;
     switch (type) {
         case 'chart':
-            return <ChartBlock on_remove={remove_handler} />;
+            return <ChartBlock id={id} on_remove={remove_handler} />;
         case 'news':
             return <NewsBlock on_remove={remove_handler} />;
         case 'account':
@@ -35,22 +33,25 @@ function render_block(type: BlockType, on_remove: () => void, locked: boolean) {
     }
 }
 
-const GRID_COLS = 16;
-
-function GridOverlay({ row_height, width }: { row_height: number; width: number }) {
-    const col_width = (width - MARGIN * 2 - MARGIN * (GRID_COLS - 1)) / GRID_COLS;
+function GridOverlay({ row_height, width }: GridOverlayProps) {
+    const col_width =
+        (width - GRID_CONSTANTS.MARGIN * 2 - GRID_CONSTANTS.MARGIN * (GRID_CONSTANTS.COLS - 1)) /
+        GRID_CONSTANTS.COLS;
 
     return (
-        <div class="absolute inset-0 pointer-events-none z-10" style={{ padding: MARGIN }}>
+        <div
+            class="absolute inset-0 pointer-events-none z-10"
+            style={{ padding: GRID_CONSTANTS.MARGIN }}
+        >
             <div class="relative w-full h-full">
-                {Array.from({ length: GRID_ROWS }).map((_, row) =>
-                    Array.from({ length: GRID_COLS }).map((_, col) => (
+                {Array.from({ length: GRID_CONSTANTS.ROWS }).map((_, row) =>
+                    Array.from({ length: GRID_CONSTANTS.COLS }).map((_, col) => (
                         <div
                             key={`${row}-${col}`}
                             class="absolute rounded border border-base-content/10"
                             style={{
-                                left: col * (col_width + MARGIN),
-                                top: row * (row_height + MARGIN),
+                                left: col * (col_width + GRID_CONSTANTS.MARGIN),
+                                top: row * (row_height + GRID_CONSTANTS.MARGIN),
                                 width: col_width,
                                 height: row_height,
                             }}
@@ -69,9 +70,10 @@ export function TradingPage() {
 
     useEffect(() => {
         const calculate_row_height = () => {
-            const available_height = window.innerHeight - HEADER_HEIGHT - MARGIN * 2;
-            const total_margins = (GRID_ROWS - 1) * MARGIN;
-            const height = Math.floor((available_height - total_margins) / GRID_ROWS);
+            const available_height =
+                window.innerHeight - GRID_CONSTANTS.HEADER_HEIGHT - GRID_CONSTANTS.MARGIN * 2;
+            const total_margins = (GRID_CONSTANTS.ROWS - 1) * GRID_CONSTANTS.MARGIN;
+            const height = Math.floor((available_height - total_margins) / GRID_CONSTANTS.ROWS);
             set_row_height(Math.max(30, height));
         };
 
@@ -126,8 +128,8 @@ export function TradingPage() {
                         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
                         cols={{ lg: 16, md: 12, sm: 8, xs: 4, xxs: 2 }}
                         rowHeight={row_height}
-                        margin={[MARGIN, MARGIN]}
-                        containerPadding={[MARGIN, MARGIN]}
+                        margin={[GRID_CONSTANTS.MARGIN, GRID_CONSTANTS.MARGIN]}
+                        containerPadding={[GRID_CONSTANTS.MARGIN, GRID_CONSTANTS.MARGIN]}
                         onLayoutChange={handle_layout_change}
                         onDragStart={handle_drag_start}
                         onDragStop={handle_drag_stop}
@@ -145,7 +147,12 @@ export function TradingPage() {
                                 key={block.id}
                                 class="bg-base-200 rounded border border-base-300/50 overflow-hidden flex flex-col"
                             >
-                                {render_block(block.type, () => remove_block(block.id), is_locked)}
+                                {render_block(
+                                    block.type,
+                                    block.id,
+                                    () => remove_block(block.id),
+                                    is_locked
+                                )}
                                 <div class="block-type-icon absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <span class="text-primary-content">
                                         {get_block_icon(block.type, 'w-12 h-12')}

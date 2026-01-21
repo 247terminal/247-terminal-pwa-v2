@@ -1,3 +1,5 @@
+import type { ExchangeId } from './exchange.types';
+
 export interface MarketData {
     symbol: string;
     base: string;
@@ -41,3 +43,47 @@ export type ChartTimeframe =
     | 'D'
     | 'W'
     | 'M';
+
+export interface ChartSettings {
+    exchange: ExchangeId;
+    symbol: string;
+    timeframe: string;
+    volume_visible: boolean;
+    grid_visible: boolean;
+}
+
+export interface TradingChartProps {
+    data: OHLCV[];
+    data_key?: string;
+    loading?: boolean;
+    tick_size?: number;
+    timeframe?: string;
+    volume_visible?: boolean;
+    grid_visible?: boolean;
+    on_volume_toggle?: (visible: boolean) => void;
+    on_grid_toggle?: (visible: boolean) => void;
+}
+
+export interface ToggleButtonProps {
+    label: string;
+    visible: boolean;
+    on_toggle: () => void;
+    with_background?: boolean;
+}
+
+export interface ChartBlockProps {
+    id: string;
+    on_remove?: () => void;
+}
+
+export interface GridOverlayProps {
+    row_height: number;
+    width: number;
+}
+
+export type FlashDirection = 'up' | 'down' | null;
+
+export interface TickerInfoProps {
+    exchange: ExchangeId;
+    symbol: string;
+}

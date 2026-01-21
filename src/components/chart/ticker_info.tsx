@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { effect } from '@preact/signals';
-import type { ExchangeId } from '../../types/exchange.types';
 import { get_ticker_signal, get_market } from '../../stores/exchange_store';
 import { format_price } from '../../utils/format';
 import { format_change } from './symbol_row';
-
-type FlashDirection = 'up' | 'down' | null;
+import type { FlashDirection, TickerInfoProps } from '../../types/chart.types';
 
 function format_funding_rate(rate: number | null): { text: string; positive: boolean } {
     if (rate === null) return { text: '-', positive: true };
@@ -22,11 +20,6 @@ function format_countdown(next_funding_time: number | null): string {
     const minutes = Math.floor((diff % 3600000) / 60000);
     const seconds = Math.floor((diff % 60000) / 1000);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-}
-
-interface TickerInfoProps {
-    exchange: ExchangeId;
-    symbol: string;
 }
 
 export function TickerInfo({ exchange, symbol }: TickerInfoProps) {
@@ -105,16 +98,14 @@ export function TickerInfo({ exchange, symbol }: TickerInfoProps) {
                 <span class="font-semibold tabular-nums text-base-content/70">{volume}</span>
             </div>
             <div class="flex flex-col leading-tight">
-                <span class="text-base-content/50">Funding</span>
-                <span
-                    class={`font-semibold tabular-nums ${funding.positive ? 'text-success' : 'text-error'}`}
-                >
-                    {funding.text}
+                <span class="text-base-content/50">Funding / Countdown</span>
+                <span class="font-semibold tabular-nums">
+                    <span class={funding.positive ? 'text-success' : 'text-error'}>
+                        {funding.text}
+                    </span>
+                    <span class="text-base-content/50 mx-1">/</span>
+                    <span class="text-base-content/70">{countdown}</span>
                 </span>
-            </div>
-            <div class="flex flex-col leading-tight">
-                <span class="text-base-content/50">Countdown</span>
-                <span class="font-semibold tabular-nums text-base-content/70">{countdown}</span>
             </div>
         </div>
     );
