@@ -1,10 +1,7 @@
-import { SymbolSelector, type ExchangeSymbols } from './symbol_selector';
+import { SymbolSelector } from './symbol_selector';
 import { LeverageSelector } from './leverage_selector';
 import { OrderTypeTabs } from './order_type_tabs';
-
-interface TradeToolbarProps {
-    exchange_symbols: ExchangeSymbols;
-}
+import type { TradeToolbarProps } from '../../../types/trade.types';
 
 export function TradeToolbar({ exchange_symbols }: TradeToolbarProps) {
     return (

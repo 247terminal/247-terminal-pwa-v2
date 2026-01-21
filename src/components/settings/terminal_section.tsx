@@ -1,11 +1,6 @@
 import { settings, set_setting } from '@/stores/settings_store';
 import { NOTIFICATION_FILTER_OPTIONS } from '@/services/settings/settings.constants';
-
-interface ToggleProps {
-    label: string;
-    checked: boolean;
-    on_change: (checked: boolean) => void;
-}
+import type { ToggleProps } from '@/types/settings.types';
 
 function Toggle({ label, checked, on_change }: ToggleProps) {
     return (
@@ -48,7 +43,8 @@ export function TerminalSection() {
                             set_setting(
                                 'terminal',
                                 'notification_filter',
-                                (e.target as HTMLSelectElement).value as typeof terminal.notification_filter
+                                (e.target as HTMLSelectElement)
+                                    .value as typeof terminal.notification_filter
                             )
                         }
                     >

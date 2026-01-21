@@ -14,7 +14,12 @@ const VARIANT_STYLES: Record<IconButtonVariant, string> = {
     ghost: 'text-base-content/50 hover:text-base-content/70',
 };
 
-export function IconButton({ variant = 'primary', on_click, children, class_name = '' }: IconButtonProps) {
+export function IconButton({
+    variant = 'primary',
+    on_click,
+    children,
+    class_name = '',
+}: IconButtonProps) {
     return (
         <button
             onClick={on_click}

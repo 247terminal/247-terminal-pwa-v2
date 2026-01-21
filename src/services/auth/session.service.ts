@@ -1,4 +1,4 @@
-import type { JWTPayload } from "./types";
+import type { JWTPayload } from './types';
 
 const TOKEN_KEY = '247_session_token';
 

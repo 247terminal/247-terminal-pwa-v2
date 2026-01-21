@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { effect } from '@preact/signals';
 import type { ExchangeId } from '../../types/exchange.types';
+import type { SymbolRowProps } from '../../types/chart.types';
 import { get_market, get_ticker_signal } from '../../stores/exchange_store';
 import { format_price } from '../../utils/format';
 
@@ -35,15 +36,6 @@ export function format_volume(vol: number | null): string {
     if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(1)}M`;
     if (vol >= 1_000) return `${(vol / 1_000).toFixed(1)}K`;
     return vol.toFixed(0);
-}
-
-interface SymbolRowProps {
-    exchange: ExchangeId;
-    symbol: string;
-    is_selected: boolean;
-    is_fav: boolean;
-    on_select: () => void;
-    on_toggle_fav: () => void;
 }
 
 export function SymbolRow({

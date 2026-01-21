@@ -1,4 +1,5 @@
 import type { ExchangeId } from './exchange.types';
+import type { UserCredentials } from './credentials.types';
 
 export interface ExchangePreferences {
     preferred: ExchangeId;
@@ -131,4 +132,91 @@ export interface SettingsState {
     settings: UserSettings | null;
     error: string | null;
     last_synced: number | null;
+}
+
+export interface ToggleProps {
+    label: string;
+    checked: boolean;
+    on_change: (checked: boolean) => void;
+}
+
+export interface NumberInputProps {
+    label: string;
+    value: number;
+    on_change: (value: number) => void;
+    min?: number;
+    max?: number;
+    step?: number;
+    suffix?: string;
+}
+
+export interface ToggleWithSliderProps {
+    label: string;
+    checked: boolean;
+    on_toggle: (checked: boolean) => void;
+    value: number;
+    on_value_change: (value: number) => void;
+    min: number;
+    max: number;
+    step?: number;
+    suffix?: string;
+}
+
+export interface ColorInputProps {
+    label: string;
+    value: string;
+    on_change: (value: string) => void;
+}
+
+export interface ShortcutEditorProps {
+    label: string;
+    binding: ShortcutBinding;
+    on_change: (binding: ShortcutBinding) => void;
+}
+
+export interface ShortcutRowProps {
+    label: string;
+    binding_key: string;
+    binding: ShortcutBinding | undefined;
+    on_change: (key: string, binding: ShortcutBinding) => void;
+}
+
+export interface KeywordListProps {
+    label: string;
+    items: string[];
+    on_add: (item: string) => void;
+    on_remove: (index: number) => void;
+    placeholder?: string;
+}
+
+export interface ExportData {
+    version: number;
+    exported_at: number;
+    settings: UserSettings;
+    credentials?: UserCredentials;
+}
+
+export type SettingsSectionId =
+    | 'news_trading'
+    | 'trading'
+    | 'terminal'
+    | 'chart'
+    | 'news'
+    | 'keywords'
+    | 'shortcuts'
+    | 'botting'
+    | 'backup';
+
+export interface SettingsDrawerProps {
+    is_open: boolean;
+    on_close: () => void;
+}
+
+export interface AccordionSectionProps {
+    id: SettingsSectionId;
+    title: string;
+    icon?: preact.ComponentChildren;
+    expanded_section: SettingsSectionId | null;
+    on_toggle: (id: SettingsSectionId) => void;
+    children: preact.ComponentChildren;
 }

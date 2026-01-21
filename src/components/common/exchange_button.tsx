@@ -7,7 +7,12 @@ interface ExchangeButtonProps {
     children: ComponentChildren;
 }
 
-export function ExchangeButton({ connected, is_selected, on_click, children }: ExchangeButtonProps) {
+export function ExchangeButton({
+    connected,
+    is_selected,
+    on_click,
+    children,
+}: ExchangeButtonProps) {
     const base_classes = 'flex items-center justify-center px-2 py-1.5 rounded transition-colors';
 
     const state_classes = connected

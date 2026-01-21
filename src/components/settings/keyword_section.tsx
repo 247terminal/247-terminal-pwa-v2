@@ -1,15 +1,7 @@
 import { useState } from 'preact/hooks';
 import { X, Plus } from 'lucide-preact';
 import { settings, update_settings } from '@/stores/settings_store';
-import type { KeywordSettings } from '@/types/settings.types';
-
-interface KeywordListProps {
-    label: string;
-    items: string[];
-    on_add: (item: string) => void;
-    on_remove: (index: number) => void;
-    placeholder?: string;
-}
+import type { KeywordSettings, KeywordListProps } from '@/types/settings.types';
 
 function KeywordList({ label, items, on_add, on_remove, placeholder }: KeywordListProps) {
     const [input_value, set_input_value] = useState('');
@@ -68,9 +60,7 @@ function KeywordList({ label, items, on_add, on_remove, placeholder }: KeywordLi
                     ))}
                 </div>
             )}
-            {items.length === 0 && (
-                <span class="text-xs text-base-content/40">No items added</span>
-            )}
+            {items.length === 0 && <span class="text-xs text-base-content/40">No items added</span>}
         </div>
     );
 }
@@ -89,7 +79,10 @@ export function KeywordSection() {
 
     function remove_item(key: keyof KeywordSettings, index: number): void {
         const current = keywords[key] as string[];
-        update_list(key, current.filter((_, i) => i !== index));
+        update_list(
+            key,
+            current.filter((_, i) => i !== index)
+        );
     }
 
     return (

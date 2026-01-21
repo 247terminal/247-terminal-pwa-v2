@@ -1,4 +1,5 @@
 import type { ExchangeId } from './exchange.types';
+import type { Timeframe } from './candle.types';
 
 export interface MarketData {
     symbol: string;
@@ -91,4 +92,45 @@ export interface TickerInfoProps {
 export interface MarketCapData {
     symbol: string;
     circulatingSupply: number;
+}
+
+export type ChartFilterType = 'all' | 'favourites' | ExchangeId;
+
+export type ChartSortField = 'symbol' | 'price' | 'change' | 'volume';
+
+export type ChartSortDirection = 'asc' | 'desc';
+
+export type ChartListItem =
+    | { type: 'header'; exchange: ExchangeId; count: number }
+    | { type: 'symbol'; exchange: ExchangeId; symbol: string };
+
+export interface SymbolWithExchange {
+    exchange: ExchangeId;
+    symbol: string;
+}
+
+export type ExchangeSymbols = Partial<Record<ExchangeId, string[]>>;
+
+export interface ChartToolbarProps {
+    exchange: ExchangeId;
+    symbol: string;
+    exchange_symbols: ExchangeSymbols;
+    timeframe: Timeframe;
+    on_symbol_change: (exchange: ExchangeId, symbol: string) => void;
+    on_timeframe_change: (tf: Timeframe) => void;
+    loading?: boolean;
+}
+
+export interface SymbolRowProps {
+    exchange: ExchangeId;
+    symbol: string;
+    is_selected: boolean;
+    is_fav: boolean;
+    on_select: () => void;
+    on_toggle_fav: () => void;
+}
+
+export interface TimeframeSelectorProps {
+    timeframe: Timeframe;
+    on_change: (tf: Timeframe) => void;
 }

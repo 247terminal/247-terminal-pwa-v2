@@ -1,10 +1,5 @@
 import { settings, set_setting } from '@/stores/settings_store';
-
-interface ToggleProps {
-    label: string;
-    checked: boolean;
-    on_change: (checked: boolean) => void;
-}
+import type { ToggleProps, ToggleWithSliderProps } from '@/types/settings.types';
 
 function Toggle({ label, checked, on_change }: ToggleProps) {
     return (
@@ -22,19 +17,17 @@ function Toggle({ label, checked, on_change }: ToggleProps) {
     );
 }
 
-interface ToggleWithSliderProps {
-    label: string;
-    checked: boolean;
-    on_toggle: (checked: boolean) => void;
-    value: number;
-    on_value_change: (value: number) => void;
-    min: number;
-    max: number;
-    step?: number;
-    suffix?: string;
-}
-
-function ToggleWithSlider({ label, checked, on_toggle, value, on_value_change, min, max, step = 1, suffix }: ToggleWithSliderProps) {
+function ToggleWithSlider({
+    label,
+    checked,
+    on_toggle,
+    value,
+    on_value_change,
+    min,
+    max,
+    step = 1,
+    suffix,
+}: ToggleWithSliderProps) {
     const percentage = ((value - min) / (max - min)) * 100;
 
     return (
@@ -56,11 +49,14 @@ function ToggleWithSlider({ label, checked, on_toggle, value, on_value_change, m
                                 min={min}
                                 max={max}
                                 step={step}
-                                onInput={(e) => on_value_change(Number((e.target as HTMLInputElement).value))}
+                                onInput={(e) =>
+                                    on_value_change(Number((e.target as HTMLInputElement).value))
+                                }
                             />
                         </div>
                         <span class="text-xs w-10 text-right tabular-nums text-primary/80">
-                            {value}{suffix}
+                            {value}
+                            {suffix}
                         </span>
                     </>
                 )}
@@ -96,7 +92,8 @@ export function TradingSection() {
                             key={opt.value}
                             type="button"
                             onClick={() => {
-                                const slippage = opt.value === 'MARKET' ? 'MARKET' : Number(opt.value);
+                                const slippage =
+                                    opt.value === 'MARKET' ? 'MARKET' : Number(opt.value);
                                 set_setting('trading', 'slippage', slippage);
                             }}
                             class={`flex-1 h-7 rounded text-xs font-medium transition-colors ${

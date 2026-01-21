@@ -20,9 +20,8 @@ effect(() => {
 });
 
 export function toggle_theme() {
-    current_theme.value = current_theme.value === 'terminal-dark'
-        ? 'terminal-light'
-        : 'terminal-dark';
+    current_theme.value =
+        current_theme.value === 'terminal-dark' ? 'terminal-light' : 'terminal-dark';
 }
 
 export function set_theme(theme: Theme) {

@@ -1,14 +1,16 @@
 import { useCallback } from 'preact/hooks';
-import type { SizeUnit, PriceDistribution, SizeDistribution } from '../../../types/trade.types';
-
-interface PriceInputProps {
-    label: string;
-    value: string;
-    on_change: (value: string) => void;
-    show_last?: boolean;
-    on_last_click?: () => void;
-    placeholder?: string;
-}
+import type {
+    SizeUnit,
+    PriceDistribution,
+    SizeDistribution,
+    PriceInputProps,
+    QuantityInputProps,
+    TotalInputProps,
+    SliderInputProps,
+    ToggleInputProps,
+    SegmentOption,
+    SegmentSelectorProps,
+} from '../../../types/trade.types';
 
 export function PriceInput({
     label,
@@ -53,15 +55,6 @@ export function PriceInput({
             </div>
         </div>
     );
-}
-
-interface QuantityInputProps {
-    label?: string;
-    value: string;
-    on_change: (value: string) => void;
-    size_unit: SizeUnit;
-    on_unit_change: (unit: SizeUnit) => void;
-    coin_symbol?: string;
 }
 
 export function QuantityInput({
@@ -111,13 +104,6 @@ export function QuantityInput({
     );
 }
 
-interface TotalInputProps {
-    label?: string;
-    value: string;
-    on_change: (value: string) => void;
-    suffix?: string;
-}
-
 export function TotalInput({ label = 'Total', value, on_change, suffix = 'USD' }: TotalInputProps) {
     const handle_input = useCallback(
         (e: Event) => {
@@ -148,16 +134,6 @@ export function TotalInput({ label = 'Total', value, on_change, suffix = 'USD' }
             </div>
         </div>
     );
-}
-
-interface SliderInputProps {
-    label: string;
-    value: number;
-    min: number;
-    max: number;
-    on_change: (value: number) => void;
-    format_value?: (value: number) => string;
-    show_max?: boolean;
 }
 
 export function SliderInput({
@@ -202,12 +178,6 @@ export function SliderInput({
     );
 }
 
-interface ToggleInputProps {
-    label: string;
-    checked: boolean;
-    on_change: (checked: boolean) => void;
-}
-
 export function ToggleInput({ label, checked, on_change }: ToggleInputProps) {
     const handle_change = useCallback(
         (e: Event) => {
@@ -228,18 +198,6 @@ export function ToggleInput({ label, checked, on_change }: ToggleInputProps) {
             <span class="text-xs text-base-content/70">{label}</span>
         </label>
     );
-}
-
-interface SegmentOption<T> {
-    value: T;
-    label: string;
-}
-
-interface SegmentSelectorProps<T extends string> {
-    label: string;
-    value: T;
-    options: SegmentOption<T>[];
-    on_change: (value: T) => void;
 }
 
 export function SegmentSelector<T extends string>({

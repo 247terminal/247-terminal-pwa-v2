@@ -1,10 +1,5 @@
 import { settings, set_setting } from '@/stores/settings_store';
-
-interface ToggleProps {
-    label: string;
-    checked: boolean;
-    on_change: (checked: boolean) => void;
-}
+import type { ToggleProps, NumberInputProps } from '@/types/settings.types';
 
 function Toggle({ label, checked, on_change }: ToggleProps) {
     return (
@@ -18,16 +13,6 @@ function Toggle({ label, checked, on_change }: ToggleProps) {
             />
         </label>
     );
-}
-
-interface NumberInputProps {
-    label: string;
-    value: number;
-    on_change: (value: number) => void;
-    min?: number;
-    max?: number;
-    step?: number;
-    suffix?: string;
 }
 
 function NumberInput({ label, value, on_change, min, max, step = 1, suffix }: NumberInputProps) {
@@ -72,7 +57,9 @@ export function NewsSection() {
                 <Toggle
                     label="Phoenix News"
                     checked={news_providers.phoenix_enabled}
-                    on_change={(checked) => set_setting('news_providers', 'phoenix_enabled', checked)}
+                    on_change={(checked) =>
+                        set_setting('news_providers', 'phoenix_enabled', checked)
+                    }
                 />
                 <Toggle
                     label="Tree of Alpha"
@@ -82,7 +69,9 @@ export function NewsSection() {
                 <Toggle
                     label="Synoptic"
                     checked={news_providers.synoptic_enabled}
-                    on_change={(checked) => set_setting('news_providers', 'synoptic_enabled', checked)}
+                    on_change={(checked) =>
+                        set_setting('news_providers', 'synoptic_enabled', checked)
+                    }
                 />
                 <Toggle
                     label="Groq AI (sentiment)"

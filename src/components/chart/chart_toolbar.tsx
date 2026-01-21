@@ -1,6 +1,15 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks';
 import { type ExchangeId } from '../../types/exchange.types';
 import type { Timeframe } from '../../types/candle.types';
+import type {
+    ChartFilterType,
+    ChartSortField,
+    ChartSortDirection,
+    ChartListItem,
+    SymbolWithExchange,
+    ExchangeSymbols,
+    ChartToolbarProps,
+} from '../../types/chart.types';
 import { get_exchange_icon } from '../common/exchanges';
 import { favourites, toggle_favourite } from '../../stores/symbol_favourites';
 import { get_ticker } from '../../stores/exchange_store';
@@ -8,50 +17,25 @@ import { SymbolRow, ITEM_HEIGHT, format_symbol } from './symbol_row';
 import { TimeframeSelector } from './timeframe_selector';
 import { TickerInfo } from './ticker_info';
 
-export type { Timeframe };
+export type { Timeframe, ExchangeSymbols };
 
 const FILTER_STORAGE_KEY = '247terminal_symbol_filter';
 const HEADER_HEIGHT = 24;
 const CONTAINER_HEIGHT = 300;
 const OVERSCAN = 5;
 
-type FilterType = 'all' | 'favourites' | ExchangeId;
-type SortField = 'symbol' | 'price' | 'change' | 'volume';
-type SortDirection = 'asc' | 'desc';
-
-type ListItem =
-    | { type: 'header'; exchange: ExchangeId; count: number }
-    | { type: 'symbol'; exchange: ExchangeId; symbol: string };
-
-interface SymbolWithExchange {
-    exchange: ExchangeId;
-    symbol: string;
-}
-
-function load_filter(): FilterType {
+function load_filter(): ChartFilterType {
     try {
         const stored = localStorage.getItem(FILTER_STORAGE_KEY);
-        if (stored) return stored as FilterType;
+        if (stored) return stored as ChartFilterType;
     } catch {}
     return 'all';
 }
 
-function save_filter(filter: FilterType): void {
+function save_filter(filter: ChartFilterType): void {
     try {
         localStorage.setItem(FILTER_STORAGE_KEY, filter);
     } catch {}
-}
-
-export type ExchangeSymbols = Partial<Record<ExchangeId, string[]>>;
-
-interface ChartToolbarProps {
-    exchange: ExchangeId;
-    symbol: string;
-    exchange_symbols: ExchangeSymbols;
-    timeframe: Timeframe;
-    on_symbol_change: (exchange: ExchangeId, symbol: string) => void;
-    on_timeframe_change: (tf: Timeframe) => void;
-    loading?: boolean;
 }
 
 export function ChartToolbar({
@@ -65,13 +49,13 @@ export function ChartToolbar({
 }: ChartToolbarProps) {
     const [symbol_open, set_symbol_open] = useState(false);
     const [symbol_search, set_symbol_search] = useState('');
-    const [active_filter, set_active_filter] = useState<FilterType>(load_filter);
-    const [sort_field, set_sort_field] = useState<SortField>('volume');
-    const [sort_direction, set_sort_direction] = useState<SortDirection>('desc');
+    const [active_filter, set_active_filter] = useState<ChartFilterType>(load_filter);
+    const [sort_field, set_sort_field] = useState<ChartSortField>('volume');
+    const [sort_direction, set_sort_direction] = useState<ChartSortDirection>('desc');
     const [scroll_top, set_scroll_top] = useState(0);
     const scroll_ref = useRef<HTMLDivElement>(null);
 
-    const toggle_sort = (field: SortField) => {
+    const toggle_sort = (field: ChartSortField) => {
         if (sort_field === field) {
             set_sort_direction(sort_direction === 'asc' ? 'desc' : 'asc');
         } else {
@@ -172,7 +156,7 @@ export function ChartToolbar({
             groups[item.exchange]?.push(item);
         }
 
-        const items: ListItem[] = [];
+        const items: ChartListItem[] = [];
         for (const ex of available_exchanges) {
             const group = groups[ex];
             if (!group || group.length === 0) continue;

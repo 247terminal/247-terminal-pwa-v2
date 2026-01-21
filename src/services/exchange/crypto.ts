@@ -18,7 +18,7 @@ export async function hmac_sha256_hex(secret: string, message: string): Promise<
     const signature = await create_hmac_signature(secret, message);
     const hash_array = Array.from(new Uint8Array(signature));
 
-    return hash_array.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hash_array.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export async function hmac_sha256_base64(secret: string, message: string): Promise<string> {

@@ -38,10 +38,7 @@ function debounced_sync(new_settings: UserSettings): void {
     }, SETTINGS_SYNC_DEBOUNCE);
 }
 
-function resolve_settings(
-    local: UserSettings | null,
-    server: UserSettings | null
-): UserSettings {
+function resolve_settings(local: UserSettings | null, server: UserSettings | null): UserSettings {
     if (local && server) return merge_settings(local, server);
     if (server) return server;
     if (local) return local;

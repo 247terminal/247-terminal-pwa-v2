@@ -7,10 +7,13 @@ interface HyperliquidCredentials {
     private_key: string;
 }
 
-export async function validate_hyperliquid(credentials: HyperliquidCredentials): Promise<ExchangeValidationResult> {
+export async function validate_hyperliquid(
+    credentials: HyperliquidCredentials
+): Promise<ExchangeValidationResult> {
     const { wallet_address, private_key } = credentials;
 
-    if (!wallet_address || !private_key) return { valid: false, error: 'wallet address and private key are required' };
+    if (!wallet_address || !private_key)
+        return { valid: false, error: 'wallet address and private key are required' };
 
     try {
         const formatted_key = private_key.startsWith('0x') ? private_key : `0x${private_key}`;

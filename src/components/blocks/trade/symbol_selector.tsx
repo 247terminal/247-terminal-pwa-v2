@@ -1,6 +1,14 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks';
 import { memo } from 'preact/compat';
 import { EXCHANGE_ORDER, type ExchangeId } from '../../../types/exchange.types';
+import type {
+    TradeFilterType,
+    TradeListItem,
+    TradeTradeSymbolWithExchange,
+    TradeExchangeSymbols,
+    SymbolRowItemProps,
+    SymbolSelectorProps,
+} from '../../../types/trade.types';
 import { get_exchange_icon } from '../../common/exchanges';
 import { favourites, toggle_favourite } from '../../../stores/symbol_favourites';
 import { get_ticker, get_market } from '../../../stores/exchange_store';
@@ -13,32 +21,12 @@ import { exchange_connection_status } from '../../../stores/credentials_store';
 import { format_symbol } from '../../chart/symbol_row';
 import { format_price } from '../../../utils/format';
 
+export type { TradeExchangeSymbols as ExchangeSymbols };
+
 const ITEM_HEIGHT = 28;
 const HEADER_HEIGHT = 24;
 const CONTAINER_HEIGHT = 250;
 const OVERSCAN = 5;
-
-type FilterType = 'all' | 'favourites' | ExchangeId;
-
-type ListItem =
-    | { type: 'header'; exchange: ExchangeId; count: number }
-    | { type: 'symbol'; exchange: ExchangeId; symbol: string };
-
-interface SymbolWithExchange {
-    exchange: ExchangeId;
-    symbol: string;
-}
-
-export type ExchangeSymbols = Partial<Record<ExchangeId, string[]>>;
-
-interface SymbolRowItemProps {
-    exchange: ExchangeId;
-    symbol: string;
-    is_selected: boolean;
-    is_fav: boolean;
-    on_select: (exchange: ExchangeId, symbol: string) => void;
-    on_toggle_fav: (exchange: ExchangeId, symbol: string) => void;
-}
 
 const SymbolRowItem = memo(function SymbolRowItem({
     exchange,
@@ -98,14 +86,10 @@ const SymbolRowItem = memo(function SymbolRowItem({
     );
 });
 
-interface SymbolSelectorProps {
-    exchange_symbols: ExchangeSymbols;
-}
-
 export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
     const [open, set_open] = useState(false);
     const [search, set_search] = useState('');
-    const [active_filter, set_active_filter] = useState<FilterType>('all');
+    const [active_filter, set_active_filter] = useState<TradeFilterType>('all');
     const [scroll_top, set_scroll_top] = useState(0);
     const scroll_ref = useRef<HTMLDivElement>(null);
 
@@ -133,7 +117,7 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
     }, [open]);
 
     const all_symbols = useMemo(() => {
-        const result: SymbolWithExchange[] = [];
+        const result: TradeSymbolWithExchange[] = [];
         for (const ex of sorted_exchanges) {
             const symbols = exchange_symbols[ex] || [];
             for (const s of symbols) {
@@ -169,13 +153,13 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
 
         const groups = sorted_exchanges.reduce(
             (acc, ex) => ({ ...acc, [ex]: [] }),
-            {} as Record<ExchangeId, SymbolWithExchange[]>
+            {} as Record<ExchangeId, TradeSymbolWithExchange[]>
         );
         for (const item of filtered) {
             groups[item.exchange]?.push(item);
         }
 
-        const items: ListItem[] = [];
+        const items: TradeListItem[] = [];
         for (const ex of sorted_exchanges) {
             const group = groups[ex];
             if (!group || group.length === 0) continue;

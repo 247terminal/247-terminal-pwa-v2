@@ -3,15 +3,7 @@ import { Download, Upload, AlertTriangle, Check } from 'lucide-preact';
 import { settings, reset_settings } from '@/stores/settings_store';
 import { credentials, clear_all_credentials } from '@/stores/credentials_store';
 import { save_to_storage } from '@/services/settings/settings.service';
-import type { UserSettings } from '@/types/settings.types';
-import type { UserCredentials } from '@/types/credentials.types';
-
-interface ExportData {
-    version: number;
-    exported_at: number;
-    settings: UserSettings;
-    credentials?: UserCredentials;
-}
+import type { ExportData } from '@/types/settings.types';
 
 export function BackupSection() {
     const [include_credentials, set_include_credentials] = useState(false);

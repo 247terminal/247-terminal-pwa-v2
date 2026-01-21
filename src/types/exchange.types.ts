@@ -92,3 +92,20 @@ export interface FundingInfo {
     funding_rate: number | null;
     next_funding_time: number | null;
 }
+
+export interface ExchangePanelProps {
+    exchange_id: ExchangeId;
+    is_open: boolean;
+    on_close: () => void;
+}
+
+export interface PasswordInputProps {
+    value: string;
+    placeholder: string;
+    on_change: (value: string) => void;
+}
+
+export interface HelpModalProps {
+    exchange_id: ExchangeId;
+    on_close: () => void;
+}

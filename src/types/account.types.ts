@@ -44,3 +44,42 @@ export interface TradeHistory {
 }
 
 export type AccountTab = 'positions' | 'orders' | 'history';
+
+export type SortDirection = 'asc' | 'desc';
+
+export type HistorySortKey = 'symbol' | 'time' | 'size' | 'entry' | 'pnl';
+
+export type PositionSortKey = 'symbol' | 'size' | 'entry' | 'liq' | 'pnl';
+
+export type OrderSortKey = 'symbol' | 'size' | 'price' | 'id';
+
+export interface SortHeaderProps<T extends string> {
+    label: string;
+    sort_key: T;
+    current_key: T;
+    direction: SortDirection;
+    on_sort: (key: T) => void;
+    align?: 'left' | 'right';
+    flex?: boolean;
+}
+
+export interface HistoryRowProps {
+    trade: TradeHistory;
+    is_private: boolean;
+}
+
+export interface PositionRowProps {
+    position: Position;
+    is_private: boolean;
+}
+
+export interface OrderRowProps {
+    order: Order;
+    is_private: boolean;
+}
+
+export interface TabButtonProps {
+    tab: AccountTab;
+    label: string;
+    count?: number;
+}

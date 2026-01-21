@@ -10,23 +10,27 @@ export type { ExchangeValidationResult, ExchangeValidationCredentials };
 type ValidatorFn = (creds: ExchangeValidationCredentials) => Promise<ExchangeValidationResult>;
 
 const validators: Record<ExchangeId, ValidatorFn> = {
-    binance: (creds) => validate_binance({
-        api_key: creds.api_key || '',
-        api_secret: creds.api_secret || '',
-    }),
-    bybit: (creds) => validate_bybit({
-        api_key: creds.api_key || '',
-        api_secret: creds.api_secret || '',
-    }),
-    blofin: (creds) => validate_blofin({
-        api_key: creds.api_key || '',
-        api_secret: creds.api_secret || '',
-        passphrase: creds.passphrase || '',
-    }),
-    hyperliquid: (creds) => validate_hyperliquid({
-        wallet_address: creds.wallet_address || '',
-        private_key: creds.private_key || '',
-    }),
+    binance: (creds) =>
+        validate_binance({
+            api_key: creds.api_key || '',
+            api_secret: creds.api_secret || '',
+        }),
+    bybit: (creds) =>
+        validate_bybit({
+            api_key: creds.api_key || '',
+            api_secret: creds.api_secret || '',
+        }),
+    blofin: (creds) =>
+        validate_blofin({
+            api_key: creds.api_key || '',
+            api_secret: creds.api_secret || '',
+            passphrase: creds.passphrase || '',
+        }),
+    hyperliquid: (creds) =>
+        validate_hyperliquid({
+            wallet_address: creds.wallet_address || '',
+            private_key: creds.private_key || '',
+        }),
 };
 
 export async function validate_exchange_credentials(

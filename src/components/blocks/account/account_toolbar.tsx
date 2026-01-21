@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'preact/hooks';
 import { Eye, EyeOff, RefreshCw, Radiation } from 'lucide-preact';
-import type { AccountTab } from '../../../types/account.types';
+import type { AccountTab, TabButtonProps } from '../../../types/account.types';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import {
     active_tab,
@@ -13,12 +13,6 @@ import {
     refresh_all_accounts,
 } from '../../../stores/account_store';
 import { exchange_connection_status } from '../../../stores/credentials_store';
-
-interface TabButtonProps {
-    tab: AccountTab;
-    label: string;
-    count?: number;
-}
 
 function TabButton({ tab, label, count }: TabButtonProps) {
     const is_active = active_tab.value === tab;

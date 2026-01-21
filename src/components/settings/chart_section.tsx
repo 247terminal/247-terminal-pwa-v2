@@ -1,11 +1,6 @@
 import { settings, set_setting } from '@/stores/settings_store';
 import { TIMEFRAME_OPTIONS } from '@/services/settings/settings.constants';
-
-interface ToggleProps {
-    label: string;
-    checked: boolean;
-    on_change: (checked: boolean) => void;
-}
+import type { ToggleProps, ColorInputProps } from '@/types/settings.types';
 
 function Toggle({ label, checked, on_change }: ToggleProps) {
     return (
@@ -19,12 +14,6 @@ function Toggle({ label, checked, on_change }: ToggleProps) {
             />
         </label>
     );
-}
-
-interface ColorInputProps {
-    label: string;
-    value: string;
-    on_change: (value: string) => void;
 }
 
 function ColorInput({ label, value, on_change }: ColorInputProps) {
@@ -60,7 +49,11 @@ export function ChartSection() {
                     class="bg-base-300 px-2 py-1 rounded text-xs text-base-content outline-none"
                     value={chart.default_timeframe}
                     onChange={(e) =>
-                        set_setting('chart', 'default_timeframe', (e.target as HTMLSelectElement).value)
+                        set_setting(
+                            'chart',
+                            'default_timeframe',
+                            (e.target as HTMLSelectElement).value
+                        )
                     }
                 >
                     {TIMEFRAME_OPTIONS.map((opt) => (

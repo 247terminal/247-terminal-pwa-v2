@@ -16,13 +16,16 @@ interface CommandBarProps {
 
 function get_filtered_by_category(query: string): Record<CommandCategory, Command[]> {
     const filtered = filter_commands(query);
-    return CATEGORY_ORDER.reduce((acc, category) => {
-        const commands = filtered.filter(cmd => cmd.category === category);
-        if (commands.length > 0) {
-            acc[category] = commands;
-        }
-        return acc;
-    }, {} as Record<CommandCategory, Command[]>);
+    return CATEGORY_ORDER.reduce(
+        (acc, category) => {
+            const commands = filtered.filter((cmd) => cmd.category === category);
+            if (commands.length > 0) {
+                acc[category] = commands;
+            }
+            return acc;
+        },
+        {} as Record<CommandCategory, Command[]>
+    );
 }
 
 const DOLLAR_PARAMS = ['SIZE', 'PRICE'];
@@ -76,9 +79,7 @@ function CommandGuide({ parsed }: { parsed: ParsedCommand }) {
             <span class="w-20 text-center py-0.5 bg-success/20 text-success text-[10px] font-medium rounded border border-success/30">
                 {command.name}
             </span>
-            <span class="text-[10px] text-success/60 font-mono w-6">
-                {command.prefix}
-            </span>
+            <span class="text-[10px] text-success/60 font-mono w-6">{command.prefix}</span>
             {command.params.map((param, i) => {
                 const is_filled = i < filled_params.length;
                 const is_current = i === filled_params.length;
@@ -86,7 +87,10 @@ function CommandGuide({ parsed }: { parsed: ParsedCommand }) {
 
                 if (is_filled) {
                     return (
-                        <span key={i} class="px-2 py-0.5 bg-success/20 text-success text-[10px] rounded border border-success/30 font-mono">
+                        <span
+                            key={i}
+                            class="px-2 py-0.5 bg-success/20 text-success text-[10px] rounded border border-success/30 font-mono"
+                        >
                             {format_filled_value(value, param)}
                         </span>
                     );
@@ -105,15 +109,9 @@ function CommandGuide({ parsed }: { parsed: ParsedCommand }) {
                     </span>
                 );
             })}
-            {is_complete && (
-                <span class="ml-auto text-[9px] text-success font-medium">
-                    READY
-                </span>
-            )}
+            {is_complete && <span class="ml-auto text-[9px] text-success font-medium">READY</span>}
             {!is_complete && (
-                <span class="ml-auto text-[9px] text-base-content/30">
-                    ENTER to submit
-                </span>
+                <span class="ml-auto text-[9px] text-base-content/30">ENTER to submit</span>
             )}
         </div>
     );
@@ -126,7 +124,8 @@ export function CommandBar({ on_submit }: CommandBarProps) {
     const [is_shaking, set_is_shaking] = useState(false);
     const input_ref = useRef<HTMLInputElement>(null);
     const container_ref = useRef<HTMLDivElement>(null);
-    const is_mac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const is_mac =
+        typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
     const parsed_command = parse_input(value);
     const show_command_list = !parsed_command;
@@ -187,10 +186,10 @@ export function CommandBar({ on_submit }: CommandBarProps) {
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            set_selected_index(prev => Math.min(prev + 1, filtered_commands.length - 1));
+            set_selected_index((prev) => Math.min(prev + 1, filtered_commands.length - 1));
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            set_selected_index(prev => Math.max(prev - 1, 0));
+            set_selected_index((prev) => Math.max(prev - 1, 0));
         } else if (e.key === 'Enter' && is_open && filtered_commands.length > 0) {
             e.preventDefault();
             const cmd = filtered_commands[selected_index];
@@ -207,7 +206,10 @@ export function CommandBar({ on_submit }: CommandBarProps) {
 
     return (
         <div ref={container_ref} class="relative">
-            <form onSubmit={handle_submit} class={`flex items-center gap-1 px-2 py-1 bg-base-100 border border-base-300 text-xs min-w-[360px] transition-colors ${is_open ? 'rounded-t' : 'rounded'} ${is_shaking ? 'animate-shake' : ''}`}>
+            <form
+                onSubmit={handle_submit}
+                class={`flex items-center gap-1 px-2 py-1 bg-base-100 border border-base-300 text-xs min-w-[360px] transition-colors ${is_open ? 'rounded-t' : 'rounded'} ${is_shaking ? 'animate-shake' : ''}`}
+            >
                 <Icon class="w-5 h-5" />
                 <input
                     ref={input_ref}
@@ -220,7 +222,10 @@ export function CommandBar({ on_submit }: CommandBarProps) {
                     class="flex-1 bg-transparent outline-none text-base-content placeholder:text-base-content/50 placeholder:font-bold"
                 />
                 {!value && (
-                    <kbd class="px-1.5 py-0.5 bg-base-300 rounded text-xs text-base-content/50 inline-flex items-center gap-1">{is_mac ? '⌘' : 'Ctrl'}<span class="text-[10px]">K</span></kbd>
+                    <kbd class="px-1.5 py-0.5 bg-base-300 rounded text-xs text-base-content/50 inline-flex items-center gap-1">
+                        {is_mac ? '⌘' : 'Ctrl'}
+                        <span class="text-[10px]">K</span>
+                    </kbd>
                 )}
             </form>
             {is_open && (
@@ -229,7 +234,7 @@ export function CommandBar({ on_submit }: CommandBarProps) {
                         <CommandGuide parsed={parsed_command} />
                     ) : (
                         <>
-                            {CATEGORY_ORDER.map(category => {
+                            {CATEGORY_ORDER.map((category) => {
                                 const commands = commands_by_category[category];
                                 if (!commands || commands.length === 0) return null;
 
@@ -258,7 +263,10 @@ export function CommandBar({ on_submit }: CommandBarProps) {
                                                         {cmd.prefix}
                                                     </span>
                                                     {cmd.params.map((param, i) => (
-                                                        <span key={i} class="px-1.5 py-0.5 bg-base-300/50 text-[9px] text-base-content/50 rounded">
+                                                        <span
+                                                            key={i}
+                                                            class="px-1.5 py-0.5 bg-base-300/50 text-[9px] text-base-content/50 rounded"
+                                                        >
                                                             {format_param_display(param)}
                                                         </span>
                                                     ))}

@@ -1,7 +1,12 @@
 import { memo } from 'preact/compat';
 import { useState, useMemo, useCallback } from 'preact/hooks';
 import { VList } from 'virtua';
-import type { Order } from '../../../types/account.types';
+import type {
+    Order,
+    OrderSortKey,
+    OrderRowProps,
+    SortDirection,
+} from '../../../types/account.types';
 import { orders_list, privacy_mode, cancel_order } from '../../../stores/account_store';
 import { get_market } from '../../../stores/exchange_store';
 import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
@@ -9,9 +14,7 @@ import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
 import { format_usd, mask_value } from '../../../utils/account_format';
-import { SortHeader, type SortDirection } from './sort_header';
-
-type OrderSortKey = 'symbol' | 'size' | 'price' | 'id';
+import { SortHeader } from './sort_header';
 
 const ORDER_TYPE_LABELS = {
     limit: 'Limit',
@@ -23,11 +26,6 @@ const ORDER_TYPE_LABELS = {
 
 function format_order_type(type: Order['type']): string {
     return ORDER_TYPE_LABELS[type];
-}
-
-interface OrderRowProps {
-    order: Order;
-    is_private: boolean;
 }
 
 const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {

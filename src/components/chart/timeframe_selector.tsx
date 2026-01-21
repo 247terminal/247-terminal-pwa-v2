@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'preact/hooks';
 import type { Timeframe } from '../../types/candle.types';
+import type { TimeframeSelectorProps } from '../../types/chart.types';
 
 const TIMEFRAME_LABELS: Record<Timeframe, string> = {
     S1: '1s',
@@ -24,11 +25,6 @@ const SECONDS: Timeframe[] = ['S1', 'S5', 'S15', 'S30'];
 const MINUTES: Timeframe[] = ['1', '5', '15', '30'];
 const HOURS: Timeframe[] = ['60', '120', '240', '480'];
 const DAYS: Timeframe[] = ['720', 'D', 'W', 'M'];
-
-interface TimeframeSelectorProps {
-    timeframe: Timeframe;
-    on_change: (tf: Timeframe) => void;
-}
 
 export function TimeframeSelector({ timeframe, on_change }: TimeframeSelectorProps) {
     const [open, set_open] = useState(false);

@@ -1,9 +1,23 @@
 import { useState, useRef, useCallback } from 'preact/hooks';
-import { ChevronDown, Newspaper, DollarSign, LogOut, Moon, Sun, Lock, LockOpen } from 'lucide-preact';
+import {
+    ChevronDown,
+    Newspaper,
+    DollarSign,
+    LogOut,
+    Moon,
+    Sun,
+    Lock,
+    LockOpen,
+} from 'lucide-preact';
 import { use_click_outside, use_escape_key } from '@/hooks';
 import { clear_token } from '@/services/auth/session.service';
 import { current_theme, toggle_theme } from '@/hooks/use_theme';
 import { layout_locked, toggle_layout_lock } from '@/stores/layout_lock_store';
+import type {
+    SettingsSectionId,
+    SettingsDrawerProps,
+    AccordionSectionProps,
+} from '@/types/settings.types';
 import { NewsTradingSection } from './news_trading_section';
 import { TradingSection } from './trading_section';
 import { TerminalSection } from './terminal_section';
@@ -13,31 +27,6 @@ import { KeywordSection } from './keyword_section';
 import { ShortcutsSection } from './shortcuts_section';
 import { BottingSection } from './botting_section';
 import { BackupSection } from './backup_section';
-
-type SectionId =
-    | 'news_trading'
-    | 'trading'
-    | 'terminal'
-    | 'chart'
-    | 'news'
-    | 'keywords'
-    | 'shortcuts'
-    | 'botting'
-    | 'backup';
-
-interface SettingsDrawerProps {
-    is_open: boolean;
-    on_close: () => void;
-}
-
-interface AccordionSectionProps {
-    id: SectionId;
-    title: string;
-    icon?: preact.ComponentChildren;
-    expanded_section: SectionId | null;
-    on_toggle: (id: SectionId) => void;
-    children: preact.ComponentChildren;
-}
 
 function AccordionSection({
     id,
@@ -73,7 +62,9 @@ function AccordionSection({
 
 export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
     const drawer_ref = useRef<HTMLDivElement>(null);
-    const [expanded_section, set_expanded_section] = useState<SectionId | null>('news_trading');
+    const [expanded_section, set_expanded_section] = useState<SettingsSectionId | null>(
+        'news_trading'
+    );
 
     const handle_close = useCallback(() => {
         on_close();
@@ -84,7 +75,7 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
 
     if (!is_open) return null;
 
-    function toggle_section(id: SectionId): void {
+    function toggle_section(id: SettingsSectionId): void {
         set_expanded_section((prev) => (prev === id ? null : id));
     }
 
@@ -187,14 +178,22 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                             onClick={toggle_theme}
                             class="p-1.5 text-base-content/50 hover:text-base-content transition-colors"
                         >
-                            {current_theme.value === 'terminal-dark' ? <Moon class="w-3.5 h-3.5" /> : <Sun class="w-3.5 h-3.5" />}
+                            {current_theme.value === 'terminal-dark' ? (
+                                <Moon class="w-3.5 h-3.5" />
+                            ) : (
+                                <Sun class="w-3.5 h-3.5" />
+                            )}
                         </button>
                         <button
                             type="button"
                             onClick={toggle_layout_lock}
                             class="p-1.5 text-base-content/50 hover:text-base-content transition-colors"
                         >
-                            {layout_locked.value ? <Lock class="w-3.5 h-3.5" /> : <LockOpen class="w-3.5 h-3.5" />}
+                            {layout_locked.value ? (
+                                <Lock class="w-3.5 h-3.5" />
+                            ) : (
+                                <LockOpen class="w-3.5 h-3.5" />
+                            )}
                         </button>
                     </div>
                     <button

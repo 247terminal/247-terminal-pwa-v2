@@ -37,10 +37,11 @@ export function filter_commands(query: string): Command[] {
     if (!query.trim()) return AVAILABLE_COMMANDS;
 
     const lower_query = query.toLowerCase();
-    return AVAILABLE_COMMANDS.filter(cmd =>
-        cmd.name.toLowerCase().includes(lower_query) ||
-        cmd.prefix.toLowerCase().startsWith(lower_query) ||
-        cmd.params.some(p => p.toLowerCase().includes(lower_query))
+    return AVAILABLE_COMMANDS.filter(
+        (cmd) =>
+            cmd.name.toLowerCase().includes(lower_query) ||
+            cmd.prefix.toLowerCase().startsWith(lower_query) ||
+            cmd.params.some((p) => p.toLowerCase().includes(lower_query))
     );
 }
 
@@ -58,7 +59,7 @@ export function parse_input(input: string): ParsedCommand | null {
     const parts = trimmed.split(/\s+/);
     const prefix = parts[0].toLowerCase();
 
-    const matched_command = AVAILABLE_COMMANDS.find(cmd => cmd.prefix === prefix);
+    const matched_command = AVAILABLE_COMMANDS.find((cmd) => cmd.prefix === prefix);
     if (!matched_command) return null;
 
     const filled_params = parts.slice(1);
@@ -78,5 +79,5 @@ export function get_active_command(input: string): Command | null {
     if (parts.length === 0) return null;
 
     const prefix = parts[0].toLowerCase();
-    return AVAILABLE_COMMANDS.find(cmd => cmd.prefix === prefix) || null;
+    return AVAILABLE_COMMANDS.find((cmd) => cmd.prefix === prefix) || null;
 }

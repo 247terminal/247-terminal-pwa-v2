@@ -1,12 +1,11 @@
 import { useState } from 'preact/hooks';
 import { settings, set_setting, update_settings } from '@/stores/settings_store';
-import type { ShortcutBinding } from '@/types/settings.types';
-
-interface ToggleProps {
-    label: string;
-    checked: boolean;
-    on_change: (checked: boolean) => void;
-}
+import type {
+    ShortcutBinding,
+    ToggleProps,
+    ShortcutEditorProps,
+    ShortcutRowProps,
+} from '@/types/settings.types';
 
 function Toggle({ label, checked, on_change }: ToggleProps) {
     return (
@@ -23,12 +22,6 @@ function Toggle({ label, checked, on_change }: ToggleProps) {
 }
 
 const MODIFIER_OPTIONS = ['NONE', 'CTRL', 'SHIFT'] as const;
-
-interface ShortcutEditorProps {
-    label: string;
-    binding: ShortcutBinding;
-    on_change: (binding: ShortcutBinding) => void;
-}
 
 function ShortcutEditor({ label, binding, on_change }: ShortcutEditorProps) {
     const [is_recording, set_is_recording] = useState(false);
@@ -77,13 +70,6 @@ function ShortcutEditor({ label, binding, on_change }: ShortcutEditorProps) {
             </button>
         </div>
     );
-}
-
-interface ShortcutRowProps {
-    label: string;
-    binding_key: string;
-    binding: ShortcutBinding | undefined;
-    on_change: (key: string, binding: ShortcutBinding) => void;
 }
 
 function ShortcutRow({ label, binding_key, binding, on_change }: ShortcutRowProps) {

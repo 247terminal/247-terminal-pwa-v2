@@ -16,19 +16,12 @@ import { init_exchange, destroy_exchange } from '@/services/exchange/account_bri
 import { load_exchange } from '@/services/exchange/init';
 import { refresh_account, clear_exchange_data } from '@/stores/account_store';
 import { get_exchange_icon, get_exchange_logo } from '@/components/common/exchanges';
-import type { ExchangeId } from '@/types/credentials.types';
-
-interface ExchangePanelProps {
-    exchange_id: ExchangeId;
-    is_open: boolean;
-    on_close: () => void;
-}
-
-interface PasswordInputProps {
-    value: string;
-    placeholder: string;
-    on_change: (value: string) => void;
-}
+import type {
+    ExchangeId,
+    ExchangePanelProps,
+    PasswordInputProps,
+    HelpModalProps,
+} from '@/types/exchange.types';
 
 function PasswordInput({ value, placeholder, on_change }: PasswordInputProps) {
     const [visible, set_visible] = useState(false);
@@ -51,11 +44,6 @@ function PasswordInput({ value, placeholder, on_change }: PasswordInputProps) {
             </button>
         </div>
     );
-}
-
-interface HelpModalProps {
-    exchange_id: ExchangeId;
-    on_close: () => void;
 }
 
 function HelpModal({ exchange_id, on_close }: HelpModalProps) {

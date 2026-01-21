@@ -1,7 +1,12 @@
 import { memo } from 'preact/compat';
 import { useState, useMemo, useCallback, useEffect } from 'preact/hooks';
 import { VList } from 'virtua';
-import type { TradeHistory } from '../../../types/account.types';
+import type {
+    TradeHistory,
+    HistorySortKey,
+    HistoryRowProps,
+    SortDirection,
+} from '../../../types/account.types';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import { history, privacy_mode, loading, refresh_history } from '../../../stores/account_store';
 import { show_pnl_card } from '../../../stores/pnl_card_store';
@@ -19,14 +24,7 @@ import {
     format_short_time,
     mask_value,
 } from '../../../utils/account_format';
-import { SortHeader, type SortDirection } from './sort_header';
-
-type HistorySortKey = 'symbol' | 'time' | 'size' | 'entry' | 'pnl';
-
-interface HistoryRowProps {
-    trade: TradeHistory;
-    is_private: boolean;
-}
+import { SortHeader } from './sort_header';
 
 const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowProps) {
     const is_buy = trade.side === 'buy';

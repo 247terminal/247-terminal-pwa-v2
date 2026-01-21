@@ -1,10 +1,19 @@
-import { useEffect } from "preact/hooks";
-import { 
-    auth_state, is_authenticated, is_loading, current_user, auth_error,
-    set_authenticated, set_unauthenticated, set_loading, clear_error
+import { useEffect } from 'preact/hooks';
+import {
+    auth_state,
+    is_authenticated,
+    is_loading,
+    current_user,
+    auth_error,
+    set_authenticated,
+    set_unauthenticated,
+    set_loading,
+    clear_error,
 } from '../stores/auth.store';
 import {
-    validate_license, check_existing_session, logout as logout_service
+    validate_license,
+    check_existing_session,
+    logout as logout_service,
 } from '../services/auth/auth.service';
 
 export function use_auth() {
@@ -21,18 +30,18 @@ export function use_auth() {
         const result = await validate_license(license_key);
 
         if (result.success && result.valid && result.user) {
-            set_authenticated(result.user)
+            set_authenticated(result.user);
             return true;
         } else {
             set_unauthenticated(result.error);
             return false;
         }
-    }
+    };
 
     const logout = (): void => {
         logout_service();
         set_unauthenticated();
-    }
+    };
 
     return {
         state: auth_state,
@@ -43,5 +52,5 @@ export function use_auth() {
         login,
         logout,
         clear_error,
-    }
+    };
 }

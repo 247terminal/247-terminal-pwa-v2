@@ -1,17 +1,8 @@
 import { memo } from 'preact/compat';
 import { useCallback } from 'preact/hooks';
+import type { SortDirection, SortHeaderProps } from '../../../types/account.types';
 
-export type SortDirection = 'asc' | 'desc';
-
-interface SortHeaderProps<T extends string> {
-    label: string;
-    sort_key: T;
-    current_key: T;
-    direction: SortDirection;
-    on_sort: (key: T) => void;
-    align?: 'left' | 'right';
-    flex?: boolean;
-}
+export type { SortDirection };
 
 function SortHeaderInner<T extends string>({
     label,

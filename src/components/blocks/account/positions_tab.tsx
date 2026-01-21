@@ -1,7 +1,12 @@
 import { memo } from 'preact/compat';
 import { useState, useMemo, useCallback } from 'preact/hooks';
 import { VList } from 'virtua';
-import type { Position } from '../../../types/account.types';
+import type {
+    Position,
+    PositionSortKey,
+    PositionRowProps,
+    SortDirection,
+} from '../../../types/account.types';
 import {
     positions_list,
     privacy_mode,
@@ -15,14 +20,7 @@ import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
 import { format_pnl, format_pct, format_usd, mask_value } from '../../../utils/account_format';
-import { SortHeader, type SortDirection } from './sort_header';
-
-type PositionSortKey = 'symbol' | 'size' | 'entry' | 'liq' | 'pnl';
-
-interface PositionRowProps {
-    position: Position;
-    is_private: boolean;
-}
+import { SortHeader } from './sort_header';
 
 const PositionRow = memo(function PositionRow({ position, is_private }: PositionRowProps) {
     const is_long = position.side === 'long';
