@@ -1,5 +1,19 @@
 @import 'tailwindcss';
 
+@font-face {
+    font-family: 'Zuume Bold';
+    src: url('/fonts/Zuume Bold.ttf') format('truetype');
+    font-weight: bold;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Arame Thin';
+    src: url('/fonts/Arame Thin.ttf') format('truetype');
+    font-weight: normal;
+    font-display: swap;
+}
+
 @plugin "daisyui";
 
 @plugin "daisyui/theme" {

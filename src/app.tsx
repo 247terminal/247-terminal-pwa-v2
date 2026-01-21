@@ -1,10 +1,11 @@
+import { useEffect } from 'preact/hooks';
 import { LocationProvider, Router, Route } from 'preact-iso';
 import { AuthGuard } from './components/auth/auth_guard';
 import { TradingPage } from './pages/trading';
 import { ThemeToggle } from './components/common/theme_toggle';
+import { PnlCardModal } from './components/common/pnl_card_modal';
+import { pnl_card_visible } from './stores/pnl_card_store';
 import { init_exchanges } from './services/exchange/init';
-
-init_exchanges().catch(console.error);
 
 function HomePage() {
     return (
@@ -43,6 +44,10 @@ function NotFound() {
 }
 
 export function App() {
+    useEffect(() => {
+        init_exchanges().catch(console.error);
+    }, []);
+
     return (
         <AuthGuard>
             <LocationProvider>
@@ -52,6 +57,7 @@ export function App() {
                     <Route default component={NotFound} />
                 </Router>
             </LocationProvider>
+            {pnl_card_visible.value && <PnlCardModal />}
         </AuthGuard>
     );
 }

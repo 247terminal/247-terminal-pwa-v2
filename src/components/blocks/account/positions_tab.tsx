@@ -8,6 +8,7 @@ import {
     close_position,
     open_tpsl_modal,
 } from '../../../stores/account_store';
+import { show_pnl_card } from '../../../stores/pnl_card_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
 import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
 import { format_symbol, parse_symbol } from '../../chart/symbol_row';
@@ -49,6 +50,15 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
         navigate_to_symbol(position.exchange, position.symbol);
     }, [position.exchange, position.symbol]);
 
+    const handle_pnl_click = useCallback(() => {
+        if (is_private) return;
+        show_pnl_card({
+            type: 'position',
+            position,
+            exchange_id: position.exchange,
+        });
+    }, [is_private, position]);
+
     return (
         <div
             class="relative flex items-center px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
@@ -58,26 +68,26 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 class={`absolute left-0 top-1 bottom-1 w-[2.5px] ${is_long ? 'bg-success' : 'bg-error'}`}
                 aria-hidden="true"
             />
-            <div
-                class="flex-1 flex items-center gap-1.5 cursor-pointer hover:opacity-80 min-w-0"
+            <button
+                type="button"
+                class="flex-1 flex items-center gap-1.5 cursor-pointer hover:opacity-80 min-w-0 bg-transparent border-none p-0 text-left"
                 onClick={handle_symbol_click}
-                onKeyDown={(e) => e.key === 'Enter' && handle_symbol_click()}
-                role="button"
-                tabIndex={0}
                 aria-label={`Navigate to ${format_symbol(position.symbol)} chart`}
             >
                 <span class="text-base-content/40 shrink-0" aria-hidden="true">
                     {get_exchange_icon(position.exchange)}
                 </span>
-                <div class="min-w-0">
-                    <div class={`font-medium truncate ${is_long ? 'text-success' : 'text-error'}`}>
+                <span class="min-w-0">
+                    <span
+                        class={`font-medium truncate block ${is_long ? 'text-success' : 'text-error'}`}
+                    >
                         {format_symbol(position.symbol)}
-                    </div>
-                    <div class="text-[10px] text-base-content/50 capitalize">
+                    </span>
+                    <span class="text-[10px] text-base-content/50 capitalize block">
                         {position.margin_mode} {position.leverage}x
-                    </div>
-                </div>
-            </div>
+                    </span>
+                </span>
+            </button>
 
             <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content">
@@ -106,12 +116,24 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                     : '-'}
             </div>
 
-            <div class={`flex-1 text-right ${pnl_color}`} role="cell">
-                <div>{mask_value(format_pnl(pnl), is_private)}</div>
-                <div class="text-[10px] opacity-70">
-                    {mask_value(format_pct(pnl_pct), is_private)}
+            {is_private ? (
+                <div class={`flex-1 text-right ${pnl_color}`} role="cell">
+                    <div>{mask_value(format_pnl(pnl), is_private)}</div>
+                    <div class="text-[10px] opacity-70">
+                        {mask_value(format_pct(pnl_pct), is_private)}
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <button
+                    type="button"
+                    class={`flex-1 text-right ${pnl_color} cursor-pointer hover:opacity-70 bg-transparent border-none p-0`}
+                    onClick={handle_pnl_click}
+                    aria-label="Open PnL card"
+                >
+                    <div>{format_pnl(pnl)}</div>
+                    <div class="text-[10px] opacity-70">{format_pct(pnl_pct)}</div>
+                </button>
+            )}
 
             <div class="flex-1 flex justify-end gap-1" role="cell">
                 <button

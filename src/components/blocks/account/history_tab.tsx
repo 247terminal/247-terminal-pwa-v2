@@ -4,6 +4,7 @@ import { VList } from 'virtua';
 import type { TradeHistory } from '../../../types/account.types';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import { history, privacy_mode, loading, refresh_history } from '../../../stores/account_store';
+import { show_pnl_card } from '../../../stores/pnl_card_store';
 import { get_market } from '../../../stores/exchange_store';
 import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
 import { format_symbol, parse_symbol } from '../../chart/symbol_row';
@@ -38,6 +39,21 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
         navigate_to_symbol(trade.exchange, trade.symbol);
     }, [trade.exchange, trade.symbol]);
 
+    const handle_pnl_click = useCallback(() => {
+        if (is_private) return;
+        show_pnl_card({
+            type: 'history',
+            exchange_id: trade.exchange,
+            symbol: trade.symbol,
+            side: trade.side === 'buy' ? 'long' : 'short',
+            leverage: 1,
+            roi_percent: trade.realized_pnl_pct,
+            pnl_amount: trade.realized_pnl,
+            entry_price: format_display_price(trade.entry_price),
+            close_price: format_display_price(trade.close_price),
+        });
+    }, [is_private, trade]);
+
     return (
         <div
             class="relative flex items-center px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
@@ -47,21 +63,19 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
                 class={`absolute left-0 top-1 bottom-1 w-[2.5px] ${is_buy ? 'bg-success' : 'bg-error'}`}
                 aria-hidden="true"
             />
-            <div
-                class="flex-1 flex items-center gap-1.5 cursor-pointer hover:opacity-80 min-w-0"
+            <button
+                type="button"
+                class="flex-1 flex items-center gap-1.5 cursor-pointer hover:opacity-80 min-w-0 bg-transparent border-none p-0 text-left"
                 onClick={handle_symbol_click}
-                onKeyDown={(e) => e.key === 'Enter' && handle_symbol_click()}
-                role="button"
-                tabIndex={0}
                 aria-label={`Navigate to ${format_symbol(trade.symbol)} chart`}
             >
                 <span class="text-base-content/40 shrink-0" aria-hidden="true">
                     {get_exchange_icon(trade.exchange)}
                 </span>
-                <div class={`font-medium truncate ${is_buy ? 'text-success' : 'text-error'}`}>
+                <span class={`font-medium truncate ${is_buy ? 'text-success' : 'text-error'}`}>
                     {format_symbol(trade.symbol)}
-                </div>
-            </div>
+                </span>
+            </button>
 
             <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content">{format_relative_time(trade.closed_at)}</div>
@@ -89,12 +103,24 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
                 </div>
             </div>
 
-            <div class={`flex-1 text-right ${pnl_color}`} role="cell">
-                <div>{mask_value(format_pnl(trade.realized_pnl), is_private)}</div>
-                <div class="text-[10px] opacity-70">
-                    {mask_value(format_pct(trade.realized_pnl_pct), is_private)}
+            {is_private ? (
+                <div class={`flex-1 text-right ${pnl_color}`} role="cell">
+                    <div>{mask_value(format_pnl(trade.realized_pnl), is_private)}</div>
+                    <div class="text-[10px] opacity-70">
+                        {mask_value(format_pct(trade.realized_pnl_pct), is_private)}
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <button
+                    type="button"
+                    class={`flex-1 text-right ${pnl_color} cursor-pointer hover:opacity-70 bg-transparent border-none p-0`}
+                    onClick={handle_pnl_click}
+                    aria-label="Open PnL card"
+                >
+                    <div>{format_pnl(trade.realized_pnl)}</div>
+                    <div class="text-[10px] opacity-70">{format_pct(trade.realized_pnl_pct)}</div>
+                </button>
+            )}
         </div>
     );
 });
