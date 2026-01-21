@@ -24,8 +24,9 @@ import {
     fetchOrders,
     fetchAccountData,
     fetchClosedPositions,
+    fetchLeverageSettings,
     hyperliquidAdapter,
-    type ExchangeCredentials,
+    type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
 } from './account_worker';
 import {
@@ -316,10 +317,16 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 break;
             case 'INIT_EXCHANGE': {
                 const exchangeId = payload?.exchangeId as ExchangeId;
-                const credentials = payload?.credentials as ExchangeCredentials;
+                const credentials = payload?.credentials as ExchangeAuthParams;
                 const oldExchange = authenticatedExchanges[exchangeId];
                 if (oldExchange?.close) {
-                    oldExchange.close().catch(() => {});
+                    oldExchange.close().catch((err) => {
+                        console.error(
+                            'failed to close exchange:',
+                            exchangeId,
+                            (err as Error).message
+                        );
+                    });
                 }
                 authenticatedExchanges[exchangeId] = createAuthenticatedExchange(
                     exchangeId,
@@ -332,7 +339,13 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 const exchangeId = payload?.exchangeId as ExchangeId;
                 const oldExchange = authenticatedExchanges[exchangeId];
                 if (oldExchange?.close) {
-                    oldExchange.close().catch(() => {});
+                    oldExchange.close().catch((err) => {
+                        console.error(
+                            'failed to close exchange:',
+                            exchangeId,
+                            (err as Error).message
+                        );
+                    });
                 }
                 delete authenticatedExchanges[exchangeId];
                 if (exchangeId === 'hyperliquid') {
@@ -369,6 +382,12 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 result = await fetchClosedPositions(
                     payload?.exchangeId as ExchangeId,
                     (payload?.limit as number) || 50
+                );
+                break;
+            case 'FETCH_LEVERAGE_SETTINGS':
+                result = await fetchLeverageSettings(
+                    payload?.exchangeId as ExchangeId,
+                    (payload?.symbols as string[]) || []
                 );
                 break;
             default:

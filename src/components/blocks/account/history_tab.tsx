@@ -1,5 +1,6 @@
 import { memo } from 'preact/compat';
-import { useState, useMemo, useCallback, useEffect } from 'preact/hooks';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'preact/hooks';
+import { useComputed } from '@preact/signals';
 import { VList } from 'virtua';
 import type {
     TradeHistory,
@@ -7,10 +8,17 @@ import type {
     HistoryRowProps,
     SortDirection,
 } from '../../../types/account.types';
+import type { ExchangeId } from '../../../types/exchange.types';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import { history, privacy_mode, loading, refresh_history } from '../../../stores/account_store';
 import { show_pnl_card } from '../../../stores/pnl_card_store';
-import { get_market } from '../../../stores/exchange_store';
+import {
+    get_market,
+    symbol_leverage,
+    get_missing_leverage_symbols,
+    set_symbol_leverages,
+} from '../../../stores/exchange_store';
+import { fetch_leverage_settings } from '../../../services/exchange/account_bridge';
 import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
 import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
@@ -26,12 +34,26 @@ import {
 } from '../../../utils/account_format';
 import { SortHeader } from './sort_header';
 
-const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowProps) {
+function calculate_roi_pct(trade: TradeHistory, leverage: number): number {
+    if (trade.entry_price <= 0) return 0;
+    const price_change_pct = ((trade.close_price - trade.entry_price) / trade.entry_price) * 100;
+    const roi = price_change_pct * leverage;
+    return trade.side === 'buy' ? roi : -roi;
+}
+
+const HistoryRow = memo(function HistoryRow({
+    trade,
+    is_private,
+    fetched_leverage,
+}: HistoryRowProps) {
     const is_buy = trade.side === 'buy';
     const pnl_color = trade.realized_pnl >= 0 ? 'text-success' : 'text-error';
     const market = get_market(trade.exchange, trade.symbol);
     const qty_step = market?.qty_step ?? 0.001;
     const usd_size = trade.size * trade.close_price;
+
+    const leverage = fetched_leverage ?? trade.leverage ?? 1;
+    const roi_pct = calculate_roi_pct(trade, leverage);
 
     const handle_symbol_click = useCallback(() => {
         navigate_to_symbol(trade.exchange, trade.symbol);
@@ -44,13 +66,13 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
             exchange_id: trade.exchange,
             symbol: trade.symbol,
             side: trade.side === 'buy' ? 'long' : 'short',
-            leverage: 1,
-            roi_percent: trade.realized_pnl_pct,
+            leverage,
+            roi_percent: roi_pct,
             pnl_amount: trade.realized_pnl,
             entry_price: format_display_price(trade.entry_price),
             close_price: format_display_price(trade.close_price),
         });
-    }, [is_private, trade]);
+    }, [is_private, trade, leverage, roi_pct]);
 
     return (
         <div
@@ -105,7 +127,7 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
                 <div class={`flex-1 text-right ${pnl_color}`} role="cell">
                     <div>{mask_value(format_pnl(trade.realized_pnl), is_private)}</div>
                     <div class="text-[10px] opacity-70">
-                        {mask_value(format_pct(trade.realized_pnl_pct), is_private)}
+                        {mask_value(format_pct(roi_pct), is_private)}
                     </div>
                 </div>
             ) : (
@@ -116,7 +138,7 @@ const HistoryRow = memo(function HistoryRow({ trade, is_private }: HistoryRowPro
                     aria-label="Open PnL card"
                 >
                     <div>{format_pnl(trade.realized_pnl)}</div>
-                    <div class="text-[10px] opacity-70">{format_pct(trade.realized_pnl_pct)}</div>
+                    <div class="text-[10px] opacity-70">{format_pct(roi_pct)}</div>
                 </button>
             )}
         </div>
@@ -151,16 +173,69 @@ function sort_history(
     });
 }
 
+async function fetch_missing_leverages(
+    trades: TradeHistory[],
+    signal?: AbortSignal
+): Promise<void> {
+    const by_exchange = new Map<ExchangeId, Set<string>>();
+
+    for (const trade of trades) {
+        if (trade.exchange === 'bybit') continue;
+        if (!by_exchange.has(trade.exchange)) {
+            by_exchange.set(trade.exchange, new Set());
+        }
+        by_exchange.get(trade.exchange)!.add(trade.symbol);
+    }
+
+    const fetch_tasks = [...by_exchange].map(async ([exchange_id, symbols]) => {
+        if (signal?.aborted) return;
+
+        const missing = get_missing_leverage_symbols(exchange_id, [...symbols]);
+        if (missing.length === 0) return;
+
+        try {
+            const leverages = await fetch_leverage_settings(exchange_id, missing);
+            if (signal?.aborted) return;
+            if (Object.keys(leverages).length > 0) {
+                set_symbol_leverages(exchange_id, leverages);
+            }
+        } catch (err) {
+            if ((err as Error).name === 'AbortError') return;
+            console.error('failed to fetch leverage settings:', (err as Error).message);
+        }
+    });
+
+    await Promise.all(fetch_tasks);
+}
+
 export function HistoryTab() {
     const trades = history.value;
     const is_private = privacy_mode.value;
     const is_loading = loading.value.history;
     const [sort_key, set_sort_key] = useState<HistorySortKey>('time');
     const [sort_direction, set_sort_direction] = useState<SortDirection>('desc');
+    const abort_controller_ref = useRef<AbortController | null>(null);
+
+    const leverages = useComputed(() => symbol_leverage.value);
 
     useEffect(() => {
         refresh_history([...EXCHANGE_IDS]);
     }, []);
+
+    useEffect(() => {
+        if (trades.length === 0) return;
+
+        if (abort_controller_ref.current) {
+            abort_controller_ref.current.abort();
+        }
+        abort_controller_ref.current = new AbortController();
+
+        fetch_missing_leverages(trades, abort_controller_ref.current.signal);
+
+        return () => {
+            abort_controller_ref.current?.abort();
+        };
+    }, [trades]);
 
     const handle_sort = useCallback(
         (key: HistorySortKey) => {
@@ -242,7 +317,12 @@ export function HistoryTab() {
             </div>
             <VList class="flex-1" role="rowgroup">
                 {sorted_trades.map((trade) => (
-                    <HistoryRow key={trade.id} trade={trade} is_private={is_private} />
+                    <HistoryRow
+                        key={trade.id}
+                        trade={trade}
+                        is_private={is_private}
+                        fetched_leverage={leverages.value[trade.exchange]?.[trade.symbol] ?? null}
+                    />
                 ))}
             </VList>
         </div>

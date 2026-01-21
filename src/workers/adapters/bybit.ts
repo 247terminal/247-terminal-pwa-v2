@@ -75,14 +75,27 @@ interface BybitClosedPnlResponse {
     };
 }
 
+function is_position_response(data: unknown): data is BybitPositionResponse {
+    return data !== null && typeof data === 'object' && 'result' in data;
+}
+
+function is_balance_response(data: unknown): data is BybitBalanceResponse {
+    return data !== null && typeof data === 'object' && 'result' in data;
+}
+
+function is_order_response(data: unknown): data is BybitOrderResponse {
+    return data !== null && typeof data === 'object' && 'result' in data;
+}
+
 export async function fetch_position_mode(exchange: BybitExchange): Promise<'hedge' | 'one_way'> {
     try {
-        const response = (await exchange.privateGetV5PositionList({
+        const response = await exchange.privateGetV5PositionList({
             category: 'linear',
             settleCoin: 'USDT',
             limit: '10',
-        })) as BybitPositionResponse;
-        const list = response?.result?.list;
+        });
+        if (!is_position_response(response)) return 'one_way';
+        const list = response.result?.list;
         if (!Array.isArray(list)) return 'one_way';
         const has_hedge = list.some((p) => p.positionIdx === '1' || p.positionIdx === '2');
         return has_hedge ? 'hedge' : 'one_way';
@@ -98,10 +111,11 @@ export async function fetch_balance(exchange: BybitExchange): Promise<{
     currency: string;
     last_updated: number;
 } | null> {
-    const response = (await exchange.privateGetV5AccountWalletBalance({
+    const response = await exchange.privateGetV5AccountWalletBalance({
         accountType: 'UNIFIED',
-    })) as BybitBalanceResponse;
-    const list = response?.result?.list;
+    });
+    if (!is_balance_response(response)) return null;
+    const list = response.result?.list;
     if (!Array.isArray(list) || list.length === 0) return null;
 
     const account = list[0];
@@ -129,11 +143,12 @@ export async function fetch_balance(exchange: BybitExchange): Promise<{
 }
 
 export async function fetch_positions(exchange: BybitExchange): Promise<RawPosition[]> {
-    const response = (await exchange.privateGetV5PositionList({
+    const response = await exchange.privateGetV5PositionList({
         category: 'linear',
         settleCoin: 'USDT',
-    })) as BybitPositionResponse;
-    const list = response?.result?.list;
+    });
+    if (!is_position_response(response)) return [];
+    const list = response.result?.list;
     if (!Array.isArray(list)) return [];
     return list.map((p) => ({
         symbol: p.symbol.replace(/USDT$/, '/USDT:USDT'),
@@ -150,11 +165,12 @@ export async function fetch_positions(exchange: BybitExchange): Promise<RawPosit
 }
 
 export async function fetch_orders(exchange: BybitExchange): Promise<RawOrder[]> {
-    const response = (await exchange.privateGetV5OrderRealtime({
+    const response = await exchange.privateGetV5OrderRealtime({
         category: 'linear',
         settleCoin: 'USDT',
-    })) as BybitOrderResponse;
-    const list = response?.result?.list;
+    });
+    if (!is_order_response(response)) return [];
+    const list = response.result?.list;
     if (!Array.isArray(list)) return [];
     return list.map((o) => ({
         symbol: o.symbol.replace(/USDT$/, '/USDT:USDT'),
@@ -205,6 +221,7 @@ export async function fetch_closed_positions(
             exit_price: Number(p.avgExitPrice || 0),
             realized_pnl: Number(p.closedPnl || 0),
             close_time: Number(p.createdTime || Date.now()),
+            leverage: Number(p.leverage || 1),
         };
     }
     return result;

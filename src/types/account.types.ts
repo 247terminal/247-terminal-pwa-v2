@@ -40,6 +40,7 @@ export interface TradeHistory {
     close_price: number;
     realized_pnl: number;
     realized_pnl_pct: number;
+    leverage: number;
     closed_at: number;
 }
 
@@ -66,6 +67,7 @@ export interface SortHeaderProps<T extends string> {
 export interface HistoryRowProps {
     trade: TradeHistory;
     is_private: boolean;
+    fetched_leverage: number | null;
 }
 
 export interface PositionRowProps {
@@ -82,4 +84,9 @@ export interface TabButtonProps {
     tab: AccountTab;
     label: string;
     count?: number;
+}
+
+export interface PnlResult {
+    pnl: number;
+    pnl_pct: number;
 }

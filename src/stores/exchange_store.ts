@@ -65,15 +65,25 @@ export function set_connection_status(
     status: ConnectionStatus,
     error?: string
 ) {
-    const current = connections.value[exchange_id];
-    connections.value = {
-        ...connections.value,
-        [exchange_id]: {
-            status,
-            error: error ?? null,
-            last_connected: status === 'connected' ? Date.now() : current.last_connected,
-        },
+    const current = connections.value;
+    const prev = current[exchange_id];
+    const next: ExchangeState = {
+        status,
+        error: error ?? null,
+        last_connected: status === 'connected' ? Date.now() : prev.last_connected,
     };
+
+    if (
+        prev.status === next.status &&
+        prev.error === next.error &&
+        prev.last_connected === next.last_connected
+    ) {
+        return;
+    }
+
+    const updated = Object.assign({}, current);
+    updated[exchange_id] = next;
+    connections.value = updated;
 }
 
 export function get_connection_status(exchange_id: ExchangeId): ConnectionStatus {
@@ -291,14 +301,29 @@ export function clear_ticker_signals() {
     ticker_signals.clear();
 }
 
+export function clear_exchange_ticker_signals(exchange_id: ExchangeId) {
+    const prefix = `${exchange_id}:`;
+    for (const key of ticker_signals.keys()) {
+        if (key.startsWith(prefix)) {
+            ticker_signals.delete(key);
+        }
+    }
+}
+
 export const circulating_supply = signal<Record<string, number>>({});
 
 let market_cap_last_fetch = 0;
 let market_cap_fetch_promise: Promise<void> | null = null;
+let market_cap_abort_controller: AbortController | null = null;
 
 async function fetch_circulating_supply(): Promise<void> {
     const token = get_token();
     if (!token) return;
+
+    if (market_cap_abort_controller) {
+        market_cap_abort_controller.abort();
+    }
+    market_cap_abort_controller = new AbortController();
 
     try {
         const response = await fetch(`${config.api_base_url}/v1/data/market-caps`, {
@@ -306,6 +331,7 @@ async function fetch_circulating_supply(): Promise<void> {
                 Authorization: `Bearer ${token}`,
                 'Accept-Encoding': 'gzip',
             },
+            signal: market_cap_abort_controller.signal,
         });
 
         if (!response.ok) return;
@@ -319,7 +345,12 @@ async function fetch_circulating_supply(): Promise<void> {
 
         circulating_supply.value = supply_map;
         market_cap_last_fetch = Date.now();
-    } catch {}
+    } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        console.error('failed to fetch circulating supply:', (err as Error).message);
+    } finally {
+        market_cap_abort_controller = null;
+    }
 }
 
 export function get_circulating_supply(base_symbol: string): number | null {
@@ -334,4 +365,27 @@ export function ensure_circulating_supply_loaded(): void {
     market_cap_fetch_promise = fetch_circulating_supply().finally(() => {
         market_cap_fetch_promise = null;
     });
+}
+
+export const symbol_leverage =
+    signal<Record<ExchangeId, Record<string, number>>>(create_empty_map());
+
+export function set_symbol_leverages(
+    exchange_id: ExchangeId,
+    leverages: Record<string, number>
+): void {
+    const current = symbol_leverage.value[exchange_id];
+    symbol_leverage.value = {
+        ...symbol_leverage.value,
+        [exchange_id]: { ...current, ...leverages },
+    };
+}
+
+export function get_symbol_leverage(exchange_id: ExchangeId, symbol: string): number | null {
+    return symbol_leverage.value[exchange_id]?.[symbol] ?? null;
+}
+
+export function get_missing_leverage_symbols(exchange_id: ExchangeId, symbols: string[]): string[] {
+    const cached = symbol_leverage.value[exchange_id] ?? {};
+    return symbols.filter((s) => !(s in cached));
 }

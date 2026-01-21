@@ -3,6 +3,7 @@ import { Check, Copy, Download, X } from 'lucide-preact';
 import { pnl_card_data, hide_pnl_card } from '@/stores/pnl_card_store';
 import { get_market, get_ticker_signal } from '@/stores/exchange_store';
 import { format_price } from '@/utils/format';
+import { calculate_position_pnl } from '@/utils/pnl';
 import {
     init_pnl_card_assets,
     render_pnl_card,
@@ -55,10 +56,14 @@ export function PnlCardModal() {
         const last_price = ticker?.last_price ?? position.last_price;
 
         const is_long = position.side === 'long';
-        const pnl = is_long
-            ? (last_price - position.entry_price) * position.size
-            : (position.entry_price - last_price) * position.size;
-        const pnl_pct = position.margin > 0 ? (pnl / position.margin) * 100 : 0;
+        const { pnl, pnl_pct } = calculate_position_pnl(
+            is_long,
+            position.entry_price,
+            last_price,
+            position.size,
+            position.margin,
+            position.leverage
+        );
 
         return {
             symbol: get_clean_symbol(market, position.symbol),
@@ -71,6 +76,9 @@ export function PnlCardModal() {
             is_realized: false,
         };
     }, [data]);
+
+    const get_render_data_ref = useRef(get_render_data);
+    get_render_data_ref.current = get_render_data;
 
     useEffect(() => {
         if (!data) return;
@@ -92,19 +100,21 @@ export function PnlCardModal() {
 
         let raf_id: number;
         let last_draw = 0;
+        let is_active = true;
         const frame_interval =
             data?.type === 'position' ? PNL_CARD_CONSTANTS.LIVE_UPDATE_FRAME_INTERVAL_MS : 0;
+        const is_live = data?.type === 'position';
 
         const draw = (timestamp: number) => {
-            if (!canvas_ref.current) return;
+            if (!is_active || !canvas_ref.current) return;
 
             if (timestamp - last_draw >= frame_interval) {
-                const rd = get_render_data();
+                const rd = get_render_data_ref.current();
                 if (rd) render_pnl_card(canvas_ref.current, rd);
                 last_draw = timestamp;
             }
 
-            if (data?.type === 'position') {
+            if (is_live) {
                 raf_id = requestAnimationFrame(draw);
             }
         };
@@ -112,9 +122,10 @@ export function PnlCardModal() {
         raf_id = requestAnimationFrame(draw);
 
         return () => {
+            is_active = false;
             if (raf_id) cancelAnimationFrame(raf_id);
         };
-    }, [loading, data, get_render_data]);
+    }, [loading, data?.type]);
 
     useEffect(() => {
         const handle_escape = (e: KeyboardEvent) => {

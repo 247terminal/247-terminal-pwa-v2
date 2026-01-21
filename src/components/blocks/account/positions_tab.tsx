@@ -20,6 +20,7 @@ import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 import { get_exchange_icon } from '../../common/exchanges';
 import { format_price, format_size } from '../../../utils/format';
 import { format_pnl, format_pct, format_usd, mask_value } from '../../../utils/account_format';
+import { calculate_position_pnl } from '../../../utils/pnl';
 import { SortHeader } from './sort_header';
 
 const PositionRow = memo(function PositionRow({ position, is_private }: PositionRowProps) {
@@ -30,10 +31,14 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
 
     const ticker = get_ticker_signal(position.exchange, position.symbol).value;
     const last_price = ticker?.last_price ?? position.last_price;
-    const pnl = is_long
-        ? (last_price - position.entry_price) * position.size
-        : (position.entry_price - last_price) * position.size;
-    const pnl_pct = position.margin > 0 ? (pnl / position.margin) * 100 : 0;
+    const { pnl, pnl_pct } = calculate_position_pnl(
+        is_long,
+        position.entry_price,
+        last_price,
+        position.size,
+        position.margin,
+        position.leverage
+    );
     const pnl_color = pnl >= 0 ? 'text-success' : 'text-error';
 
     const handle_close = useCallback(() => {

@@ -883,11 +883,13 @@ Auth: EIP-712 signature (r, s, v) + nonce
 ### Phase 1.0 - Store Setup ✅ DONE
 
 **Files:**
+
 - `src/stores/account_store.ts` - Signals for balances, positions, orders
 - `src/types/trading.types.ts` - Balance, PositionMode, MarginMode types
 - `src/types/account.types.ts` - Position, Order types
 
 **Architecture:**
+
 ```
 account_store.ts
 ├── balances: Map<ExchangeId, Balance>
@@ -900,12 +902,14 @@ account_store.ts
 ### Phase 1.1 - Exchange Connection ✅ DONE
 
 **Files:**
+
 - `src/services/exchange/account_bridge.ts` - postMessage wrapper, same API as before
 - `src/workers/account_worker.ts` - CCXT instance management (runs in worker)
 - `src/workers/adapters/` - Exchange-specific adapters (binance, bybit, blofin, hyperliquid)
 - `src/services/exchange/validators/` - Credential validation per exchange
 
 **Flow:**
+
 1. `init_exchange(exchange_id, credentials)` - Sends credentials to worker, creates CCXT instance
 2. `fetch_account_config(exchange_id)` - Gets position_mode (hedge/one_way) from exchange API
 3. Position mode auto-detected via API (no manual toggle needed)
@@ -914,10 +918,12 @@ account_store.ts
 ### Phase 1.2 - Market Data Extension ✅ DONE (via existing markets fetch)
 
 **Files:**
+
 - `src/workers/exchange.worker.ts` - Fetches markets via CCXT
 - `src/stores/exchange_store.ts` - Stores in `markets` signal
 
 **Already fetched per symbol:**
+
 - `min_qty`, `max_qty`, `qty_step` from `market.limits.amount`
 - `tick_size` from `market.precision.price`
 - `contract_size`, `max_leverage`
@@ -927,11 +933,13 @@ account_store.ts
 ### Phase 1.3 - Balance Fetch ✅ DONE
 
 **Files:**
+
 - `src/services/exchange/account_bridge.ts` - `fetch_balance()` sends message to worker
 - `src/workers/account_worker.ts` - `handle_fetch_balance()` calls CCXT in worker
 - `src/stores/account_store.ts` - `refresh_balance()`, `update_balance()`
 
 **Flow:**
+
 1. `fetch_balance(exchange_id)` sends postMessage to worker
 2. Worker calls CCXT `fetchBalance()`, maps to `{ total, available, used, currency }`
 3. Worker returns result via postMessage
@@ -942,43 +950,78 @@ account_store.ts
 ### Phase 1.4 - Position Fetch ✅ DONE
 
 **Files:**
+
 - `src/services/exchange/account_bridge.ts` - `fetch_positions()` sends message to worker
 - `src/workers/account_worker.ts` - `handle_fetch_positions()` calls CCXT in worker
 - `src/workers/adapters/` - Exchange-specific position mapping
 - `src/stores/account_store.ts` - `refresh_positions()`, `update_positions_batch()`
 
 **Position mapping:**
+
 ```typescript
 {
-  id, exchange, symbol, side, size, entry_price, last_price,
-  liquidation_price, unrealized_pnl, unrealized_pnl_pct,
-  margin, leverage, margin_mode, updated_at
+    (id,
+        exchange,
+        symbol,
+        side,
+        size,
+        entry_price,
+        last_price,
+        liquidation_price,
+        unrealized_pnl,
+        unrealized_pnl_pct,
+        margin,
+        leverage,
+        margin_mode,
+        updated_at);
 }
 ```
 
 ### Phase 1.5 - Order Fetch ✅ DONE
 
 **Files:**
+
 - `src/services/exchange/account_bridge.ts` - `fetch_orders()` sends message to worker
 - `src/workers/account_worker.ts` - `handle_fetch_orders()` calls CCXT in worker
 - `src/workers/adapters/` - Exchange-specific order mapping
 - `src/stores/account_store.ts` - `refresh_orders()`, `update_orders_batch()`
 
 **Order mapping:**
+
 ```typescript
 {
-  id, exchange, symbol, side, type, size, price, filled, status, created_at
+    (id, exchange, symbol, side, type, size, price, filled, status, created_at);
 }
 ```
 
 **Combined refresh:** `refresh_account(exchange_id)` fetches all three in parallel
 
-### Phase 2.0 - Leverage Management
+### Phase 2.0 - Leverage Management ✅ DONE
 
-1. Fetch current leverage per symbol on connect
-2. Store in `symbol_settings[symbol].leverage`
-3. Implement `set_leverage(exchange, symbol, leverage)`
-4. Call before order placement
+**Implemented:** Leverage fetching for trade history ROI calculation
+
+**Files:**
+
+- `src/workers/adapters/binance.ts` - `fetch_leverage_settings()` via `fapiPrivateGetSymbolConfig`
+- `src/workers/adapters/blofin.ts` - `fetch_leverage_settings()` via `privateGetAccountBatchLeverageInfo` (batches of 20)
+- `src/workers/adapters/hyperliquid.ts` - `fetch_leverage_settings()` via `activeAssetData` per coin
+- `src/stores/exchange_store.ts` - `symbol_leverage` signal, `get/set_symbol_leverages()`, `get_missing_leverage_symbols()`
+- `src/services/exchange/account_bridge.ts` - `fetch_leverage_settings()` bridge function
+- `src/workers/exchange.worker.ts` - `FETCH_LEVERAGE_SETTINGS` message handler
+- `src/components/blocks/account/history_tab.tsx` - Fetches leverage on mount for history symbols
+
+**Flow:**
+
+1. When history tab opens, `fetch_missing_leverages()` identifies symbols without cached leverage
+2. For each exchange (except Bybit which returns leverage in closed PnL), fetches leverage settings
+3. Stores in `symbol_leverage` signal (persists until page reload)
+4. HistoryRow recalculates ROI using fetched leverage: `roi = price_change_pct * leverage`
+
+**Note:** Bybit's closed position API already includes leverage, so no separate fetch needed.
+
+**TODO (future):**
+
+1. Implement `set_leverage(exchange, symbol, leverage)` for setting leverage from trade block or settings
 
 ### Phase 2.1 - Market Order Placement
 
@@ -1055,10 +1098,10 @@ async function handle_test() {
     update_exchange_credentials(exchange_id, { ...creds, connected: true });
 
     // 4. Load market data (fire-and-forget)
-    load_exchange(exchange_id);  // markets, tickers, funding → exchange_store
+    load_exchange(exchange_id); // markets, tickers, funding → exchange_store
 
     // 5. Fetch account data (fire-and-forget)
-    refresh_account(exchange_id);  // balance, positions, orders → account_store
+    refresh_account(exchange_id); // balance, positions, orders → account_store
 }
 ```
 
@@ -1082,7 +1125,7 @@ async function init_exchanges() {
 
     // 4. Load market data for connected (or all if none connected)
     for (const ex of exchanges_to_load) {
-        load_exchange(ex);  // markets, tickers, funding, start ticker stream
+        load_exchange(ex); // markets, tickers, funding, start ticker stream
     }
 }
 ```

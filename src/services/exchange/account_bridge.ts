@@ -16,7 +16,7 @@ interface AccountData {
     orders: Order[];
 }
 
-interface ExchangeCredentials {
+interface ExchangeAuthParams {
     api_key?: string;
     api_secret?: string;
     passphrase?: string;
@@ -70,7 +70,7 @@ function dedupeRequest<T>(key: string, fn: () => Promise<T>): Promise<T> {
 
 export async function init_exchange(
     exchangeId: ExchangeId,
-    credentials: ExchangeCredentials
+    credentials: ExchangeAuthParams
 ): Promise<void> {
     getWorker();
     await sendRequest<{ initialized: boolean }>('INIT_EXCHANGE', {
@@ -89,7 +89,9 @@ export async function destroy_exchange(exchangeId: ExchangeId): Promise<void> {
 
 export function destroy_all_exchanges(): void {
     for (const exchangeId of initializedExchanges) {
-        sendRequest<{ destroyed: boolean }>('DESTROY_EXCHANGE', { exchangeId }).catch(() => {});
+        sendRequest<{ destroyed: boolean }>('DESTROY_EXCHANGE', { exchangeId }).catch((err) => {
+            console.error('failed to destroy exchange:', exchangeId, (err as Error).message);
+        });
     }
     initializedExchanges.clear();
     marketMapCache.clear();
@@ -138,5 +140,16 @@ export function fetch_closed_positions(
 ): Promise<TradeHistory[]> {
     return dedupeRequest(`closed:${exchangeId}`, () =>
         sendRequest<TradeHistory[]>('FETCH_CLOSED_POSITIONS', { exchangeId, limit })
+    );
+}
+
+export function fetch_leverage_settings(
+    exchangeId: ExchangeId,
+    symbols: string[]
+): Promise<Record<string, number>> {
+    if (symbols.length === 0) return Promise.resolve({});
+    const key = `leverage:${exchangeId}:${symbols.sort().join(',')}`;
+    return dedupeRequest(key, () =>
+        sendRequest<Record<string, number>>('FETCH_LEVERAGE_SETTINGS', { exchangeId, symbols })
     );
 }

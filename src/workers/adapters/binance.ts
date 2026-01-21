@@ -59,6 +59,34 @@ interface BinanceTrade {
     time: number;
 }
 
+interface BinanceSymbolConfig {
+    symbol: string;
+    marginType: string;
+    isAutoAddMargin: string;
+    leverage: number;
+    maxNotionalValue: string;
+}
+
+function is_balance_array(data: unknown): data is BinanceBalance[] {
+    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.asset === 'string');
+}
+
+function is_position_array(data: unknown): data is BinancePosition[] {
+    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.symbol === 'string');
+}
+
+function is_order_array(data: unknown): data is BinanceOrder[] {
+    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.orderId === 'string');
+}
+
+function is_trade_array(data: unknown): data is BinanceTrade[] {
+    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.orderId === 'string');
+}
+
+function is_symbol_config_array(data: unknown): data is BinanceSymbolConfig[] {
+    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.symbol === 'string');
+}
+
 export async function fetch_position_mode(exchange: BinanceExchange): Promise<'hedge' | 'one_way'> {
     try {
         const response = await exchange.fapiPrivateGetPositionSideDual();
@@ -75,8 +103,8 @@ export async function fetch_balance(exchange: BinanceExchange): Promise<{
     currency: string;
     last_updated: number;
 } | null> {
-    const response = (await exchange.fapiPrivateV2GetBalance()) as BinanceBalance[];
-    if (!Array.isArray(response)) return null;
+    const response = await exchange.fapiPrivateV2GetBalance();
+    if (!is_balance_array(response)) return null;
 
     let total = 0;
     let available = 0;
@@ -110,8 +138,8 @@ export async function fetch_balance(exchange: BinanceExchange): Promise<{
 }
 
 export async function fetch_positions(exchange: BinanceExchange): Promise<RawPosition[]> {
-    const response = (await exchange.fapiPrivateV2GetPositionRisk()) as BinancePosition[];
-    if (!Array.isArray(response)) return [];
+    const response = await exchange.fapiPrivateV2GetPositionRisk();
+    if (!is_position_array(response)) return [];
     return response.map((p) => {
         const positionAmt = Number(p.positionAmt);
         return {
@@ -130,12 +158,14 @@ export async function fetch_positions(exchange: BinanceExchange): Promise<RawPos
 }
 
 export async function fetch_orders(exchange: BinanceExchange): Promise<RawOrder[]> {
-    const [regular, algo] = await Promise.all([
-        exchange.fapiPrivateGetOpenOrders() as Promise<BinanceOrder[]>,
-        (exchange.fapiPrivateGetOpenAlgoOrders() as Promise<BinanceAlgoOrder[]>).catch(() => []),
+    const [regularRaw, algoRaw] = await Promise.all([
+        exchange.fapiPrivateGetOpenOrders(),
+        exchange.fapiPrivateGetOpenAlgoOrders().catch(() => []),
     ]);
-    const regularLen = Array.isArray(regular) ? regular.length : 0;
-    const algoLen = Array.isArray(algo) ? algo.length : 0;
+    const regular = is_order_array(regularRaw) ? regularRaw : [];
+    const algo = Array.isArray(algoRaw) ? (algoRaw as BinanceAlgoOrder[]) : [];
+    const regularLen = regular.length;
+    const algoLen = algo.length;
     const result: RawOrder[] = new Array(regularLen + algoLen);
     let idx = 0;
     for (let i = 0; i < regularLen; i++) {
@@ -175,10 +205,11 @@ export async function fetch_closed_positions(
     exchange: BinanceExchange,
     limit: number
 ): Promise<RawClosedPosition[]> {
-    const trades = (await exchange.fapiPrivateGetUserTrades({
+    const tradesRaw = await exchange.fapiPrivateGetUserTrades({
         limit: Math.min(limit * 10, 1000),
-    })) as BinanceTrade[];
-    if (!Array.isArray(trades)) return [];
+    });
+    if (!is_trade_array(tradesRaw)) return [];
+    const trades = tradesRaw;
 
     const order_map: Record<
         string,
@@ -227,9 +258,10 @@ export async function fetch_closed_positions(
     }
 
     const closed: RawClosedPosition[] = [];
+    const order_values = Object.values(order_map);
 
-    for (const order_id in order_map) {
-        const o = order_map[order_id];
+    for (let i = 0; i < order_values.length; i++) {
+        const o = order_values[i];
 
         if (!o.is_closing) continue;
 
@@ -256,8 +288,31 @@ export async function fetch_closed_positions(
             exit_price,
             realized_pnl: o.total_pnl,
             close_time: o.time,
+            leverage: 1,
         });
     }
 
     return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
+}
+
+export async function fetch_leverage_settings(
+    exchange: BinanceExchange,
+    symbols?: string[]
+): Promise<Record<string, number>> {
+    try {
+        const response = await exchange.fapiPrivateGetSymbolConfig();
+        if (!is_symbol_config_array(response)) return {};
+
+        const result: Record<string, number> = {};
+        for (const item of response) {
+            const symbol = normalize_symbol(item.symbol);
+            if (!symbols || symbols.includes(symbol)) {
+                result[symbol] = item.leverage || 1;
+            }
+        }
+        return result;
+    } catch (err) {
+        console.error('failed to fetch binance leverage settings:', (err as Error).message);
+        return {};
+    }
 }

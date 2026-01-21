@@ -57,10 +57,40 @@ interface BlofinFillResponse {
     }>;
 }
 
+interface BlofinLeverageResponse {
+    data?: Array<{
+        instId: string;
+        leverage: string;
+        marginMode: string;
+        positionSide: string;
+    }>;
+}
+
+function is_position_response(data: unknown): data is BlofinPositionResponse {
+    return data !== null && typeof data === 'object' && 'data' in data;
+}
+
+function is_balance_response(data: unknown): data is BlofinBalanceResponse {
+    return data !== null && typeof data === 'object' && 'data' in data;
+}
+
+function is_order_response(data: unknown): data is BlofinOrderResponse {
+    return data !== null && typeof data === 'object' && 'data' in data;
+}
+
+function is_fill_response(data: unknown): data is BlofinFillResponse {
+    return data !== null && typeof data === 'object' && 'data' in data;
+}
+
+function is_leverage_response(data: unknown): data is BlofinLeverageResponse {
+    return data !== null && typeof data === 'object' && 'data' in data;
+}
+
 export async function fetch_position_mode(exchange: BlofinExchange): Promise<'hedge' | 'one_way'> {
     try {
-        const response = (await exchange.privateGetAccountPositions()) as BlofinPositionResponse;
-        const data = response?.data;
+        const response = await exchange.privateGetAccountPositions();
+        if (!is_position_response(response)) return 'one_way';
+        const data = response.data;
         if (!Array.isArray(data)) return 'one_way';
         const has_hedge = data.some((p) => p.positionSide === 'long' || p.positionSide === 'short');
         return has_hedge ? 'hedge' : 'one_way';
@@ -76,8 +106,9 @@ export async function fetch_balance(exchange: BlofinExchange): Promise<{
     currency: string;
     last_updated: number;
 } | null> {
-    const response = (await exchange.privateGetAccountBalance()) as BlofinBalanceResponse;
-    const data = response?.data;
+    const response = await exchange.privateGetAccountBalance();
+    if (!is_balance_response(response)) return null;
+    const data = response.data;
     if (!data) return null;
 
     const total = parseFloat(data.totalEquity || '0');
@@ -98,8 +129,9 @@ export async function fetch_balance(exchange: BlofinExchange): Promise<{
 }
 
 export async function fetch_positions(exchange: BlofinExchange): Promise<RawPosition[]> {
-    const response = (await exchange.privateGetAccountPositions()) as BlofinPositionResponse;
-    const data = response?.data;
+    const response = await exchange.privateGetAccountPositions();
+    if (!is_position_response(response)) return [];
+    const data = response.data;
     if (!Array.isArray(data)) return [];
     return data.map((p) => ({
         symbol: p.instId.replace(/-/g, '/') + ':USDT',
@@ -116,8 +148,9 @@ export async function fetch_positions(exchange: BlofinExchange): Promise<RawPosi
 }
 
 export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]> {
-    const response = (await exchange.privateGetTradeOrdersPending()) as BlofinOrderResponse;
-    const data = response?.data;
+    const response = await exchange.privateGetTradeOrdersPending();
+    if (!is_order_response(response)) return [];
+    const data = response.data;
     if (!Array.isArray(data)) return [];
     return data.map((o) => ({
         symbol: o.instId.replace(/-/g, '/') + ':USDT',
@@ -144,10 +177,11 @@ export async function fetch_closed_positions(
     limit: number,
     contract_values?: Record<string, number>
 ): Promise<RawClosedPosition[]> {
-    const response = (await exchange.privateGetTradeFillsHistory({
+    const response = await exchange.privateGetTradeFillsHistory({
         limit: String(limit * 5),
-    })) as BlofinFillResponse;
-    const data = response?.data;
+    });
+    if (!is_fill_response(response)) return [];
+    const data = response.data;
     if (!Array.isArray(data)) return [];
 
     const sorted_fills = [...data].sort((a, b) => Number(a.ts) - Number(b.ts));
@@ -217,6 +251,7 @@ export async function fetch_closed_positions(
                         exit_price: fill_price,
                         realized_pnl: pos.total_pnl,
                         close_time: fill_time,
+                        leverage: 1,
                     });
 
                     const excess = fill_amount - close_size;
@@ -237,4 +272,44 @@ export async function fetch_closed_positions(
     }
 
     return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
+}
+
+function from_blofin_inst_id(instId: string): string {
+    return instId.replace(/-/g, '/') + ':USDT';
+}
+
+export async function fetch_leverage_settings(
+    exchange: BlofinExchange,
+    symbols: string[]
+): Promise<Record<string, number>> {
+    if (symbols.length === 0) return {};
+
+    const result: Record<string, number> = {};
+    const batch_size = 20;
+
+    try {
+        for (let i = 0; i < symbols.length; i += batch_size) {
+            const batch = symbols.slice(i, i + batch_size);
+            const inst_ids = batch.map((s) => {
+                const base = s.split('/')[0];
+                return `${base}-USDT`;
+            });
+
+            const response = await exchange.privateGetAccountBatchLeverageInfo({
+                instId: inst_ids.join(','),
+                marginMode: 'cross',
+            });
+
+            if (is_leverage_response(response) && Array.isArray(response.data)) {
+                for (const item of response.data) {
+                    const symbol = from_blofin_inst_id(item.instId);
+                    result[symbol] = parseFloat(item.leverage) || 1;
+                }
+            }
+        }
+    } catch (err) {
+        console.error('failed to fetch blofin leverage settings:', (err as Error).message);
+    }
+
+    return result;
 }

@@ -18,7 +18,7 @@ import {
 } from './adapters';
 import type { ExchangeId, CcxtExchange } from '@/types/worker.types';
 
-export interface ExchangeCredentials {
+export interface ExchangeAuthParams {
     api_key?: string;
     api_secret?: string;
     passphrase?: string;
@@ -57,7 +57,7 @@ function getProxyOptions(exchangeId: ExchangeId): {
 
 export function createAuthenticatedExchange(
     exchangeId: ExchangeId,
-    credentials: ExchangeCredentials
+    credentials: ExchangeAuthParams
 ): CcxtExchange {
     const proxyOptions = getProxyOptions(exchangeId);
 
@@ -351,10 +351,12 @@ function mapClosedPosition(
     close_price: number;
     realized_pnl: number;
     realized_pnl_pct: number;
+    leverage: number;
     closed_at: number;
 } {
-    const pnl_pct =
+    const price_change_pct =
         raw.entry_price > 0 ? ((raw.exit_price - raw.entry_price) / raw.entry_price) * 100 : 0;
+    const roi_pct = price_change_pct * raw.leverage;
 
     return {
         id: `${exchangeId}-${raw.symbol}-${raw.close_time}-${idx}`,
@@ -365,7 +367,8 @@ function mapClosedPosition(
         entry_price: raw.entry_price,
         close_price: raw.exit_price,
         realized_pnl: raw.realized_pnl,
-        realized_pnl_pct: raw.side === 'long' ? pnl_pct : -pnl_pct,
+        realized_pnl_pct: raw.side === 'long' ? roi_pct : -roi_pct,
+        leverage: raw.leverage,
         closed_at: raw.close_time,
     };
 }
@@ -408,6 +411,40 @@ export async function fetchClosedPositions(
     } catch (err) {
         console.error(`failed to fetch ${exchangeId} closed positions:`, (err as Error).message);
         return [];
+    }
+}
+
+export async function fetchLeverageSettings(
+    exchangeId: ExchangeId,
+    symbols: string[]
+): Promise<Record<string, number>> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.fetch_leverage_settings(
+                    exchange as BinanceExchange,
+                    symbols
+                );
+            case 'blofin':
+                return await blofinAdapter.fetch_leverage_settings(
+                    exchange as BlofinExchange,
+                    symbols
+                );
+            case 'hyperliquid':
+                return await hyperliquidAdapter.fetch_leverage_settings(
+                    exchange as HyperliquidExchange,
+                    symbols
+                );
+            case 'bybit':
+                return {};
+            default:
+                return {};
+        }
+    } catch (err) {
+        console.error(`failed to fetch ${exchangeId} leverage settings:`, (err as Error).message);
+        return {};
     }
 }
 

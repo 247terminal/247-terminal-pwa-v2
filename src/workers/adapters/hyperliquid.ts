@@ -1,6 +1,6 @@
 import type hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
 import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
-import { HYPERLIQUID_CACHE_TTL } from '@/config';
+import { HYPERLIQUID_CACHE_TTL, EXCHANGE_CONFIG } from '@/config';
 
 export type HyperliquidExchange = InstanceType<typeof hyperliquid>;
 
@@ -41,6 +41,25 @@ interface UserFill {
     dir: string;
 }
 
+interface ActiveAssetData {
+    leverage?: {
+        type?: string;
+        value?: number;
+    };
+}
+
+function is_clearinghouse_state(data: unknown): data is ClearinghouseState {
+    return data !== null && typeof data === 'object';
+}
+
+function is_open_orders_array(data: unknown): data is OpenOrder[] {
+    return Array.isArray(data);
+}
+
+function is_user_fills_array(data: unknown): data is UserFill[] {
+    return Array.isArray(data);
+}
+
 let cached_state: { wallet: string; data: ClearinghouseState; timestamp: number } | null = null;
 let pending_fetch: Promise<ClearinghouseState | null> | null = null;
 
@@ -63,11 +82,12 @@ async function get_clearinghouse_state(
 
     pending_fetch = (async () => {
         try {
-            const response = (await exchange.publicPostInfo({
+            const response = await exchange.publicPostInfo({
                 type: 'clearinghouseState',
                 user: wallet,
-            })) as ClearinghouseState;
+            });
 
+            if (!is_clearinghouse_state(response)) return null;
             cached_state = { wallet, data: response, timestamp: Date.now() };
             return response;
         } finally {
@@ -132,11 +152,11 @@ export async function fetch_positions(exchange: HyperliquidExchange): Promise<Ra
 export async function fetch_orders(exchange: HyperliquidExchange): Promise<RawOrder[]> {
     const wallet = exchange.walletAddress;
     if (!wallet) return [];
-    const response = (await exchange.publicPostInfo({
+    const response = await exchange.publicPostInfo({
         type: 'openOrders',
         user: wallet,
-    })) as OpenOrder[];
-    if (!Array.isArray(response)) return [];
+    });
+    if (!is_open_orders_array(response)) return [];
     return response.map((o) => ({
         symbol: `${o.coin}/USDC:USDC`,
         id: String(o.oid),
@@ -156,11 +176,11 @@ export async function fetch_closed_positions(
     const wallet = exchange.walletAddress;
     if (!wallet) return [];
 
-    const response = (await exchange.publicPostInfo({
+    const response = await exchange.publicPostInfo({
         type: 'userFills',
         user: wallet,
-    })) as UserFill[];
-    if (!Array.isArray(response)) return [];
+    });
+    if (!is_user_fills_array(response)) return [];
 
     const closed: RawClosedPosition[] = [];
 
@@ -189,8 +209,43 @@ export async function fetch_closed_positions(
             exit_price: price,
             realized_pnl: pnl,
             close_time: time,
+            leverage: 1,
         });
     }
 
     return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
+}
+
+const HYPERLIQUID_INFO_URL = `${EXCHANGE_CONFIG.hyperliquid.restUrl}/info`;
+
+export async function fetch_leverage_settings(
+    exchange: HyperliquidExchange,
+    symbols: string[]
+): Promise<Record<string, number>> {
+    const wallet = exchange.walletAddress;
+    if (!wallet || symbols.length === 0) return {};
+
+    const leverages: Record<string, number> = {};
+
+    const requests = symbols.map(async (symbol) => {
+        const coin = symbol.split('/')[0];
+        const response = await fetch(HYPERLIQUID_INFO_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'activeAssetData', user: wallet, coin }),
+        });
+        if (!response.ok) return null;
+        const data = (await response.json()) as ActiveAssetData;
+        return { symbol, leverage: data?.leverage?.value };
+    });
+
+    const results = await Promise.allSettled(requests);
+
+    for (const result of results) {
+        if (result.status === 'fulfilled' && result.value?.leverage) {
+            leverages[result.value.symbol] = result.value.leverage;
+        }
+    }
+
+    return leverages;
 }

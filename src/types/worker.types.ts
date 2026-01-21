@@ -340,4 +340,5 @@ export interface RawClosedPosition {
     exit_price: number;
     realized_pnl: number;
     close_time: number;
+    leverage: number;
 }
