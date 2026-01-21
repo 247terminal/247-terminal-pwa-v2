@@ -13,6 +13,10 @@ import {
     type FundingInfo,
 } from '../types/exchange.types';
 import type { MarketData } from '../services/exchange/chart_data';
+import type { MarketCapData } from '../types/chart.types';
+import { get_token } from '../services/auth/session.service';
+import { config } from '../config';
+import { MARKET_CAP_CONSTANTS } from '../config/chart.constants';
 
 export type { TickerData, TickerUpdate, StreamTickerUpdate, BidAskUpdate, PriceUpdate };
 
@@ -285,4 +289,49 @@ export function has_markets(exchange_id: ExchangeId): boolean {
 
 export function clear_ticker_signals() {
     ticker_signals.clear();
+}
+
+export const circulating_supply = signal<Record<string, number>>({});
+
+let market_cap_last_fetch = 0;
+let market_cap_fetch_promise: Promise<void> | null = null;
+
+async function fetch_circulating_supply(): Promise<void> {
+    const token = get_token();
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${config.api_base_url}/v1/data/market-caps`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Accept-Encoding': 'gzip',
+            },
+        });
+
+        if (!response.ok) return;
+
+        const data: MarketCapData[] = await response.json();
+        const supply_map: Record<string, number> = {};
+
+        for (const item of data) {
+            supply_map[item.symbol] = item.circulatingSupply;
+        }
+
+        circulating_supply.value = supply_map;
+        market_cap_last_fetch = Date.now();
+    } catch {}
+}
+
+export function get_circulating_supply(base_symbol: string): number | null {
+    return circulating_supply.value[base_symbol] ?? null;
+}
+
+export function ensure_circulating_supply_loaded(): void {
+    const now = Date.now();
+    if (now - market_cap_last_fetch < MARKET_CAP_CONSTANTS.CACHE_TTL_MS) return;
+    if (market_cap_fetch_promise) return;
+
+    market_cap_fetch_promise = fetch_circulating_supply().finally(() => {
+        market_cap_fetch_promise = null;
+    });
 }

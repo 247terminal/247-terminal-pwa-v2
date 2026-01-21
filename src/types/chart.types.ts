@@ -60,8 +60,8 @@ export interface TradingChartProps {
     timeframe?: string;
     volume_visible?: boolean;
     grid_visible?: boolean;
-    on_volume_toggle?: (visible: boolean) => void;
-    on_grid_toggle?: (visible: boolean) => void;
+    on_volume_toggle?: () => void;
+    on_grid_toggle?: () => void;
 }
 
 export interface ToggleButtonProps {
@@ -86,4 +86,9 @@ export type FlashDirection = 'up' | 'down' | null;
 export interface TickerInfoProps {
     exchange: ExchangeId;
     symbol: string;
+}
+
+export interface MarketCapData {
+    symbol: string;
+    circulatingSupply: number;
 }

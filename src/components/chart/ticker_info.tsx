@@ -1,9 +1,17 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import { memo } from 'preact/compat';
 import { effect } from '@preact/signals';
-import { get_ticker_signal, get_market } from '../../stores/exchange_store';
-import { format_price } from '../../utils/format';
+import {
+    get_ticker_signal,
+    get_market,
+    get_circulating_supply,
+    ensure_circulating_supply_loaded,
+    circulating_supply as circulating_supply_signal,
+} from '../../stores/exchange_store';
+import { format_price, format_market_cap } from '../../utils/format';
 import { format_change } from './symbol_row';
 import type { FlashDirection, TickerInfoProps } from '../../types/chart.types';
+import { TICKER_CONSTANTS } from '../../config/chart.constants';
 
 function format_funding_rate(rate: number | null): { text: string; positive: boolean } {
     if (rate === null) return { text: '-', positive: true };
@@ -22,12 +30,27 @@ function format_countdown(next_funding_time: number | null): string {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
-export function TickerInfo({ exchange, symbol }: TickerInfoProps) {
+function get_base_symbol(symbol: string): string {
+    return symbol.split('/')[0];
+}
+
+export const TickerInfo = memo(function TickerInfo({ exchange, symbol }: TickerInfoProps) {
     const ticker_signal = get_ticker_signal(exchange, symbol);
     const [ticker, set_ticker] = useState(ticker_signal.value);
     const [countdown, set_countdown] = useState('');
     const [price_flash, set_price_flash] = useState<FlashDirection>(null);
+    const [circulating_supply, set_circulating_supply] = useState<number | null>(null);
     const prev_price = useRef<number | null>(null);
+
+    useEffect(() => {
+        ensure_circulating_supply_loaded();
+        const dispose = effect(() => {
+            void circulating_supply_signal.value;
+            const base = get_base_symbol(symbol);
+            set_circulating_supply(get_circulating_supply(base));
+        });
+        return dispose;
+    }, [symbol]);
 
     useEffect(() => {
         const dispose = effect(() => {
@@ -47,7 +70,10 @@ export function TickerInfo({ exchange, symbol }: TickerInfoProps) {
 
     useEffect(() => {
         if (!price_flash) return;
-        const timeout = setTimeout(() => set_price_flash(null), 3000);
+        const timeout = setTimeout(
+            () => set_price_flash(null),
+            TICKER_CONSTANTS.PRICE_FLASH_DURATION_MS
+        );
         return () => clearTimeout(timeout);
     }, [price_flash]);
 
@@ -72,6 +98,9 @@ export function TickerInfo({ exchange, symbol }: TickerInfoProps) {
     const volume =
         ticker?.volume_24h?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? '-';
     const funding = format_funding_rate(ticker?.funding_rate ?? null);
+    const market_cap_value =
+        circulating_supply && ticker?.last_price ? circulating_supply * ticker.last_price : null;
+    const market_cap = format_market_cap(market_cap_value);
 
     const price_flash_class =
         price_flash === 'up'
@@ -107,6 +136,10 @@ export function TickerInfo({ exchange, symbol }: TickerInfoProps) {
                     <span class="text-base-content/70">{countdown}</span>
                 </span>
             </div>
+            <div class="flex flex-col leading-tight">
+                <span class="text-base-content/50">Market Cap</span>
+                <span class="font-semibold tabular-nums text-base-content/70">{market_cap}</span>
+            </div>
         </div>
     );
-}
+});

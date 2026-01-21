@@ -17,3 +17,11 @@ export const GRID_CONSTANTS = {
     MARGIN: 8,
     HEADER_HEIGHT: 40,
 } as const;
+
+export const TICKER_CONSTANTS = {
+    PRICE_FLASH_DURATION_MS: 3000,
+} as const;
+
+export const MARKET_CAP_CONSTANTS = {
+    CACHE_TTL_MS: 4 * 60 * 60 * 1000,
+} as const;

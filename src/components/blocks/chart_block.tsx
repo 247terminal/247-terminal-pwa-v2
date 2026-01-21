@@ -212,19 +212,21 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
         [update_settings]
     );
 
-    const handle_volume_toggle = useCallback(
-        (visible: boolean) => {
-            update_settings({ volume_visible: visible });
-        },
-        [update_settings]
-    );
+    const handle_volume_toggle = useCallback(() => {
+        set_settings((prev) => {
+            const next = { ...prev, volume_visible: !prev.volume_visible };
+            save_chart_settings(id, next);
+            return next;
+        });
+    }, [id]);
 
-    const handle_grid_toggle = useCallback(
-        (visible: boolean) => {
-            update_settings({ grid_visible: visible });
-        },
-        [update_settings]
-    );
+    const handle_grid_toggle = useCallback(() => {
+        set_settings((prev) => {
+            const next = { ...prev, grid_visible: !prev.grid_visible };
+            save_chart_settings(id, next);
+            return next;
+        });
+    }, [id]);
 
     return (
         <div class="h-full flex flex-col group">

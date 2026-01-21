@@ -1,3 +1,5 @@
+import type { MarketData } from './chart.types';
+
 export type ExchangeId = 'binance' | 'blofin' | 'bybit' | 'hyperliquid';
 
 export type StreamState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
@@ -13,29 +15,7 @@ export interface TickerEntry {
     next_funding_time: number | null;
 }
 
-export interface OHLCV {
-    time: number;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-}
-
-export interface MarketInfo {
-    symbol: string;
-    base: string;
-    quote: string;
-    settle: string;
-    active: boolean;
-    type: string;
-    tick_size: number;
-    min_qty: number;
-    max_qty: number;
-    qty_step: number;
-    contract_size: number;
-    max_leverage: number | null;
-}
+export type MarketInfo = MarketData;
 
 export interface WorkerMessage {
     type: string;

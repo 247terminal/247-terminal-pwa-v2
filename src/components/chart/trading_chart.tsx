@@ -335,12 +335,12 @@ export function TradingChart({
     }, [menu_expanded]);
 
     const toggle_volume = useCallback(() => {
-        on_volume_toggle?.(!volume_visible);
-    }, [on_volume_toggle, volume_visible]);
+        on_volume_toggle?.();
+    }, [on_volume_toggle]);
 
     const toggle_grid = useCallback(() => {
-        on_grid_toggle?.(!grid_visible);
-    }, [on_grid_toggle, grid_visible]);
+        on_grid_toggle?.();
+    }, [on_grid_toggle]);
 
     const toggle_menu = useCallback(() => {
         set_menu_expanded((prev) => !prev);
