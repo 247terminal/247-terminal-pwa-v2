@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback } from 'preact/hooks';
-import { ChevronDown, Newspaper, DollarSign } from 'lucide-preact';
+import { ChevronDown, Newspaper, DollarSign, LogOut, Moon, Sun, Lock, LockOpen } from 'lucide-preact';
 import { use_click_outside, use_escape_key } from '@/hooks';
+import { clear_token } from '@/services/auth/session.service';
+import { current_theme, toggle_theme } from '@/hooks/use_theme';
+import { layout_locked, toggle_layout_lock } from '@/stores/layout_lock_store';
 import { NewsTradingSection } from './news_trading_section';
 import { TradingSection } from './trading_section';
 import { TerminalSection } from './terminal_section';
@@ -175,6 +178,35 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                     >
                         <BackupSection />
                     </AccordionSection>
+                </div>
+
+                <div class="px-4 py-3 flex items-center justify-between">
+                    <div class="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={toggle_theme}
+                            class="p-1.5 text-base-content/50 hover:text-base-content transition-colors"
+                        >
+                            {current_theme.value === 'terminal-dark' ? <Moon class="w-3.5 h-3.5" /> : <Sun class="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={toggle_layout_lock}
+                            class="p-1.5 text-base-content/50 hover:text-base-content transition-colors"
+                        >
+                            {layout_locked.value ? <Lock class="w-3.5 h-3.5" /> : <LockOpen class="w-3.5 h-3.5" />}
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            clear_token();
+                            window.location.reload();
+                        }}
+                        class="p-1.5 text-base-content/50 hover:text-error transition-colors"
+                    >
+                        <LogOut class="w-3.5 h-3.5" />
+                    </button>
                 </div>
             </div>
         </div>
