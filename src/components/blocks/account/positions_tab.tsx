@@ -1,6 +1,5 @@
 import { memo } from 'preact/compat';
 import { useState, useMemo, useCallback } from 'preact/hooks';
-import { useSignalEffect } from '@preact/signals';
 import { VList } from 'virtua';
 import type { Position } from '../../../types/account.types';
 import {
@@ -30,13 +29,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
     const tick_size = market?.tick_size ?? 0.01;
     const qty_step = market?.qty_step ?? 0.001;
 
-    const ticker_signal = get_ticker_signal(position.exchange, position.symbol);
-    const [ticker, set_ticker] = useState(ticker_signal.value);
-
-    useSignalEffect(() => {
-        set_ticker(ticker_signal.value);
-    });
-
+    const ticker = get_ticker_signal(position.exchange, position.symbol).value;
     const last_price = ticker?.last_price ?? position.last_price;
     const pnl = is_long
         ? (last_price - position.entry_price) * position.size
@@ -58,7 +51,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
 
     return (
         <div
-            class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
+            class="relative flex items-center px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
             role="row"
         >
             <span
@@ -66,7 +59,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 aria-hidden="true"
             />
             <div
-                class="w-24 shrink-0 flex items-center gap-1.5 cursor-pointer hover:opacity-80"
+                class="flex-1 flex items-center gap-1.5 cursor-pointer hover:opacity-80 min-w-0"
                 onClick={handle_symbol_click}
                 onKeyDown={(e) => e.key === 'Enter' && handle_symbol_click()}
                 role="button"
@@ -76,7 +69,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 <span class="text-base-content/40 shrink-0" aria-hidden="true">
                     {get_exchange_icon(position.exchange)}
                 </span>
-                <div>
+                <div class="min-w-0">
                     <div class={`font-medium truncate ${is_long ? 'text-success' : 'text-error'}`}>
                         {format_symbol(position.symbol)}
                     </div>
@@ -86,7 +79,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right" role="cell">
+            <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content">
                     {mask_value(format_usd(position.size * last_price), is_private)}
                 </div>
@@ -98,7 +91,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right" role="cell">
+            <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content/70">
                     {mask_value(format_price(position.entry_price, tick_size), is_private)}
                 </div>
@@ -107,13 +100,13 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </div>
             </div>
 
-            <div class="w-16 shrink-0 text-right text-error/70" role="cell">
+            <div class="flex-1 text-right text-error/70" role="cell">
                 {position.liquidation_price
                     ? mask_value(format_price(position.liquidation_price, tick_size), is_private)
                     : '-'}
             </div>
 
-            <div class={`w-20 shrink-0 text-right ${pnl_color}`} role="cell">
+            <div class={`flex-1 text-right ${pnl_color}`} role="cell">
                 <div>{mask_value(format_pnl(pnl), is_private)}</div>
                 <div class="text-[10px] opacity-70">
                     {mask_value(format_pct(pnl_pct), is_private)}
@@ -204,7 +197,7 @@ export function PositionsTab() {
     return (
         <div class="flex-1 flex flex-col overflow-hidden" role="table" aria-label="Open positions">
             <div
-                class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 bg-base-200"
+                class="flex items-center px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 bg-base-200"
                 role="row"
             >
                 <SortHeader
@@ -213,7 +206,7 @@ export function PositionsTab() {
                     current_key={sort_key}
                     direction={sort_direction}
                     on_sort={handle_sort}
-                    width="w-24"
+                    flex
                 />
                 <SortHeader
                     label="Size"
@@ -222,7 +215,7 @@ export function PositionsTab() {
                     direction={sort_direction}
                     on_sort={handle_sort}
                     align="right"
-                    width="w-20"
+                    flex
                 />
                 <SortHeader
                     label="Entry/Last"
@@ -231,7 +224,7 @@ export function PositionsTab() {
                     direction={sort_direction}
                     on_sort={handle_sort}
                     align="right"
-                    width="w-20"
+                    flex
                 />
                 <SortHeader
                     label="Liq"
@@ -240,7 +233,7 @@ export function PositionsTab() {
                     direction={sort_direction}
                     on_sort={handle_sort}
                     align="right"
-                    width="w-16"
+                    flex
                 />
                 <SortHeader
                     label="uPNL"
@@ -249,7 +242,7 @@ export function PositionsTab() {
                     direction={sort_direction}
                     on_sort={handle_sort}
                     align="right"
-                    width="w-20"
+                    flex
                 />
                 <div class="flex-1 text-right" role="columnheader">
                     Actions

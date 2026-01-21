@@ -331,3 +331,13 @@ export interface RawOrder {
     filled: number;
     timestamp: number;
 }
+
+export interface RawClosedPosition {
+    symbol: string;
+    side: 'long' | 'short';
+    size: number;
+    entry_price: number;
+    exit_price: number;
+    realized_pnl: number;
+    close_time: number;
+}

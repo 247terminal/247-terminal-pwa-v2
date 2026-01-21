@@ -23,6 +23,7 @@ import {
     fetchPositions,
     fetchOrders,
     fetchAccountData,
+    fetchClosedPositions,
     hyperliquidAdapter,
     type ExchangeCredentials,
     type MarketInfo as AccountMarketInfo,
@@ -362,6 +363,12 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 result = await fetchAccountData(
                     payload?.exchangeId as ExchangeId,
                     (payload?.marketMap as Record<string, AccountMarketInfo>) || {}
+                );
+                break;
+            case 'FETCH_CLOSED_POSITIONS':
+                result = await fetchClosedPositions(
+                    payload?.exchangeId as ExchangeId,
+                    (payload?.limit as number) || 50
                 );
                 break;
             default:

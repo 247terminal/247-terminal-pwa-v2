@@ -10,6 +10,11 @@ import {
     hyperliquid as hyperliquidAdapter,
     type RawPosition,
     type RawOrder,
+    type RawClosedPosition,
+    type BinanceExchange,
+    type BybitExchange,
+    type BlofinExchange,
+    type HyperliquidExchange,
 } from './adapters';
 import type { ExchangeId, CcxtExchange } from '@/types/worker.types';
 
@@ -25,7 +30,7 @@ export interface MarketInfo {
     contract_size?: number;
 }
 
-const ORDER_TYPE_MAP: Record<string, string> = {
+const ORDER_TYPE_MAP = {
     limit: 'limit',
     market: 'market',
     stop: 'stop',
@@ -34,7 +39,7 @@ const ORDER_TYPE_MAP: Record<string, string> = {
     take_profit_market: 'take_profit',
     stop_loss: 'stop_loss',
     trailing_stop: 'stop',
-};
+} as const;
 
 export const authenticatedExchanges: Record<string, CcxtExchange> = {};
 
@@ -112,13 +117,13 @@ export async function fetchAccountConfig(exchangeId: ExchangeId): Promise<{
 
     switch (exchangeId) {
         case 'binance':
-            position_mode = await binanceAdapter.fetch_position_mode(exchange as never);
+            position_mode = await binanceAdapter.fetch_position_mode(exchange as BinanceExchange);
             break;
         case 'bybit':
-            position_mode = await bybitAdapter.fetch_position_mode(exchange as never);
+            position_mode = await bybitAdapter.fetch_position_mode(exchange as BybitExchange);
             break;
         case 'blofin':
-            position_mode = await blofinAdapter.fetch_position_mode(exchange as never);
+            position_mode = await blofinAdapter.fetch_position_mode(exchange as BlofinExchange);
             break;
     }
 
@@ -222,13 +227,13 @@ export async function fetchBalance(exchangeId: ExchangeId): Promise<{
     try {
         switch (exchangeId) {
             case 'binance':
-                return await binanceAdapter.fetch_balance(exchange as never);
+                return await binanceAdapter.fetch_balance(exchange as BinanceExchange);
             case 'bybit':
-                return await bybitAdapter.fetch_balance(exchange as never);
+                return await bybitAdapter.fetch_balance(exchange as BybitExchange);
             case 'blofin':
-                return await blofinAdapter.fetch_balance(exchange as never);
+                return await blofinAdapter.fetch_balance(exchange as BlofinExchange);
             case 'hyperliquid':
-                return await hyperliquidAdapter.fetch_balance(exchange as never);
+                return await hyperliquidAdapter.fetch_balance(exchange as HyperliquidExchange);
             default:
                 return null;
         }
@@ -249,16 +254,16 @@ export async function fetchPositions(
 
         switch (exchangeId) {
             case 'binance':
-                raw = await binanceAdapter.fetch_positions(exchange as never);
+                raw = await binanceAdapter.fetch_positions(exchange as BinanceExchange);
                 break;
             case 'bybit':
-                raw = await bybitAdapter.fetch_positions(exchange as never);
+                raw = await bybitAdapter.fetch_positions(exchange as BybitExchange);
                 break;
             case 'blofin':
-                raw = await blofinAdapter.fetch_positions(exchange as never);
+                raw = await blofinAdapter.fetch_positions(exchange as BlofinExchange);
                 break;
             case 'hyperliquid':
-                raw = await hyperliquidAdapter.fetch_positions(exchange as never);
+                raw = await hyperliquidAdapter.fetch_positions(exchange as HyperliquidExchange);
                 break;
         }
 
@@ -291,20 +296,24 @@ export async function fetchOrders(
 
         switch (exchangeId) {
             case 'binance':
-                raw = await binanceAdapter.fetch_orders(exchange as never);
+                raw = await binanceAdapter.fetch_orders(exchange as BinanceExchange);
                 break;
             case 'bybit':
-                raw = await bybitAdapter.fetch_orders(exchange as never);
+                raw = await bybitAdapter.fetch_orders(exchange as BybitExchange);
                 break;
             case 'blofin':
-                raw = await blofinAdapter.fetch_orders(exchange as never);
+                raw = await blofinAdapter.fetch_orders(exchange as BlofinExchange);
                 break;
             case 'hyperliquid':
-                raw = await hyperliquidAdapter.fetch_orders(exchange as never);
+                raw = await hyperliquidAdapter.fetch_orders(exchange as HyperliquidExchange);
                 break;
         }
 
-        return raw.map((o) => mapOrder(o, exchangeId, marketMap));
+        const result = new Array<ReturnType<typeof mapOrder>>(raw.length);
+        for (let i = 0; i < raw.length; i++) {
+            result[i] = mapOrder(raw[i], exchangeId, marketMap);
+        }
+        return result;
     } catch (err) {
         console.error(`failed to fetch ${exchangeId} orders:`, (err as Error).message);
         return [];
@@ -326,6 +335,80 @@ export async function fetchAccountData(
     ]);
 
     return { balance, positions, orders };
+}
+
+function mapClosedPosition(
+    raw: RawClosedPosition,
+    exchangeId: ExchangeId,
+    idx: number
+): {
+    id: string;
+    exchange: ExchangeId;
+    symbol: string;
+    side: 'buy' | 'sell';
+    size: number;
+    entry_price: number;
+    close_price: number;
+    realized_pnl: number;
+    realized_pnl_pct: number;
+    closed_at: number;
+} {
+    const pnl_pct =
+        raw.entry_price > 0 ? ((raw.exit_price - raw.entry_price) / raw.entry_price) * 100 : 0;
+
+    return {
+        id: `${exchangeId}-${raw.symbol}-${raw.close_time}-${idx}`,
+        exchange: exchangeId,
+        symbol: raw.symbol,
+        side: raw.side === 'long' ? 'buy' : 'sell',
+        size: raw.size,
+        entry_price: raw.entry_price,
+        close_price: raw.exit_price,
+        realized_pnl: raw.realized_pnl,
+        realized_pnl_pct: raw.side === 'long' ? pnl_pct : -pnl_pct,
+        closed_at: raw.close_time,
+    };
+}
+
+export async function fetchClosedPositions(
+    exchangeId: ExchangeId,
+    limit: number
+): Promise<ReturnType<typeof mapClosedPosition>[]> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        let raw: RawClosedPosition[] = [];
+
+        switch (exchangeId) {
+            case 'binance':
+                raw = await binanceAdapter.fetch_closed_positions(
+                    exchange as BinanceExchange,
+                    limit
+                );
+                break;
+            case 'bybit':
+                raw = await bybitAdapter.fetch_closed_positions(exchange as BybitExchange, limit);
+                break;
+            case 'blofin':
+                raw = await blofinAdapter.fetch_closed_positions(exchange as BlofinExchange, limit);
+                break;
+            case 'hyperliquid':
+                raw = await hyperliquidAdapter.fetch_closed_positions(
+                    exchange as HyperliquidExchange,
+                    limit
+                );
+                break;
+        }
+
+        const result = new Array<ReturnType<typeof mapClosedPosition>>(raw.length);
+        for (let i = 0; i < raw.length; i++) {
+            result[i] = mapClosedPosition(raw[i], exchangeId, i);
+        }
+        return result;
+    } catch (err) {
+        console.error(`failed to fetch ${exchangeId} closed positions:`, (err as Error).message);
+        return [];
+    }
 }
 
 export { hyperliquidAdapter };

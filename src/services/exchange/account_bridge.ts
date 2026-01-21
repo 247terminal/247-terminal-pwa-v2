@@ -1,6 +1,6 @@
 import type { ExchangeId } from '@/types/exchange.types';
 import type { PositionMode, MarginMode, Balance } from '@/types/trading.types';
-import type { Position, Order } from '@/types/account.types';
+import type { Position, Order, TradeHistory } from '@/types/account.types';
 import { getWorker, sendRequest } from './chart_data';
 import { get_exchange_markets } from '@/stores/exchange_store';
 import { MARKET_MAP_CACHE_TTL } from '@/config';
@@ -130,4 +130,13 @@ export function fetch_account_data(exchangeId: ExchangeId): Promise<AccountData>
         const marketMap = getMarketMap(exchangeId);
         return sendRequest<AccountData>('FETCH_ACCOUNT_DATA', { exchangeId, marketMap });
     });
+}
+
+export function fetch_closed_positions(
+    exchangeId: ExchangeId,
+    limit = 50
+): Promise<TradeHistory[]> {
+    return dedupeRequest(`closed:${exchangeId}`, () =>
+        sendRequest<TradeHistory[]>('FETCH_CLOSED_POSITIONS', { exchangeId, limit })
+    );
 }

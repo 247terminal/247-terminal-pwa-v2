@@ -1,7 +1,7 @@
 import type binanceusdm from 'ccxt/js/src/pro/binanceusdm.js';
-import type { RawPosition, RawOrder } from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
 
-type BinanceExchange = InstanceType<typeof binanceusdm>;
+export type BinanceExchange = InstanceType<typeof binanceusdm>;
 
 interface BinanceBalance {
     asset: string;
@@ -46,6 +46,17 @@ interface BinanceAlgoOrder {
     triggerPrice: string;
     price: string;
     createTime: string;
+}
+
+interface BinanceTrade {
+    symbol: string;
+    orderId: string;
+    side: string;
+    positionSide: string;
+    qty: string;
+    price: string;
+    realizedPnl: string;
+    time: number;
 }
 
 export async function fetch_position_mode(exchange: BinanceExchange): Promise<'hedge' | 'one_way'> {
@@ -154,4 +165,99 @@ export async function fetch_orders(exchange: BinanceExchange): Promise<RawOrder[
         };
     }
     return result;
+}
+
+function normalize_symbol(symbol: string): string {
+    return symbol.replace(/USDT$/, '/USDT:USDT');
+}
+
+export async function fetch_closed_positions(
+    exchange: BinanceExchange,
+    limit: number
+): Promise<RawClosedPosition[]> {
+    const trades = (await exchange.fapiPrivateGetUserTrades({
+        limit: Math.min(limit * 10, 1000),
+    })) as BinanceTrade[];
+    if (!Array.isArray(trades)) return [];
+
+    const order_map: Record<
+        string,
+        {
+            symbol: string;
+            side: string;
+            pos_side: string;
+            total_qty: number;
+            total_value: number;
+            total_pnl: number;
+            time: number;
+            is_closing: boolean;
+        }
+    > = {};
+
+    for (const t of trades) {
+        const pnl = Number(t.realizedPnl) || 0;
+        const order_id = t.orderId;
+        const qty = Number(t.qty) || 0;
+        const price = Number(t.price) || 0;
+        const side = t.side?.toUpperCase() || '';
+        const pos_side = t.positionSide?.toUpperCase() || 'BOTH';
+
+        const is_closing =
+            pos_side === 'LONG'
+                ? side === 'SELL'
+                : pos_side === 'SHORT'
+                  ? side === 'BUY'
+                  : pnl !== 0;
+
+        if (!order_map[order_id]) {
+            order_map[order_id] = {
+                symbol: normalize_symbol(t.symbol),
+                side,
+                pos_side,
+                total_qty: 0,
+                total_value: 0,
+                total_pnl: 0,
+                time: Number(t.time) || Date.now(),
+                is_closing,
+            };
+        }
+        order_map[order_id].total_qty += qty;
+        order_map[order_id].total_value += qty * price;
+        order_map[order_id].total_pnl += pnl;
+    }
+
+    const closed: RawClosedPosition[] = [];
+
+    for (const order_id in order_map) {
+        const o = order_map[order_id];
+
+        if (!o.is_closing) continue;
+
+        const exit_price = o.total_qty > 0 ? o.total_value / o.total_qty : 0;
+
+        let position_side: 'long' | 'short';
+        if (o.pos_side === 'LONG') {
+            position_side = 'long';
+        } else if (o.pos_side === 'SHORT') {
+            position_side = 'short';
+        } else {
+            position_side = o.side === 'SELL' ? 'long' : 'short';
+        }
+
+        const pnl_per_unit = o.total_qty > 0 ? o.total_pnl / o.total_qty : 0;
+        const entry_price =
+            position_side === 'long' ? exit_price - pnl_per_unit : exit_price + pnl_per_unit;
+
+        closed.push({
+            symbol: o.symbol,
+            side: position_side,
+            size: o.total_qty,
+            entry_price: Math.max(0, entry_price),
+            exit_price,
+            realized_pnl: o.total_pnl,
+            close_time: o.time,
+        });
+    }
+
+    return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
 }

@@ -13,13 +13,13 @@ import { SortHeader, type SortDirection } from './sort_header';
 
 type OrderSortKey = 'symbol' | 'size' | 'price' | 'id';
 
-const ORDER_TYPE_LABELS: Record<Order['type'], string> = {
+const ORDER_TYPE_LABELS = {
     limit: 'Limit',
     market: 'Market',
     stop: 'Stop',
     take_profit: 'TP',
     stop_loss: 'SL',
-};
+} as const satisfies Record<Order['type'], string>;
 
 function format_order_type(type: Order['type']): string {
     return ORDER_TYPE_LABELS[type];
@@ -47,7 +47,7 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
 
     return (
         <div
-            class="relative flex items-center gap-2 px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
+            class="relative flex items-center px-2 py-1.5 hover:bg-base-300/30 transition-colors text-xs"
             role="row"
         >
             <span
@@ -55,7 +55,7 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
                 aria-hidden="true"
             />
             <div
-                class="w-24 shrink-0 flex items-center gap-1.5 cursor-pointer hover:opacity-80"
+                class="flex-1 flex items-center gap-1.5 cursor-pointer hover:opacity-80 min-w-0"
                 onClick={handle_symbol_click}
                 onKeyDown={(e) => e.key === 'Enter' && handle_symbol_click()}
                 role="button"
@@ -65,7 +65,7 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
                 <span class="text-base-content/40 shrink-0" aria-hidden="true">
                     {get_exchange_icon(order.exchange)}
                 </span>
-                <div>
+                <div class="min-w-0">
                     <div class={`font-medium truncate ${is_buy ? 'text-success' : 'text-error'}`}>
                         {format_symbol(order.symbol)}
                     </div>
@@ -75,7 +75,7 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right" role="cell">
+            <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content">
                     {mask_value(format_usd(order.size * order.price), is_private)}
                 </div>
@@ -88,16 +88,13 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
                 </div>
             </div>
 
-            <div class="w-20 shrink-0 text-right" role="cell">
+            <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content">
                     {mask_value(format_price(order.price, tick_size), is_private)}
                 </div>
             </div>
 
-            <div
-                class="w-20 shrink-0 text-right text-base-content/50 font-mono text-[10px]"
-                role="cell"
-            >
+            <div class="flex-1 text-right text-base-content/50 font-mono text-[10px]" role="cell">
                 {order.id.slice(-8)}
             </div>
 
@@ -170,7 +167,7 @@ export function OrdersTab() {
     return (
         <div class="flex-1 flex flex-col overflow-hidden" role="table" aria-label="Active orders">
             <div
-                class="flex items-center gap-2 px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 bg-base-200"
+                class="flex items-center px-2 py-1 text-[10px] text-base-content/50 border-b border-base-300/50 bg-base-200"
                 role="row"
             >
                 <SortHeader
@@ -179,7 +176,7 @@ export function OrdersTab() {
                     current_key={sort_key}
                     direction={sort_direction}
                     on_sort={handle_sort}
-                    width="w-24"
+                    flex
                 />
                 <SortHeader
                     label="Size"
@@ -188,7 +185,7 @@ export function OrdersTab() {
                     direction={sort_direction}
                     on_sort={handle_sort}
                     align="right"
-                    width="w-20"
+                    flex
                 />
                 <SortHeader
                     label="Price"
@@ -197,7 +194,7 @@ export function OrdersTab() {
                     direction={sort_direction}
                     on_sort={handle_sort}
                     align="right"
-                    width="w-20"
+                    flex
                 />
                 <SortHeader
                     label="ID"
@@ -206,7 +203,7 @@ export function OrdersTab() {
                     direction={sort_direction}
                     on_sort={handle_sort}
                     align="right"
-                    width="w-20"
+                    flex
                 />
                 <div class="flex-1 text-right" role="columnheader">
                     Actions

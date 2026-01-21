@@ -6,6 +6,7 @@ import {
     fetch_balance as fetch_balance_api,
     fetch_positions as fetch_positions_api,
     fetch_orders as fetch_orders_api,
+    fetch_closed_positions as fetch_closed_positions_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
 
@@ -32,7 +33,7 @@ export const orders = signal<Map<string, Order>>(new Map());
 export const history = signal<TradeHistory[]>([]);
 export const active_tab = signal<AccountTab>('positions');
 export const privacy_mode = signal(load_privacy_mode());
-export const loading = signal({ balance: false, positions: false, orders: false });
+export const loading = signal({ balance: false, positions: false, orders: false, history: false });
 
 export const positions_count = computed(() => positions.value.size);
 export const orders_count = computed(() => orders.value.size);
@@ -70,58 +71,82 @@ export function toggle_privacy(): void {
 }
 
 export function update_position(position: Position): void {
-    const map = new Map(positions.value);
+    const current = positions.value;
     if (position.size === 0) {
+        if (!current.has(position.id)) return;
+        const map = new Map(current);
         map.delete(position.id);
+        positions.value = map;
     } else {
+        if (current.get(position.id) === position) return;
+        const map = new Map(current);
         map.set(position.id, position);
+        positions.value = map;
     }
-    positions.value = map;
 }
 
 export function update_positions_batch(updates: Position[]): void {
-    batch(() => {
-        const map = new Map(positions.value);
-        for (const pos of updates) {
-            if (pos.size === 0) {
+    if (updates.length === 0) return;
+    const current = positions.value;
+    const map = new Map(current);
+    let changed = false;
+    for (const pos of updates) {
+        if (pos.size === 0) {
+            if (map.has(pos.id)) {
                 map.delete(pos.id);
-            } else {
-                map.set(pos.id, pos);
+                changed = true;
             }
+        } else if (map.get(pos.id) !== pos) {
+            map.set(pos.id, pos);
+            changed = true;
         }
-        positions.value = map;
-    });
+    }
+    if (changed) positions.value = map;
 }
 
 export function clear_positions(): void {
+    if (positions.value.size === 0) return;
     positions.value = new Map();
 }
 
 export function update_order(order: Order): void {
-    const map = new Map(orders.value);
-    if (order.status === 'closed' || order.status === 'canceled') {
+    const current = orders.value;
+    const shouldRemove = order.status === 'closed' || order.status === 'canceled';
+    if (shouldRemove) {
+        if (!current.has(order.id)) return;
+        const map = new Map(current);
         map.delete(order.id);
+        orders.value = map;
     } else {
+        if (current.get(order.id) === order) return;
+        const map = new Map(current);
         map.set(order.id, order);
+        orders.value = map;
     }
-    orders.value = map;
 }
 
 export function update_orders_batch(updates: Order[]): void {
-    batch(() => {
-        const map = new Map(orders.value);
-        for (const order of updates) {
-            if (order.status === 'closed' || order.status === 'canceled') {
+    if (updates.length === 0) return;
+    const current = orders.value;
+    const map = new Map(current);
+    let changed = false;
+    for (const order of updates) {
+        const shouldRemove = order.status === 'closed' || order.status === 'canceled';
+        if (shouldRemove) {
+            if (map.has(order.id)) {
                 map.delete(order.id);
-            } else {
-                map.set(order.id, order);
+                changed = true;
             }
+        } else if (map.get(order.id) !== order) {
+            map.set(order.id, order);
+            changed = true;
         }
-        orders.value = map;
-    });
+    }
+    if (changed) orders.value = map;
 }
 
 export function clear_orders(): void {
+    if (orders.value.size === 0) return;
     orders.value = new Map();
 }
 
@@ -130,24 +155,44 @@ export function add_history(trade: TradeHistory): void {
 }
 
 export function add_history_batch(trades: TradeHistory[]): void {
-    batch(() => {
-        const sorted = trades.toSorted((a, b) => b.closed_at - a.closed_at);
-        history.value = [...sorted, ...history.value].slice(0, HISTORY_LIMIT);
-    });
+    if (trades.length === 0) return;
+    const current = history.value;
+    const merged = new Array<TradeHistory>(Math.min(trades.length + current.length, HISTORY_LIMIT));
+    let ti = 0,
+        ci = 0,
+        mi = 0;
+    const sorted_trades = trades.toSorted((a, b) => b.closed_at - a.closed_at);
+    while (mi < HISTORY_LIMIT && (ti < sorted_trades.length || ci < current.length)) {
+        if (ti >= sorted_trades.length) {
+            merged[mi++] = current[ci++];
+        } else if (ci >= current.length) {
+            merged[mi++] = sorted_trades[ti++];
+        } else if (sorted_trades[ti].closed_at >= current[ci].closed_at) {
+            merged[mi++] = sorted_trades[ti++];
+        } else {
+            merged[mi++] = current[ci++];
+        }
+    }
+    history.value = merged;
 }
 
 export function clear_history(): void {
+    if (history.value.length === 0) return;
     history.value = [];
 }
 
 export function update_balance(exchange_id: ExchangeId, balance: Balance): void {
-    const map = new Map(balances.value);
+    const current = balances.value;
+    if (current.get(exchange_id) === balance) return;
+    const map = new Map(current);
     map.set(exchange_id, balance);
     balances.value = map;
 }
 
 export function clear_balance(exchange_id: ExchangeId): void {
-    const map = new Map(balances.value);
+    const current = balances.value;
+    if (!current.has(exchange_id)) return;
+    const map = new Map(current);
     map.delete(exchange_id);
     balances.value = map;
 }
@@ -256,4 +301,23 @@ export async function cancel_order(_exchange_id: ExchangeId, _order_id: string):
 
 export async function close_position(_exchange_id: ExchangeId, _symbol: string): Promise<void> {
     return;
+}
+
+export async function refresh_history(exchange_ids: ExchangeId[]): Promise<void> {
+    const connected = exchange_ids.filter(has_exchange);
+    if (connected.length === 0) return;
+
+    loading.value = { ...loading.value, history: true };
+    try {
+        const results = await Promise.all(
+            connected.map((id) => fetch_closed_positions_api(id).catch(() => []))
+        );
+        const all_trades = results.flat();
+        all_trades.sort((a, b) => b.closed_at - a.closed_at);
+        history.value = all_trades.slice(0, HISTORY_LIMIT);
+    } catch (err) {
+        console.error('failed to fetch trade history:', (err as Error).message);
+    } finally {
+        loading.value = { ...loading.value, history: false };
+    }
 }

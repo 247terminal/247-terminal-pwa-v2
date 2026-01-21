@@ -1,7 +1,10 @@
 import type bybit from 'ccxt/js/src/pro/bybit.js';
-import type { RawPosition, RawOrder } from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
 
-type BybitExchange = InstanceType<typeof bybit>;
+export type BybitExchange = InstanceType<typeof bybit>;
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const HISTORY_WEEKS = 5;
 
 interface BybitPositionResponse {
     result?: {
@@ -52,6 +55,22 @@ interface BybitOrderResponse {
             triggerPrice: string;
             cumExecQty: string;
             createdTime: string;
+        }>;
+    };
+}
+
+interface BybitClosedPnlResponse {
+    result?: {
+        list?: Array<{
+            symbol: string;
+            side: string;
+            qty: string;
+            avgEntryPrice: string;
+            avgExitPrice: string;
+            closedPnl: string;
+            createdTime: string;
+            updatedTime: string;
+            leverage: string;
         }>;
     };
 }
@@ -147,4 +166,46 @@ export async function fetch_orders(exchange: BybitExchange): Promise<RawOrder[]>
         filled: Number(o.cumExecQty || 0),
         timestamp: Number(o.createdTime || Date.now()),
     }));
+}
+
+export async function fetch_closed_positions(
+    exchange: BybitExchange,
+    limit: number
+): Promise<RawClosedPosition[]> {
+    const now = Date.now();
+
+    const promises = Array.from({ length: HISTORY_WEEKS }, (_, i) => {
+        const endTime = now - i * SEVEN_DAYS_MS;
+        const startTime = endTime - SEVEN_DAYS_MS;
+        return exchange
+            .privateGetV5PositionClosedPnl({
+                category: 'linear',
+                startTime,
+                endTime,
+                limit: Math.min(limit, 100),
+            })
+            .then((r) => (r as BybitClosedPnlResponse)?.result?.list ?? [])
+            .catch(() => [] as NonNullable<BybitClosedPnlResponse['result']>['list']);
+    });
+
+    const results = await Promise.all(promises);
+    const list = results.flat();
+
+    if (list.length === 0) return [];
+
+    const count = Math.min(list.length, limit);
+    const result: RawClosedPosition[] = new Array(count);
+    for (let i = 0; i < count; i++) {
+        const p = list[i];
+        result[i] = {
+            symbol: p.symbol.replace(/USDT$/, '/USDT:USDT'),
+            side: p.side === 'Buy' ? 'long' : 'short',
+            size: Number(p.qty || 0),
+            entry_price: Number(p.avgEntryPrice || 0),
+            exit_price: Number(p.avgExitPrice || 0),
+            realized_pnl: Number(p.closedPnl || 0),
+            close_time: Number(p.createdTime || Date.now()),
+        };
+    }
+    return result;
 }

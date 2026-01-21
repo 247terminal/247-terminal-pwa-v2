@@ -1,8 +1,8 @@
 import type hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
-import type { RawPosition, RawOrder } from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
 import { HYPERLIQUID_CACHE_TTL } from '@/config';
 
-type HyperliquidExchange = InstanceType<typeof hyperliquid>;
+export type HyperliquidExchange = InstanceType<typeof hyperliquid>;
 
 interface ClearinghouseState {
     marginSummary?: { accountValue?: string; totalMarginUsed?: string };
@@ -29,6 +29,16 @@ interface OpenOrder {
     sz: number;
     limitPx: number;
     timestamp: number;
+}
+
+interface UserFill {
+    coin: string;
+    side: string;
+    px: string;
+    sz: string;
+    closedPnl: string;
+    time: number;
+    dir: string;
 }
 
 let cached_state: { wallet: string; data: ClearinghouseState; timestamp: number } | null = null;
@@ -137,4 +147,50 @@ export async function fetch_orders(exchange: HyperliquidExchange): Promise<RawOr
         filled: 0,
         timestamp: Number(o.timestamp || Date.now()),
     }));
+}
+
+export async function fetch_closed_positions(
+    exchange: HyperliquidExchange,
+    limit: number
+): Promise<RawClosedPosition[]> {
+    const wallet = exchange.walletAddress;
+    if (!wallet) return [];
+
+    const response = (await exchange.publicPostInfo({
+        type: 'userFills',
+        user: wallet,
+    })) as UserFill[];
+    if (!Array.isArray(response)) return [];
+
+    const closed: RawClosedPosition[] = [];
+
+    for (const fill of response) {
+        const dir = fill.dir || '';
+
+        const is_close_long = dir === 'Close Long';
+        const is_close_short = dir === 'Close Short';
+        if (!is_close_long && !is_close_short) continue;
+
+        const pnl = Number(fill.closedPnl || 0);
+        const price = Number(fill.px);
+        const size = Number(fill.sz);
+        const time = Number(fill.time) || Date.now();
+
+        const position_side: 'long' | 'short' = is_close_long ? 'long' : 'short';
+
+        const pnl_per_unit = size > 0 ? pnl / size : 0;
+        const entry_price = position_side === 'long' ? price - pnl_per_unit : price + pnl_per_unit;
+
+        closed.push({
+            symbol: `${fill.coin}/USDC:USDC`,
+            side: position_side,
+            size,
+            entry_price: Math.max(0, entry_price),
+            exit_price: price,
+            realized_pnl: pnl,
+            close_time: time,
+        });
+    }
+
+    return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
 }

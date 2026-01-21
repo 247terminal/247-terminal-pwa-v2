@@ -1,7 +1,9 @@
 import type blofin from 'ccxt/js/src/pro/blofin.js';
-import type { RawPosition, RawOrder } from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
 
-type BlofinExchange = InstanceType<typeof blofin>;
+export type BlofinExchange = InstanceType<typeof blofin>;
+
+const POSITION_SIZE_THRESHOLD = 0.00001;
 
 interface BlofinPositionResponse {
     data?: Array<{
@@ -40,6 +42,18 @@ interface BlofinOrderResponse {
         triggerPrice: string;
         filledSize: string;
         createTime: string;
+    }>;
+}
+
+interface BlofinFillResponse {
+    data?: Array<{
+        instId: string;
+        side: string;
+        positionSide: string;
+        fillSize: string;
+        fillPrice: string;
+        fillPnl: string;
+        ts: string;
     }>;
 }
 
@@ -115,4 +129,112 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
         filled: Number(o.filledSize || 0),
         timestamp: Number(o.createTime || Date.now()),
     }));
+}
+
+interface PositionState {
+    side: 'long' | 'short';
+    size: number;
+    entry_price: number;
+    total_pnl: number;
+    last_time: number;
+}
+
+export async function fetch_closed_positions(
+    exchange: BlofinExchange,
+    limit: number,
+    contract_values?: Record<string, number>
+): Promise<RawClosedPosition[]> {
+    const response = (await exchange.privateGetTradeFillsHistory({
+        limit: String(limit * 5),
+    })) as BlofinFillResponse;
+    const data = response?.data;
+    if (!Array.isArray(data)) return [];
+
+    const sorted_fills = [...data].sort((a, b) => Number(a.ts) - Number(b.ts));
+    const by_symbol: Record<string, typeof sorted_fills> = {};
+
+    for (const f of sorted_fills) {
+        const sym = f.instId.replace(/-/g, '/') + ':USDT';
+        if (!by_symbol[sym]) by_symbol[sym] = [];
+        by_symbol[sym].push(f);
+    }
+
+    const closed: RawClosedPosition[] = [];
+
+    for (const symbol in by_symbol) {
+        const symbol_fills = by_symbol[symbol];
+        const contract_value = contract_values?.[symbol] || 1;
+        let pos: PositionState | null = null;
+
+        for (const f of symbol_fills) {
+            const fill_side = f.side?.toLowerCase() || '';
+            const pos_side = f.positionSide?.toLowerCase() || 'net';
+            const fill_price = Number(f.fillPrice);
+            const fill_amount = Number(f.fillSize) * contract_value;
+            const fill_pnl = Number(f.fillPnl || 0);
+            const fill_time = Number(f.ts);
+
+            let trade_side: 'long' | 'short';
+            let is_opening: boolean;
+
+            if (pos_side === 'long') {
+                trade_side = 'long';
+                is_opening = fill_side === 'buy';
+            } else if (pos_side === 'short') {
+                trade_side = 'short';
+                is_opening = fill_side === 'sell';
+            } else {
+                trade_side = fill_side === 'buy' ? 'long' : 'short';
+                is_opening = !pos || pos.side === trade_side;
+            }
+
+            if (!pos) {
+                pos = {
+                    side: trade_side,
+                    size: fill_amount,
+                    entry_price: fill_price,
+                    total_pnl: fill_pnl,
+                    last_time: fill_time,
+                };
+            } else if (is_opening) {
+                const new_size = pos.size + fill_amount;
+                pos.entry_price =
+                    (pos.entry_price * pos.size + fill_price * fill_amount) / new_size;
+                pos.size = new_size;
+                pos.total_pnl += fill_pnl;
+                pos.last_time = fill_time;
+            } else {
+                pos.total_pnl += fill_pnl;
+                const close_size = Math.min(fill_amount, pos.size);
+                pos.size -= close_size;
+
+                if (pos.size <= POSITION_SIZE_THRESHOLD) {
+                    closed.push({
+                        symbol,
+                        side: pos.side,
+                        size: close_size,
+                        entry_price: pos.entry_price,
+                        exit_price: fill_price,
+                        realized_pnl: pos.total_pnl,
+                        close_time: fill_time,
+                    });
+
+                    const excess = fill_amount - close_size;
+                    if (excess > POSITION_SIZE_THRESHOLD) {
+                        pos = {
+                            side: trade_side,
+                            size: excess,
+                            entry_price: fill_price,
+                            total_pnl: 0,
+                            last_time: fill_time,
+                        };
+                    } else {
+                        pos = null;
+                    }
+                }
+            }
+        }
+    }
+
+    return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
 }

@@ -10,7 +10,7 @@ interface SortHeaderProps<T extends string> {
     direction: SortDirection;
     on_sort: (key: T) => void;
     align?: 'left' | 'right';
-    width: string;
+    flex?: boolean;
 }
 
 function SortHeaderInner<T extends string>({
@@ -20,7 +20,7 @@ function SortHeaderInner<T extends string>({
     direction,
     on_sort,
     align = 'left',
-    width,
+    flex = false,
 }: SortHeaderProps<T>) {
     const is_active = current_key === sort_key;
 
@@ -32,7 +32,7 @@ function SortHeaderInner<T extends string>({
         <button
             type="button"
             onClick={handle_click}
-            class={`${width} shrink-0 ${align === 'right' ? 'text-right' : ''} hover:text-base-content transition-colors flex items-center gap-0.5 ${align === 'right' ? 'justify-end' : ''} ${is_active ? 'text-base-content' : ''}`}
+            class={`${flex ? 'flex-1' : ''} ${align === 'right' ? 'text-right' : ''} hover:text-base-content transition-colors flex items-center gap-0.5 ${align === 'right' ? 'justify-end' : ''} ${is_active ? 'text-base-content' : ''}`}
         >
             {label}
             {is_active && <span class="text-[8px]">{direction === 'asc' ? '↑' : '↓'}</span>}
