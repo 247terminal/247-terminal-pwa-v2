@@ -31,8 +31,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
         show_profit: false,
     },
     chart: {
-        default_timeframe: '5m',
-        order_history: true,
+        default_timeframe: '5',
         up_candle_color: '#00C853',
         down_candle_color: '#FF1744',
         chart_tickers: [],
@@ -57,7 +56,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
         delay_threshold: 5000,
         history_limit: 100,
         auto_clear_seconds: 0,
-        font_size: 12,
     },
     keywords: {
         blacklisted_words: [],
@@ -86,14 +84,18 @@ export const DEFAULT_SETTINGS: UserSettings = {
 };
 
 export const TIMEFRAME_OPTIONS = [
-    { value: '1m', label: '1m' },
-    { value: '5m', label: '5m' },
-    { value: '15m', label: '15m' },
-    { value: '30m', label: '30m' },
-    { value: '1h', label: '1H' },
-    { value: '4h', label: '4H' },
-    { value: 'D', label: 'D' },
-    { value: 'W', label: 'W' },
+    { value: '1', label: '1m' },
+    { value: '5', label: '5m' },
+    { value: '15', label: '15m' },
+    { value: '30', label: '30m' },
+    { value: '60', label: '1h' },
+    { value: '120', label: '2h' },
+    { value: '240', label: '4h' },
+    { value: '480', label: '8h' },
+    { value: '720', label: '12h' },
+    { value: 'D', label: '1D' },
+    { value: 'W', label: '1W' },
+    { value: 'M', label: '1M' },
 ] as const;
 
 export const NOTIFICATION_FILTER_OPTIONS = [

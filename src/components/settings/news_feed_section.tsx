@@ -7,7 +7,7 @@ const BUTTON_STYLE_OPTIONS = [
     { value: 'standard', label: 'Standard' },
 ] as const;
 
-export function NewsTradingSection() {
+export function NewsFeedSection() {
     const trading = settings.value.trading;
 
     function update_size(index: number, value: number): void {

@@ -32,7 +32,6 @@ export interface TerminalSettings {
 
 export interface ChartSettings {
     default_timeframe: string;
-    order_history: boolean;
     up_candle_color: string;
     down_candle_color: string;
     chart_tickers: string[];
@@ -59,7 +58,6 @@ export interface NewsDisplaySettings {
     delay_threshold: number;
     history_limit: number;
     auto_clear_seconds: number;
-    font_size: number;
 }
 
 export interface KeywordSettings {
@@ -197,7 +195,7 @@ export interface ExportData {
 }
 
 export type SettingsSectionId =
-    | 'news_trading'
+    | 'news_feed'
     | 'trading'
     | 'terminal'
     | 'chart'

@@ -25,7 +25,7 @@ import type {
     SettingsDrawerProps,
     AccordionSectionProps,
 } from '@/types/settings.types';
-import { NewsTradingSection } from './news_trading_section';
+import { NewsFeedSection } from './news_feed_section';
 import { TradingSection } from './trading_section';
 import { TerminalSection } from './terminal_section';
 import { ChartSection } from './chart_section';
@@ -105,13 +105,13 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                     </AccordionSection>
 
                     <AccordionSection
-                        id="news_trading"
-                        title="NEWS TRADING"
+                        id="news_feed"
+                        title="NEWS FEED"
                         icon={<Newspaper class="w-4 h-4" />}
                         expanded_section={expanded_section}
                         on_toggle={toggle_section}
                     >
-                        <NewsTradingSection />
+                        <NewsFeedSection />
                     </AccordionSection>
 
                     <AccordionSection

@@ -123,8 +123,7 @@ export function ShortcutsSection() {
 
             {!shortcuts.disabled && (
                 <>
-                    <div class="pt-2 border-t border-base-300 space-y-3">
-                        <span class="text-xs font-medium text-base-content/50">EMERGENCY</span>
+                    <div class="pt-3 border-t border-base-300 space-y-3">
                         <ShortcutEditor
                             label="Nuke All Positions"
                             binding={shortcuts.nuke_all}
@@ -144,10 +143,6 @@ export function ShortcutsSection() {
                             />
                         ))}
                     </div>
-
-                    <p class="text-xs text-base-content/40">
-                        Click a shortcut button and press your desired key combination
-                    </p>
                 </>
             )}
         </div>

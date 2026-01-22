@@ -1,5 +1,5 @@
 export { SettingsDrawer } from './settings_drawer';
-export { NewsTradingSection } from './news_trading_section';
+export { NewsFeedSection } from './news_feed_section';
 export { TradingSection } from './trading_section';
 export { TerminalSection } from './terminal_section';
 export { ChartSection } from './chart_section';
