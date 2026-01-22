@@ -32,14 +32,8 @@ import {
     format_short_time,
     mask_value,
 } from '../../../utils/account_format';
+import { calculate_roi_pct } from '../../../utils/pnl';
 import { SortHeader } from './sort_header';
-
-function calculate_roi_pct(trade: TradeHistory, leverage: number): number {
-    if (trade.entry_price <= 0) return 0;
-    const price_change_pct = ((trade.close_price - trade.entry_price) / trade.entry_price) * 100;
-    const roi = price_change_pct * leverage;
-    return trade.side === 'buy' ? roi : -roi;
-}
 
 const HistoryRow = memo(function HistoryRow({
     trade,
@@ -53,7 +47,8 @@ const HistoryRow = memo(function HistoryRow({
     const usd_size = trade.size * trade.close_price;
 
     const leverage = fetched_leverage ?? trade.leverage ?? 1;
-    const roi_pct = calculate_roi_pct(trade, leverage);
+    const is_long = trade.side === 'buy';
+    const roi_pct = calculate_roi_pct(trade.entry_price, trade.close_price, leverage, is_long);
 
     const handle_symbol_click = useCallback(() => {
         navigate_to_symbol(trade.exchange, trade.symbol);

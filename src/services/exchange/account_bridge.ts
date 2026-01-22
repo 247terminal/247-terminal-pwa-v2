@@ -1,6 +1,8 @@
+import { signal } from '@preact/signals';
 import type { ExchangeId } from '@/types/exchange.types';
 import type { PositionMode, MarginMode, Balance } from '@/types/trading.types';
 import type { Position, Order, TradeHistory } from '@/types/account.types';
+import type { RawFill } from '@/types/worker.types';
 import { getWorker, sendRequest } from './chart_data';
 import { get_exchange_markets } from '@/stores/exchange_store';
 import { MARKET_MAP_CACHE_TTL } from '@/config';
@@ -36,6 +38,8 @@ interface CachedMarketMap {
 const initializedExchanges = new Set<ExchangeId>();
 const marketMapCache = new Map<ExchangeId, CachedMarketMap>();
 const inflightRequests = new Map<string, Promise<unknown>>();
+
+export const initialized_exchanges_signal = signal<Set<ExchangeId>>(new Set());
 
 function getMarketMap(exchangeId: ExchangeId): Record<string, MarketInfo> {
     const now = Date.now();
@@ -80,12 +84,14 @@ export async function init_exchange(
         credentials,
     });
     initializedExchanges.add(exchangeId);
+    initialized_exchanges_signal.value = new Set(initializedExchanges);
     marketMapCache.delete(exchangeId);
 }
 
 export async function destroy_exchange(exchangeId: ExchangeId): Promise<void> {
     await sendRequest<{ destroyed: boolean }>('DESTROY_EXCHANGE', { exchangeId });
     initializedExchanges.delete(exchangeId);
+    initialized_exchanges_signal.value = new Set(initializedExchanges);
     marketMapCache.delete(exchangeId);
 }
 
@@ -96,6 +102,7 @@ export function destroy_all_exchanges(): void {
         });
     }
     initializedExchanges.clear();
+    initialized_exchanges_signal.value = new Set();
     marketMapCache.clear();
 }
 
@@ -153,5 +160,16 @@ export function fetch_leverage_settings(
     const key = `leverage:${exchangeId}:${symbols.sort().join(',')}`;
     return dedupeRequest(key, () =>
         sendRequest<Record<string, number>>('FETCH_LEVERAGE_SETTINGS', { exchangeId, symbols })
+    );
+}
+
+export function fetch_symbol_fills(
+    exchangeId: ExchangeId,
+    symbol: string,
+    limit = 100
+): Promise<RawFill[]> {
+    const key = `fills:${exchangeId}:${symbol}`;
+    return dedupeRequest(key, () =>
+        sendRequest<RawFill[]>('FETCH_SYMBOL_FILLS', { exchangeId, symbol, limit })
     );
 }

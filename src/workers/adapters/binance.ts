@@ -1,5 +1,5 @@
 import type binanceusdm from 'ccxt/js/src/pro/binanceusdm.js';
-import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 
 export type BinanceExchange = InstanceType<typeof binanceusdm>;
 
@@ -315,4 +315,44 @@ export async function fetch_leverage_settings(
         console.error('failed to fetch binance leverage settings:', (err as Error).message);
         return {};
     }
+}
+
+export async function fetch_symbol_fills(
+    exchange: BinanceExchange,
+    symbol: string,
+    limit: number
+): Promise<RawFill[]> {
+    const binance_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    const tradesRaw = await exchange.fapiPrivateGetUserTrades({
+        symbol: binance_symbol,
+        limit: Math.min(limit, 1000),
+    });
+    if (!is_trade_array(tradesRaw)) return [];
+
+    return tradesRaw.map((t, idx) => {
+        const is_buy = t.side?.toUpperCase() === 'BUY';
+        const pos_side = t.positionSide?.toUpperCase() || 'BOTH';
+        const pnl = Number(t.realizedPnl) || 0;
+
+        let direction: 'open' | 'close';
+        if (pos_side === 'LONG') {
+            direction = is_buy ? 'open' : 'close';
+        } else if (pos_side === 'SHORT') {
+            direction = is_buy ? 'close' : 'open';
+        } else {
+            direction = pnl !== 0 ? 'close' : 'open';
+        }
+
+        return {
+            id: `${t.orderId}-${idx}`,
+            order_id: t.orderId,
+            symbol: normalize_symbol(t.symbol),
+            side: is_buy ? 'buy' : 'sell',
+            price: Number(t.price || 0),
+            size: Number(t.qty || 0),
+            time: Number(t.time || Date.now()),
+            closed_pnl: pnl,
+            direction,
+        };
+    });
 }

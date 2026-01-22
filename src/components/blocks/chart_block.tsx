@@ -6,12 +6,18 @@ import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/cha
 import { EXCHANGE_ORDER, type ExchangeId } from '../../types/exchange.types';
 import type { ChartSettings, ChartBlockProps, EmaSettings } from '../../types/chart.types';
 import type { EmaPoint, EmaState } from '../../types/indicator.types';
+import type { RawFill } from '../../types/worker.types';
 import {
     fetch_ohlcv,
     watch_ohlcv,
     toolbar_to_chart_timeframe,
     type OHLCV,
 } from '../../services/exchange/chart_data';
+import {
+    fetch_symbol_fills,
+    has_exchange,
+    initialized_exchanges_signal,
+} from '../../services/exchange/account_bridge';
 import { markets, get_market } from '../../stores/exchange_store';
 import { exchange_connection_status } from '../../stores/credentials_store';
 import { positions_list, orders_list } from '../../stores/account_store';
@@ -115,6 +121,7 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
     const [data, set_data] = useState<OHLCV[]>([]);
     const [loading, set_loading] = useState(true);
     const [ema_data, set_ema_data] = useState<EmaPoint[]>([]);
+    const [fills, set_fills] = useState<RawFill[]>([]);
     const ema_state_ref = useRef<EmaState | null>(null);
 
     const state_ref = useRef({ exchange, symbol });
@@ -283,6 +290,36 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
         set_ema_data(points);
     }, [ema_period]);
 
+    const is_exchange_connected = connection_status[exchange];
+    const initialized_exchanges = initialized_exchanges_signal.value;
+    const is_exchange_ready = is_exchange_connected && initialized_exchanges.has(exchange);
+
+    useEffect(() => {
+        set_fills([]);
+
+        if (!is_exchange_ready) {
+            return;
+        }
+
+        let cancelled = false;
+
+        fetch_symbol_fills(exchange, symbol, 100)
+            .then((result) => {
+                if (!cancelled) {
+                    set_fills(result);
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    set_fills([]);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [exchange, symbol, is_exchange_ready]);
+
     const handle_symbol_change = useCallback(
         (ex: ExchangeId, s: string) => {
             if (ex === exchange && s === symbol) return;
@@ -391,6 +428,7 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
                     positions={filtered_positions}
                     orders={filtered_orders}
                     current_price={current_price}
+                    fills={fills}
                 />
             </div>
         </div>

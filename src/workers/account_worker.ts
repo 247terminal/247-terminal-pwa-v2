@@ -11,12 +11,14 @@ import {
     type RawPosition,
     type RawOrder,
     type RawClosedPosition,
+    type RawFill,
     type BinanceExchange,
     type BybitExchange,
     type BlofinExchange,
     type HyperliquidExchange,
 } from './adapters';
 import type { ExchangeId, CcxtExchange } from '@/types/worker.types';
+import { mapPosition, mapOrder, mapClosedPosition } from './position_mappers';
 
 export interface ExchangeAuthParams {
     api_key?: string;
@@ -29,17 +31,6 @@ export interface ExchangeAuthParams {
 export interface MarketInfo {
     contract_size?: number;
 }
-
-const ORDER_TYPE_MAP = {
-    limit: 'limit',
-    market: 'market',
-    stop: 'stop',
-    stop_market: 'stop',
-    take_profit: 'take_profit',
-    take_profit_market: 'take_profit',
-    stop_loss: 'stop_loss',
-    trailing_stop: 'stop',
-} as const;
 
 export const authenticatedExchanges: Record<string, CcxtExchange> = {};
 
@@ -128,106 +119,6 @@ export async function fetchAccountConfig(exchangeId: ExchangeId): Promise<{
     }
 
     return { position_mode, default_margin_mode: 'cross' };
-}
-
-function mapPosition(
-    raw: RawPosition,
-    exchangeId: ExchangeId,
-    marketMap: Record<string, MarketInfo>
-): {
-    id: string;
-    exchange: ExchangeId;
-    symbol: string;
-    side: 'long' | 'short';
-    size: number;
-    contracts?: number;
-    entry_price: number;
-    last_price: number;
-    liquidation_price: number | null;
-    unrealized_pnl: number;
-    unrealized_pnl_pct: number;
-    margin: number;
-    leverage: number;
-    margin_mode: 'cross' | 'isolated';
-    updated_at: number;
-} {
-    const side: 'long' | 'short' = raw.side === 'short' ? 'short' : 'long';
-    const margin_mode = raw.margin_mode;
-    const market = marketMap[raw.symbol];
-    const entry_price = Number(raw.entry_price ?? 0);
-    const margin = Number(raw.initial_margin ?? 0);
-    const leverage = Number(raw.leverage ?? 1);
-    const unrealized_pnl = Number(raw.unrealized_pnl ?? 0);
-    const unrealized_pnl_pct = margin > 0 ? (unrealized_pnl / margin) * 100 : 0;
-
-    let size = raw.contracts;
-    let contracts: number | undefined;
-
-    if (exchangeId === 'blofin') {
-        contracts = raw.contracts;
-        const contract_size = market?.contract_size;
-        if (contract_size && contract_size > 0) {
-            size = raw.contracts * contract_size;
-        }
-    }
-
-    return {
-        id: `${exchangeId}-${raw.symbol}-${side}`,
-        exchange: exchangeId,
-        symbol: raw.symbol,
-        side,
-        size,
-        contracts,
-        entry_price,
-        last_price: Number(raw.mark_price ?? raw.entry_price ?? 0),
-        liquidation_price: raw.liquidation_price ? Number(raw.liquidation_price) : null,
-        unrealized_pnl,
-        unrealized_pnl_pct,
-        margin,
-        leverage,
-        margin_mode,
-        updated_at: Date.now(),
-    };
-}
-
-function mapOrder(
-    raw: RawOrder,
-    exchangeId: ExchangeId,
-    marketMap: Record<string, MarketInfo>
-): {
-    id: string;
-    exchange: ExchangeId;
-    symbol: string;
-    side: 'buy' | 'sell';
-    type: string;
-    size: number;
-    price: number;
-    filled: number;
-    status: 'open' | 'partial';
-    created_at: number;
-} {
-    const market = marketMap[raw.symbol];
-    const contract_size =
-        exchangeId === 'blofin' && market?.contract_size && market.contract_size > 0
-            ? market.contract_size
-            : 1;
-    const size = raw.amount * contract_size;
-    const filled = raw.filled * contract_size;
-    const status: 'open' | 'partial' =
-        raw.filled > 0 && raw.filled < raw.amount ? 'partial' : 'open';
-
-    return {
-        id: raw.id,
-        exchange: exchangeId,
-        symbol: raw.symbol,
-        side: raw.side,
-        type: ORDER_TYPE_MAP[raw.type] ?? 'limit',
-        size,
-        price: raw.price,
-        filled,
-        status,
-        created_at: raw.timestamp,
-    };
 }
 
 export async function fetchBalance(exchangeId: ExchangeId): Promise<{
@@ -352,42 +243,6 @@ export async function fetchAccountData(
     return { balance, positions, orders };
 }
 
-function mapClosedPosition(
-    raw: RawClosedPosition,
-    exchangeId: ExchangeId,
-    idx: number
-): {
-    id: string;
-    exchange: ExchangeId;
-    symbol: string;
-    side: 'buy' | 'sell';
-    size: number;
-    entry_price: number;
-    close_price: number;
-    realized_pnl: number;
-    realized_pnl_pct: number;
-    leverage: number;
-    closed_at: number;
-} {
-    const price_change_pct =
-        raw.entry_price > 0 ? ((raw.exit_price - raw.entry_price) / raw.entry_price) * 100 : 0;
-    const roi_pct = price_change_pct * raw.leverage;
-
-    return {
-        id: `${exchangeId}-${raw.symbol}-${raw.close_time}-${idx}`,
-        exchange: exchangeId,
-        symbol: raw.symbol,
-        side: raw.side === 'long' ? 'buy' : 'sell',
-        size: raw.size,
-        entry_price: raw.entry_price,
-        close_price: raw.exit_price,
-        realized_pnl: raw.realized_pnl,
-        realized_pnl_pct: raw.side === 'long' ? roi_pct : -roi_pct,
-        leverage: raw.leverage,
-        closed_at: raw.close_time,
-    };
-}
-
 export async function fetchClosedPositions(
     exchangeId: ExchangeId,
     limit: number
@@ -460,6 +315,48 @@ export async function fetchLeverageSettings(
     } catch (err) {
         console.error(`failed to fetch ${exchangeId} leverage settings:`, (err as Error).message);
         return {};
+    }
+}
+
+export async function fetchSymbolFills(
+    exchangeId: ExchangeId,
+    symbol: string,
+    limit: number
+): Promise<RawFill[]> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.fetch_symbol_fills(
+                    exchange as BinanceExchange,
+                    symbol,
+                    limit
+                );
+            case 'bybit':
+                return await bybitAdapter.fetch_symbol_fills(
+                    exchange as BybitExchange,
+                    symbol,
+                    limit
+                );
+            case 'blofin':
+                return await blofinAdapter.fetch_symbol_fills(
+                    exchange as BlofinExchange,
+                    symbol,
+                    limit
+                );
+            case 'hyperliquid':
+                return await hyperliquidAdapter.fetch_symbol_fills(
+                    exchange as HyperliquidExchange,
+                    symbol,
+                    limit
+                );
+            default:
+                return [];
+        }
+    } catch (err) {
+        console.error(`failed to fetch ${exchangeId} symbol fills:`, (err as Error).message);
+        return [];
     }
 }
 

@@ -1,5 +1,5 @@
 import type bybit from 'ccxt/js/src/pro/bybit.js';
-import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
 
 export type BybitExchange = InstanceType<typeof bybit>;
@@ -84,6 +84,26 @@ function is_balance_response(data: unknown): data is BybitBalanceResponse {
 }
 
 function is_order_response(data: unknown): data is BybitOrderResponse {
+    return data !== null && typeof data === 'object' && 'result' in data;
+}
+
+interface BybitExecutionResponse {
+    result?: {
+        list?: Array<{
+            symbol: string;
+            execId: string;
+            orderId: string;
+            side: string;
+            execPrice: string;
+            execQty: string;
+            execTime: string;
+            closedSize: string;
+            execType: string;
+        }>;
+    };
+}
+
+function is_execution_response(data: unknown): data is BybitExecutionResponse {
     return data !== null && typeof data === 'object' && 'result' in data;
 }
 
@@ -245,4 +265,39 @@ export async function fetch_closed_positions(
         };
     }
     return result;
+}
+
+export async function fetch_symbol_fills(
+    exchange: BybitExchange,
+    symbol: string,
+    limit: number
+): Promise<RawFill[]> {
+    const bybit_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    const response = await exchange.privateGetV5ExecutionList({
+        category: 'linear',
+        symbol: bybit_symbol,
+        limit: String(limit),
+    });
+    if (!is_execution_response(response)) return [];
+    const list = response.result?.list;
+    if (!Array.isArray(list)) return [];
+
+    const trades = list.filter((f) => f.execType === 'Trade');
+
+    return trades.map((f) => {
+        const is_buy = f.side === 'Buy';
+        const closed_size = Number(f.closedSize || 0);
+        const is_close = closed_size > 0;
+        return {
+            id: f.execId,
+            order_id: f.orderId,
+            symbol: f.symbol.replace(/USDT$/, '/USDT:USDT'),
+            side: is_buy ? 'buy' : 'sell',
+            price: Number(f.execPrice || 0),
+            size: Number(f.execQty || 0),
+            time: Number(f.execTime || Date.now()),
+            closed_pnl: 0,
+            direction: is_close ? 'close' : 'open',
+        };
+    });
 }

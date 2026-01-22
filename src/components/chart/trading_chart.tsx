@@ -18,6 +18,7 @@ import { tick_size_to_precision } from '../../utils/format';
 import { get_timeframe_seconds } from '../../services/chart/drawing_manager';
 import { use_chart_drawing } from '../../hooks/use_chart_drawing';
 import { use_price_lines } from '../../hooks/use_price_lines';
+import { use_trade_markers } from '../../hooks/use_trade_markers';
 import { DrawingToolbar } from './drawing_toolbar';
 import { DrawingOverlay } from './drawing_overlay';
 import { ErrorBoundary } from '../common/error_boundary';
@@ -63,6 +64,7 @@ export function TradingChart({
     positions = [],
     orders = [],
     current_price = null,
+    fills = [],
 }: TradingChartProps) {
     const container_ref = useRef<HTMLDivElement>(null);
     const chart_ref = useRef<IChartApi | null>(null);
@@ -118,6 +120,15 @@ export function TradingChart({
         data_key,
         colors: price_line_colors,
         is_private: privacy_mode.value,
+    });
+
+    use_trade_markers({
+        series,
+        fills,
+        data_key,
+        colors: price_line_colors,
+        first_candle_time,
+        timeframe_seconds: get_timeframe_seconds(timeframe),
     });
 
     useEffect(() => {

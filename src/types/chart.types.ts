@@ -2,6 +2,7 @@ import type { ExchangeId } from './exchange.types';
 import type { Timeframe } from './candle.types';
 import type { EmaPoint } from './indicator.types';
 import type { Position, Order } from './account.types';
+import type { RawFill } from './worker.types';
 
 export interface ThemeColors {
     background: string;
@@ -99,6 +100,7 @@ export interface TradingChartProps {
     positions?: Position[];
     orders?: Order[];
     current_price?: number | null;
+    fills?: RawFill[];
 }
 
 export interface ToggleButtonProps {

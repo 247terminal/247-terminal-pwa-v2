@@ -342,3 +342,15 @@ export interface RawClosedPosition {
     close_time: number;
     leverage: number;
 }
+
+export interface RawFill {
+    id: string;
+    order_id: string;
+    symbol: string;
+    side: 'buy' | 'sell';
+    price: number;
+    size: number;
+    time: number;
+    closed_pnl: number;
+    direction: 'open' | 'close';
+}

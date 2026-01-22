@@ -1,5 +1,5 @@
 import type blofin from 'ccxt/js/src/pro/blofin.js';
-import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 import { POSITION_CONSTANTS } from '@/config/chart.constants';
 
 export type BlofinExchange = InstanceType<typeof blofin>;
@@ -47,6 +47,8 @@ interface BlofinOrderResponse {
 interface BlofinFillResponse {
     data?: Array<{
         instId: string;
+        orderId: string;
+        tradeId: string;
         side: string;
         positionSide: string;
         fillSize: string;
@@ -386,4 +388,45 @@ export async function fetch_leverage_settings(
     }
 
     return result;
+}
+
+export async function fetch_symbol_fills(
+    exchange: BlofinExchange,
+    symbol: string,
+    limit: number
+): Promise<RawFill[]> {
+    const inst_id = symbol.replace(/\//, '-').replace(/:USDT$/, '');
+    const response = await exchange.privateGetTradeFillsHistory({
+        instId: inst_id,
+        limit: String(limit),
+    });
+    if (!is_fill_response(response)) return [];
+    const data = response.data;
+    if (!Array.isArray(data)) return [];
+
+    return data.map((f, idx) => {
+        const is_buy = f.side?.toLowerCase() === 'buy';
+        const pos_side = f.positionSide?.toLowerCase() || 'net';
+        let direction: 'open' | 'close';
+
+        if (pos_side === 'long') {
+            direction = is_buy ? 'open' : 'close';
+        } else if (pos_side === 'short') {
+            direction = is_buy ? 'close' : 'open';
+        } else {
+            direction = 'open';
+        }
+
+        return {
+            id: f.tradeId || `${f.ts}-${idx}`,
+            order_id: f.orderId || `${f.ts}-${idx}`,
+            symbol: f.instId.replace(/-/g, '/') + ':USDT',
+            side: is_buy ? 'buy' : 'sell',
+            price: Number(f.fillPrice || 0),
+            size: Number(f.fillSize || 0),
+            time: Number(f.ts || Date.now()),
+            closed_pnl: Number(f.fillPnl || 0),
+            direction,
+        };
+    });
 }

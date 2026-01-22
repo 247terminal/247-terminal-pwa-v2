@@ -1,5 +1,5 @@
 import type hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
-import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 import { HYPERLIQUID_CACHE_TTL, EXCHANGE_CONFIG } from '@/config';
 
 export type HyperliquidExchange = InstanceType<typeof hyperliquid>;
@@ -36,6 +36,7 @@ interface OpenOrder {
 
 interface UserFill {
     coin: string;
+    oid: number;
     side: string;
     px: string;
     sz: string;
@@ -270,4 +271,39 @@ export async function fetch_leverage_settings(
     }
 
     return leverages;
+}
+
+export async function fetch_symbol_fills(
+    exchange: HyperliquidExchange,
+    symbol: string,
+    limit: number
+): Promise<RawFill[]> {
+    const wallet = exchange.walletAddress;
+    if (!wallet) return [];
+
+    const coin = symbol.split('/')[0];
+    const response = await exchange.publicPostInfo({
+        type: 'userFills',
+        user: wallet,
+    });
+    if (!is_user_fills_array(response)) return [];
+
+    const filtered = response.filter((f) => f.coin === coin).slice(0, limit);
+
+    return filtered.map((f, idx) => {
+        const is_buy = f.side === 'B';
+        const dir = f.dir || '';
+        const is_close = dir.startsWith('Close');
+        return {
+            id: `${f.time}-${idx}`,
+            order_id: String(f.oid || `${f.time}-${idx}`),
+            symbol: `${f.coin}/USDC:USDC`,
+            side: is_buy ? 'buy' : 'sell',
+            price: Number(f.px || 0),
+            size: Number(f.sz || 0),
+            time: Number(f.time || Date.now()),
+            closed_pnl: Number(f.closedPnl || 0),
+            direction: is_close ? 'close' : 'open',
+        };
+    });
 }

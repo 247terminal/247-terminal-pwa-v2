@@ -1,5 +1,17 @@
 import type { PnlResult } from '../types/account.types';
 
+export function calculate_roi_pct(
+    entry_price: number,
+    exit_price: number,
+    leverage: number,
+    is_long: boolean
+): number {
+    if (entry_price <= 0) return 0;
+    const price_change_pct = ((exit_price - entry_price) / entry_price) * 100;
+    const roi = price_change_pct * leverage;
+    return is_long ? roi : -roi;
+}
+
 export function calculate_position_pnl(
     is_long: boolean,
     entry_price: number,

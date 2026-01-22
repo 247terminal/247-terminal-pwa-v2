@@ -25,6 +25,7 @@ import {
     fetchAccountData,
     fetchClosedPositions,
     fetchLeverageSettings,
+    fetchSymbolFills,
     hyperliquidAdapter,
     type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
@@ -388,6 +389,13 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 result = await fetchLeverageSettings(
                     payload?.exchangeId as ExchangeId,
                     (payload?.symbols as string[]) || []
+                );
+                break;
+            case 'FETCH_SYMBOL_FILLS':
+                result = await fetchSymbolFills(
+                    payload?.exchangeId as ExchangeId,
+                    payload?.symbol as string,
+                    (payload?.limit as number) || 100
                 );
                 break;
             default:
