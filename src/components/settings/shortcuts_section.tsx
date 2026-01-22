@@ -10,7 +10,7 @@ import type {
 function Toggle({ label, checked, on_change }: ToggleProps) {
     return (
         <label class="flex items-center justify-between cursor-pointer">
-            <span class="text-xs text-base-content/70">{label}</span>
+            <span class="text-xs text-base-content/70 uppercase">{label}</span>
             <input
                 type="checkbox"
                 class="toggle toggle-xs toggle-primary"
@@ -54,7 +54,7 @@ function ShortcutEditor({ label, binding, on_change }: ShortcutEditorProps) {
 
     return (
         <div class="flex items-center justify-between">
-            <span class="text-xs text-base-content/70">{label}</span>
+            <span class="text-xs text-base-content/70 uppercase">{label}</span>
             <button
                 type="button"
                 onClick={() => set_is_recording(true)}

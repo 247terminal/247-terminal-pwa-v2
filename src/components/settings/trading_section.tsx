@@ -4,7 +4,7 @@ import type { ToggleProps, ToggleWithSliderProps } from '@/types/settings.types'
 function Toggle({ label, checked, on_change }: ToggleProps) {
     return (
         <label class="flex items-center cursor-pointer">
-            <span class="w-1/4 text-xs text-base-content/70">{label}</span>
+            <span class="w-1/4 text-xs text-base-content/70 uppercase">{label}</span>
             <div class="w-3/4 flex justify-end">
                 <input
                     type="checkbox"
@@ -32,7 +32,7 @@ function ToggleWithSlider({
 
     return (
         <div class="flex items-center">
-            <span class="w-1/4 text-xs text-base-content/70">{label}</span>
+            <span class="w-1/4 text-xs text-base-content/70 uppercase">{label}</span>
             <div class="w-3/4 flex items-center justify-end gap-2">
                 {checked && (
                     <>
@@ -85,7 +85,7 @@ export function TradingSection() {
     return (
         <div class="space-y-4">
             <div class="flex items-center">
-                <span class="w-1/4 text-xs text-base-content/70">Slippage</span>
+                <span class="w-1/4 text-xs text-base-content/70 uppercase">Slippage</span>
                 <div class="w-3/4 flex gap-2">
                     {SLIPPAGE_OPTIONS.map((opt) => (
                         <button

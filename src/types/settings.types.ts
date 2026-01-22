@@ -10,6 +10,9 @@ export interface TradingSettings {
     sizes: [number, number, number, number];
     size_count: 1 | 2 | 4;
     button_style: 'swipe' | 'standard';
+    freeze_on_hover: boolean;
+    full_size_media: boolean;
+    disable_media: boolean;
     slippage: number | 'MARKET';
     auto_tp_enabled: boolean;
     auto_tp_value: number;
@@ -23,9 +26,6 @@ export interface TerminalSettings {
     auto_login: boolean;
     push_notifications: boolean;
     notification_filter: 'all' | 'critical' | 'special' | 'both';
-    full_size_media: boolean;
-    disable_media: boolean;
-    freeze_on_hover: boolean;
     share_trades: boolean;
     show_profit: boolean;
 }

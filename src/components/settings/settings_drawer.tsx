@@ -8,6 +8,13 @@ import {
     Sun,
     Lock,
     LockOpen,
+    Settings,
+    LineChart,
+    Rss,
+    Tag,
+    Keyboard,
+    Bot,
+    HardDrive,
 } from 'lucide-preact';
 import { use_click_outside, use_escape_key } from '@/hooks';
 import { clear_token } from '@/services/auth/session.service';
@@ -63,7 +70,7 @@ function AccordionSection({
 export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
     const drawer_ref = useRef<HTMLDivElement>(null);
     const [expanded_section, set_expanded_section] = useState<SettingsSectionId | null>(
-        'news_trading'
+        'terminal'
     );
 
     const handle_close = useCallback(() => {
@@ -88,6 +95,16 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
             >
                 <div class="flex-1 overflow-y-auto">
                     <AccordionSection
+                        id="terminal"
+                        title="GENERAL"
+                        icon={<Settings class="w-4 h-4" />}
+                        expanded_section={expanded_section}
+                        on_toggle={toggle_section}
+                    >
+                        <TerminalSection />
+                    </AccordionSection>
+
+                    <AccordionSection
                         id="news_trading"
                         title="NEWS TRADING"
                         icon={<Newspaper class="w-4 h-4" />}
@@ -108,17 +125,9 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                     </AccordionSection>
 
                     <AccordionSection
-                        id="terminal"
-                        title="TERMINAL"
-                        expanded_section={expanded_section}
-                        on_toggle={toggle_section}
-                    >
-                        <TerminalSection />
-                    </AccordionSection>
-
-                    <AccordionSection
                         id="chart"
                         title="CHART"
+                        icon={<LineChart class="w-4 h-4" />}
                         expanded_section={expanded_section}
                         on_toggle={toggle_section}
                     >
@@ -128,6 +137,7 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                     <AccordionSection
                         id="news"
                         title="NEWS"
+                        icon={<Rss class="w-4 h-4" />}
                         expanded_section={expanded_section}
                         on_toggle={toggle_section}
                     >
@@ -137,6 +147,7 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                     <AccordionSection
                         id="keywords"
                         title="KEYWORDS"
+                        icon={<Tag class="w-4 h-4" />}
                         expanded_section={expanded_section}
                         on_toggle={toggle_section}
                     >
@@ -146,6 +157,7 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                     <AccordionSection
                         id="shortcuts"
                         title="SHORTCUTS"
+                        icon={<Keyboard class="w-4 h-4" />}
                         expanded_section={expanded_section}
                         on_toggle={toggle_section}
                     >
@@ -155,6 +167,7 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                     <AccordionSection
                         id="botting"
                         title="BOTTING"
+                        icon={<Bot class="w-4 h-4" />}
                         expanded_section={expanded_section}
                         on_toggle={toggle_section}
                     >
@@ -164,6 +177,7 @@ export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
                     <AccordionSection
                         id="backup"
                         title="BACKUP & RESTORE"
+                        icon={<HardDrive class="w-4 h-4" />}
                         expanded_section={expanded_section}
                         on_toggle={toggle_section}
                     >

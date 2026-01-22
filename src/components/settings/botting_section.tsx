@@ -4,7 +4,7 @@ import type { ToggleProps, NumberInputProps } from '@/types/settings.types';
 function Toggle({ label, checked, on_change }: ToggleProps) {
     return (
         <label class="flex items-center justify-between cursor-pointer">
-            <span class="text-xs text-base-content/70">{label}</span>
+            <span class="text-xs text-base-content/70 uppercase">{label}</span>
             <input
                 type="checkbox"
                 class="toggle toggle-xs toggle-primary"
@@ -18,7 +18,7 @@ function Toggle({ label, checked, on_change }: ToggleProps) {
 function NumberInput({ label, value, on_change, min, max, step = 1, suffix }: NumberInputProps) {
     return (
         <div class="flex items-center justify-between">
-            <span class="text-xs text-base-content/70">{label}</span>
+            <span class="text-xs text-base-content/70 uppercase">{label}</span>
             <div class="flex items-center gap-1">
                 <input
                     type="number"
@@ -77,7 +77,7 @@ export function BottingSection() {
                         />
                         {botting.mobile_notification_enabled && (
                             <div class="space-y-2">
-                                <span class="text-xs text-base-content/70">NTFY Topic</span>
+                                <span class="text-xs text-base-content/70 uppercase">NTFY Topic</span>
                                 <input
                                     type="text"
                                     class="w-full bg-base-300 px-2 py-1.5 rounded text-xs text-base-content outline-none"
@@ -110,7 +110,7 @@ export function BottingSection() {
                         {botting.auto_pause_enabled && (
                             <>
                                 <div class="flex items-center justify-between">
-                                    <span class="text-xs text-base-content/70">Timeframe</span>
+                                    <span class="text-xs text-base-content/70 uppercase">Timeframe</span>
                                     <select
                                         class="bg-base-300 px-2 py-1 rounded text-xs text-base-content outline-none"
                                         value={botting.auto_pause_timeframe}

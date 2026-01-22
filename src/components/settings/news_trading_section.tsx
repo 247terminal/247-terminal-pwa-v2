@@ -22,8 +22,44 @@ export function NewsTradingSection() {
 
     return (
         <div class="space-y-4">
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs text-base-content/70 uppercase">Freeze feed on hover</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-xs toggle-primary"
+                    checked={trading.freeze_on_hover}
+                    onChange={(e) =>
+                        set_setting('trading', 'freeze_on_hover', (e.target as HTMLInputElement).checked)
+                    }
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs text-base-content/70 uppercase">Full size media</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-xs toggle-primary"
+                    checked={trading.full_size_media}
+                    onChange={(e) =>
+                        set_setting('trading', 'full_size_media', (e.target as HTMLInputElement).checked)
+                    }
+                />
+            </label>
+
+            <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs text-base-content/70 uppercase">Disable media</span>
+                <input
+                    type="checkbox"
+                    class="toggle toggle-xs toggle-primary"
+                    checked={trading.disable_media}
+                    onChange={(e) =>
+                        set_setting('trading', 'disable_media', (e.target as HTMLInputElement).checked)
+                    }
+                />
+            </label>
+
             <div class="flex items-center">
-                <span class="w-1/4 text-xs text-base-content/70">Style</span>
+                <span class="w-1/4 text-xs text-base-content/70 uppercase">Style</span>
                 <div class="w-3/4 flex gap-2">
                     {BUTTON_STYLE_OPTIONS.map((opt) => (
                         <button
@@ -43,7 +79,7 @@ export function NewsTradingSection() {
             </div>
 
             <div class="flex items-center">
-                <span class="w-1/4 text-xs text-base-content/70">Buttons</span>
+                <span class="w-1/4 text-xs text-base-content/70 uppercase">Buttons</span>
                 <div class="w-3/4 flex gap-2">
                     {SIZE_COUNT_OPTIONS.map((count) => (
                         <button
@@ -63,7 +99,7 @@ export function NewsTradingSection() {
             </div>
 
             <div class="flex items-center">
-                <span class="w-1/4 text-xs text-base-content/70 shrink-0">Amounts</span>
+                <span class="w-1/4 text-xs text-base-content/70 uppercase shrink-0">Amounts</span>
                 <div class="w-3/4 flex gap-2 min-w-0">
                     {get_visible_sizes().map((size, index) => (
                         <div key={index} class="relative flex-1 min-w-0">
