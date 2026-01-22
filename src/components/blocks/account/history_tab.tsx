@@ -11,6 +11,7 @@ import type {
 import type { ExchangeId } from '../../../types/exchange.types';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import { history, privacy_mode, loading, refresh_history } from '../../../stores/account_store';
+import { LogoSpinner } from '../../common/logo_spinner';
 import { show_pnl_card } from '../../../stores/pnl_card_store';
 import {
     get_market,
@@ -246,9 +247,11 @@ export function HistoryTab() {
     if (trades.length === 0) {
         return (
             <div class="flex-1 flex items-center justify-center">
-                <div class="text-xs text-base-content/50 text-center py-8">
-                    {is_loading ? 'Loading history...' : 'No trade history'}
-                </div>
+                {is_loading ? (
+                    <LogoSpinner size={32} />
+                ) : (
+                    <div class="text-xs text-base-content/50 text-center py-8">No trade history</div>
+                )}
             </div>
         );
     }

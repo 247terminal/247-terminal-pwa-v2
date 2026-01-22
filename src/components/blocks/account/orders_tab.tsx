@@ -7,7 +7,8 @@ import type {
     OrderRowProps,
     SortDirection,
 } from '../../../types/account.types';
-import { orders_list, privacy_mode, cancel_order } from '../../../stores/account_store';
+import { orders_list, privacy_mode, loading, cancel_order } from '../../../stores/account_store';
+import { LogoSpinner } from '../../common/logo_spinner';
 import { get_market } from '../../../stores/exchange_store';
 import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
 import { format_symbol, parse_symbol } from '../../chart/symbol_row';
@@ -134,6 +135,7 @@ function sort_orders(orders: Order[], key: OrderSortKey, direction: SortDirectio
 export function OrdersTab() {
     const orders = orders_list.value;
     const is_private = privacy_mode.value;
+    const is_loading = loading.value.orders;
     const [sort_key, set_sort_key] = useState<OrderSortKey>('symbol');
     const [sort_direction, set_sort_direction] = useState<SortDirection>('asc');
 
@@ -157,7 +159,11 @@ export function OrdersTab() {
     if (orders.length === 0) {
         return (
             <div class="flex-1 flex items-center justify-center">
-                <div class="text-xs text-base-content/50 text-center py-8">No active orders</div>
+                {is_loading ? (
+                    <LogoSpinner size={32} />
+                ) : (
+                    <div class="text-xs text-base-content/50 text-center py-8">No active orders</div>
+                )}
             </div>
         );
     }

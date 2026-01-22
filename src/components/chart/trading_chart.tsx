@@ -22,6 +22,7 @@ import { use_trade_markers } from '../../hooks/use_trade_markers';
 import { DrawingToolbar } from './drawing_toolbar';
 import { DrawingOverlay } from './drawing_overlay';
 import { ErrorBoundary } from '../common/error_boundary';
+import { LogoSpinner } from '../common/logo_spinner';
 import { Eye, EyeOff, Settings } from 'lucide-preact';
 import { EmaSettingsPanel } from './ema_settings_panel';
 import { CHART_CONSTANTS, EMA_CONSTANTS } from '../../config/chart.constants';
@@ -478,7 +479,7 @@ export function TradingChart({
                 />
                 {show_spinner && (
                     <div class="absolute inset-0 flex items-center justify-center bg-base-100">
-                        <div class="w-8 h-8 border-2 border-base-content/20 border-t-primary rounded-full animate-spin" />
+                        <LogoSpinner size={48} />
                     </div>
                 )}
             </div>

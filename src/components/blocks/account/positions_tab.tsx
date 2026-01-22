@@ -10,9 +10,11 @@ import type {
 import {
     positions_list,
     privacy_mode,
+    loading,
     close_position,
     open_tpsl_modal,
 } from '../../../stores/account_store';
+import { LogoSpinner } from '../../common/logo_spinner';
 import { show_pnl_card } from '../../../stores/pnl_card_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
 import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
@@ -189,6 +191,7 @@ function sort_positions(
 export function PositionsTab() {
     const positions = positions_list.value;
     const is_private = privacy_mode.value;
+    const is_loading = loading.value.positions;
     const [sort_key, set_sort_key] = useState<PositionSortKey>('pnl');
     const [sort_direction, set_sort_direction] = useState<SortDirection>('desc');
 
@@ -212,7 +215,11 @@ export function PositionsTab() {
     if (positions.length === 0) {
         return (
             <div class="flex-1 flex items-center justify-center">
-                <div class="text-xs text-base-content/50 text-center py-8">No open positions</div>
+                {is_loading ? (
+                    <LogoSpinner size={32} />
+                ) : (
+                    <div class="text-xs text-base-content/50 text-center py-8">No open positions</div>
+                )}
             </div>
         );
     }
