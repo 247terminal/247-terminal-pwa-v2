@@ -2,6 +2,14 @@ import type { MarketData } from './chart.types';
 
 export type ExchangeId = 'binance' | 'blofin' | 'bybit' | 'hyperliquid';
 
+export interface ExchangeAuthParams {
+    api_key?: string;
+    api_secret?: string;
+    passphrase?: string;
+    wallet_address?: string;
+    private_key?: string;
+}
+
 export type StreamState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 export interface TickerEntry {

@@ -1,8 +1,10 @@
-import binanceusdm from 'ccxt/js/src/pro/binanceusdm.js';
-import blofin from 'ccxt/js/src/pro/blofin.js';
-import bybit from 'ccxt/js/src/pro/bybit.js';
-import hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
-import { PROXY_CONFIG } from '@/config';
+import {
+    getExchange,
+    setExchangeAuth,
+    clearExchangeAuth,
+    isExchangeAuthenticated,
+    type ExchangeAuthParams,
+} from './data_fetchers';
 import {
     binance as binanceAdapter,
     bybit as bybitAdapter,
@@ -20,83 +22,29 @@ import {
 import type { ExchangeId, CcxtExchange } from '@/types/worker.types';
 import { mapPosition, mapOrder, mapClosedPosition } from './position_mappers';
 
-export interface ExchangeAuthParams {
-    api_key?: string;
-    api_secret?: string;
-    passphrase?: string;
-    wallet_address?: string;
-    private_key?: string;
-}
+export type { ExchangeAuthParams };
 
 export interface MarketInfo {
     contract_size?: number;
-}
-
-export const authenticatedExchanges: Record<string, CcxtExchange> = {};
-
-function getProxyOptions(exchangeId: ExchangeId): {
-    proxy?: string;
-    headers?: Record<string, string>;
-} {
-    const proxy = PROXY_CONFIG[exchangeId];
-    if (!proxy) return {};
-    return {
-        proxy: proxy.url,
-        headers: { 'x-proxy-auth': proxy.auth },
-    };
 }
 
 export function createAuthenticatedExchange(
     exchangeId: ExchangeId,
     credentials: ExchangeAuthParams
 ): CcxtExchange {
-    const proxyOptions = getProxyOptions(exchangeId);
+    setExchangeAuth(exchangeId, credentials);
+    return getExchange(exchangeId);
+}
 
-    let instance: CcxtExchange;
-    switch (exchangeId) {
-        case 'binance':
-            instance = new binanceusdm({
-                ...proxyOptions,
-                apiKey: credentials.api_key,
-                secret: credentials.api_secret,
-                options: { warnOnFetchOpenOrdersWithoutSymbol: false },
-            }) as unknown as CcxtExchange;
-            break;
-        case 'bybit':
-            instance = new bybit({
-                apiKey: credentials.api_key,
-                secret: credentials.api_secret,
-            }) as unknown as CcxtExchange;
-            break;
-        case 'blofin':
-            instance = new blofin({
-                ...proxyOptions,
-                apiKey: credentials.api_key,
-                secret: credentials.api_secret,
-                password: credentials.passphrase,
-            }) as unknown as CcxtExchange;
-            break;
-        case 'hyperliquid':
-            instance = new hyperliquid({
-                walletAddress: credentials.wallet_address,
-                privateKey: credentials.private_key,
-            }) as unknown as CcxtExchange;
-            break;
-        default:
-            throw new Error(`unsupported exchange: ${exchangeId}`);
-    }
-
-    instance.markets = {};
-    instance.markets_by_id = {};
-    return instance;
+export function destroyAuthenticatedExchange(exchangeId: ExchangeId): void {
+    clearExchangeAuth(exchangeId);
 }
 
 function getAuthenticatedExchange(exchangeId: ExchangeId): CcxtExchange {
-    const instance = authenticatedExchanges[exchangeId];
-    if (!instance) {
+    if (!isExchangeAuthenticated(exchangeId)) {
         throw new Error(`exchange ${exchangeId} not initialized`);
     }
-    return instance;
+    return getExchange(exchangeId);
 }
 
 export async function fetchAccountConfig(exchangeId: ExchangeId): Promise<{

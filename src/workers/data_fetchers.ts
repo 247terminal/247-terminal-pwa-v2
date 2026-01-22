@@ -1,6 +1,14 @@
-import { EXCHANGE_CONFIG, VALID_SETTLE, TIMEFRAME_MAP } from '@/config';
+import { EXCHANGE_CONFIG, VALID_SETTLE, TIMEFRAME_MAP, PROXY_CONFIG } from '@/config';
 import { fetchBlofinFundingRates } from './streams/blofin';
-import type { ExchangeId, MarketInfo, CcxtExchange, CcxtMarket } from '@/types/worker.types';
+import type {
+    ExchangeId,
+    ExchangeAuthParams,
+    MarketInfo,
+    CcxtExchange,
+    CcxtMarket,
+} from '@/types/worker.types';
+
+export type { ExchangeAuthParams };
 
 type ExchangeClassType = new (options: Record<string, unknown>) => CcxtExchange;
 
@@ -11,31 +19,111 @@ export function registerExchangeClass(name: string, cls: ExchangeClassType): voi
 }
 
 const exchanges: Record<string, CcxtExchange> = {};
+const exchangeCredentials: Record<string, ExchangeAuthParams> = {};
 
-export function getExchange(exchangeId: ExchangeId): CcxtExchange {
-    if (exchanges[exchangeId]) return exchanges[exchangeId];
+function getProxyOptions(exchangeId: ExchangeId): {
+    proxy?: string;
+    headers?: Record<string, string>;
+} {
+    const proxy = PROXY_CONFIG[exchangeId];
+    if (!proxy) return {};
+    return {
+        proxy: proxy.url,
+        headers: { 'x-proxy-auth': proxy.auth },
+    };
+}
 
+function createExchangeInstance(
+    exchangeId: ExchangeId,
+    credentials?: ExchangeAuthParams
+): CcxtExchange {
     const config = EXCHANGE_CONFIG[exchangeId];
     if (!config) throw new Error(`unknown exchange: ${exchangeId}`);
 
     const ExchangeClass = EXCHANGE_CLASSES[config.ccxtClass];
     if (!ExchangeClass) throw new Error(`ccxt class not found: ${config.ccxtClass}`);
 
+    const proxyOptions = getProxyOptions(exchangeId);
+
     const exchangeOptions: Record<string, unknown> = {
+        ...proxyOptions,
         enableRateLimit: false,
-        options: { defaultType: config.defaultType },
+        options: {
+            defaultType: config.defaultType,
+            warnOnFetchOpenOrdersWithoutSymbol: false,
+        },
     };
 
-    if (config.proxy) exchangeOptions.proxy = config.proxy;
-    if (config.headers) exchangeOptions.headers = config.headers;
+    if (credentials?.api_key) {
+        exchangeOptions.apiKey = credentials.api_key;
+        exchangeOptions.secret = credentials.api_secret;
+        if (credentials.passphrase) {
+            exchangeOptions.password = credentials.passphrase;
+        }
+    }
+    if (credentials?.wallet_address) {
+        exchangeOptions.walletAddress = credentials.wallet_address;
+        exchangeOptions.privateKey = credentials.private_key;
+    }
 
-    exchanges[exchangeId] = new ExchangeClass(exchangeOptions) as unknown as CcxtExchange;
+    return new ExchangeClass(exchangeOptions) as unknown as CcxtExchange;
+}
+
+function hasMarkets(markets: Record<string, CcxtMarket> | undefined): boolean {
+    if (!markets) return false;
+    for (const key in markets) {
+        if (Object.hasOwn(markets, key)) return true;
+    }
+    return false;
+}
+
+function replaceExchangeInstance(exchangeId: ExchangeId, credentials?: ExchangeAuthParams): void {
+    const oldExchange = exchanges[exchangeId];
+
+    if (oldExchange?.close) {
+        oldExchange.close().catch((err) => {
+            console.error('failed to close exchange:', exchangeId, (err as Error).message);
+        });
+    }
+
+    const newExchange = createExchangeInstance(exchangeId, credentials);
+
+    if (hasMarkets(oldExchange?.markets)) {
+        newExchange.markets = oldExchange.markets;
+        newExchange.markets_by_id = oldExchange.markets_by_id || {};
+    }
+
+    exchanges[exchangeId] = newExchange;
+
+    if (credentials) {
+        exchangeCredentials[exchangeId] = credentials;
+    } else {
+        delete exchangeCredentials[exchangeId];
+    }
+}
+
+export function getExchange(exchangeId: ExchangeId): CcxtExchange {
+    if (exchanges[exchangeId]) return exchanges[exchangeId];
+
+    exchanges[exchangeId] = createExchangeInstance(exchangeId);
     return exchanges[exchangeId];
+}
+
+export function setExchangeAuth(exchangeId: ExchangeId, credentials: ExchangeAuthParams): void {
+    replaceExchangeInstance(exchangeId, credentials);
+}
+
+export function clearExchangeAuth(exchangeId: ExchangeId): void {
+    replaceExchangeInstance(exchangeId);
+}
+
+export function isExchangeAuthenticated(exchangeId: ExchangeId): boolean {
+    return !!exchangeCredentials[exchangeId];
 }
 
 export async function loadMarkets(exchangeId: ExchangeId): Promise<Record<string, CcxtMarket>> {
     const exchange = getExchange(exchangeId);
-    if (!exchange.markets || Object.keys(exchange.markets).length === 0) {
+    if (!hasMarkets(exchange.markets)) {
         await exchange.loadMarkets();
     }
     return exchange.markets;
@@ -53,6 +141,7 @@ function isLinearSwapForExchange(market: CcxtMarket, exchangeId: ExchangeId): bo
 }
 
 export function getSwapSymbols(exchange: CcxtExchange): string[] {
+    if (!exchange.markets) return [];
     return Object.values(exchange.markets)
         .filter(isLinearSwap)
         .map((m) => m.symbol);
@@ -112,8 +201,10 @@ export async function fetchFundingRates(
     exchangeId: ExchangeId
 ): Promise<Record<string, { funding_rate: number | null; next_funding_time: number | null }>> {
     const exchange = getExchange(exchangeId);
+    await loadMarkets(exchangeId);
+
     const symbols = getSwapSymbols(exchange);
-    if (!symbols || symbols.length === 0) return {};
+    if (symbols.length === 0) return {};
 
     if (exchangeId === 'blofin') {
         return fetchBlofinFundingRates(exchange);

@@ -16,8 +16,8 @@ import { startBlofinNativeStream, stopBlofinNativeStream } from './streams/blofi
 import { startCexStream, stopCexStream } from './streams/hyperliquid_cex';
 import { startDexStream, stopDexStream } from './streams/hyperliquid_dex';
 import {
-    authenticatedExchanges,
     createAuthenticatedExchange,
+    destroyAuthenticatedExchange,
     fetchAccountConfig,
     fetchBalance,
     fetchPositions,
@@ -319,36 +319,13 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             case 'INIT_EXCHANGE': {
                 const exchangeId = payload?.exchangeId as ExchangeId;
                 const credentials = payload?.credentials as ExchangeAuthParams;
-                const oldExchange = authenticatedExchanges[exchangeId];
-                if (oldExchange?.close) {
-                    oldExchange.close().catch((err) => {
-                        console.error(
-                            'failed to close exchange:',
-                            exchangeId,
-                            (err as Error).message
-                        );
-                    });
-                }
-                authenticatedExchanges[exchangeId] = createAuthenticatedExchange(
-                    exchangeId,
-                    credentials
-                );
+                createAuthenticatedExchange(exchangeId, credentials);
                 result = { initialized: true };
                 break;
             }
             case 'DESTROY_EXCHANGE': {
                 const exchangeId = payload?.exchangeId as ExchangeId;
-                const oldExchange = authenticatedExchanges[exchangeId];
-                if (oldExchange?.close) {
-                    oldExchange.close().catch((err) => {
-                        console.error(
-                            'failed to close exchange:',
-                            exchangeId,
-                            (err as Error).message
-                        );
-                    });
-                }
-                delete authenticatedExchanges[exchangeId];
+                destroyAuthenticatedExchange(exchangeId);
                 if (exchangeId === 'hyperliquid') {
                     hyperliquidAdapter.clear_cache();
                 }
