@@ -4,15 +4,15 @@ import {
     createChart,
     CandlestickSeries,
     HistogramSeries,
+    LineSeries,
     ColorType,
     CrosshairMode,
     type IChartApi,
     type ISeriesApi,
-    type CandlestickData,
-    type HistogramData,
     type Time,
+    type LineData,
+    type LineWidth,
 } from 'lightweight-charts';
-import type { OHLCV } from '../../services/exchange/chart_data';
 import type { TradingChartProps, ToggleButtonProps } from '../../types/chart.types';
 import { tick_size_to_precision } from '../../utils/format';
 import { get_timeframe_seconds } from '../../services/chart/drawing_manager';
@@ -20,80 +20,25 @@ import { use_chart_drawing } from '../../hooks/use_chart_drawing';
 import { DrawingToolbar } from './drawing_toolbar';
 import { DrawingOverlay } from './drawing_overlay';
 import { ErrorBoundary } from '../common/error_boundary';
-import { Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-preact';
-import { CHART_CONSTANTS } from '../../config/chart.constants';
+import { Eye, EyeOff, Settings } from 'lucide-preact';
+import { EmaSettingsPanel } from './ema_settings_panel';
+import { CHART_CONSTANTS, EMA_CONSTANTS } from '../../config/chart.constants';
+import { get_theme_colors } from '../../utils/theme';
+import { ohlcv_to_candle, ohlcv_to_volume } from '../../utils/chart_data_transform';
 
-let theme_colors_cache: ReturnType<typeof get_theme_colors> | null = null;
-let theme_cache_key: string | null = null;
-
-function get_css_variable(name: string): string {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
-function get_theme_colors(force_refresh = false) {
-    const current_theme = document.documentElement.getAttribute('data-theme');
-
-    if (!force_refresh && theme_colors_cache && theme_cache_key === current_theme) {
-        return theme_colors_cache;
-    }
-
-    const is_dark = current_theme === 'terminal-dark';
-    const base_content = get_css_variable('--color-base-content');
-    const base_300 = get_css_variable('--color-base-300');
-    const success = get_css_variable('--color-success');
-    const error = get_css_variable('--color-error');
-
-    theme_colors_cache = {
-        background: is_dark ? '#000000' : '#ffffff',
-        text: base_content || '#fafafa',
-        grid: base_300
-            ? `color-mix(in oklch, ${base_300}, transparent 50%)`
-            : 'rgba(40, 41, 45, 0.5)',
-        up: success || 'rgb(0, 200, 114)',
-        down: error || 'rgb(255, 107, 59)',
-    };
-    theme_cache_key = current_theme;
-
-    return theme_colors_cache;
-}
-
-function ohlcv_to_candle(ohlcv: OHLCV): CandlestickData<Time> {
-    return {
-        time: ohlcv.time as Time,
-        open: ohlcv.open,
-        high: ohlcv.high,
-        low: ohlcv.low,
-        close: ohlcv.close,
-    };
-}
-
-function ohlcv_to_volume(ohlcv: OHLCV, up_color: string, down_color: string): HistogramData<Time> {
-    const is_up = ohlcv.close >= ohlcv.open;
-    return {
-        time: ohlcv.time as Time,
-        value: ohlcv.volume,
-        color: is_up ? up_color : down_color,
-    };
-}
-
-const ToggleButton = memo(function ToggleButton({
-    label,
-    visible,
-    on_toggle,
-    with_background = true,
-}: ToggleButtonProps) {
+const ToggleButton = memo(function ToggleButton({ label, visible, on_toggle }: ToggleButtonProps) {
     return (
         <button
             type="button"
             onClick={on_toggle}
-            class={`flex items-center gap-1.5 px-2 py-1 text-xs rounded text-base-content transition-colors font-medium ${
-                with_background ? 'bg-base-200 hover:bg-base-300' : 'hover:bg-base-300'
-            } ${!visible && 'opacity-50'}`}
+            class={`flex items-center justify-between w-16 px-2 py-1 text-xs rounded text-base-content transition-all font-medium bg-base-200/50 group-hover/toggles:bg-base-200 hover:!bg-base-300 ${!visible ? 'opacity-50' : ''}`}
             title={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
             aria-pressed={visible}
         >
             <span>{label}</span>
-            {visible ? <Eye class="w-3.5 h-3.5" /> : <EyeOff class="w-3.5 h-3.5" />}
+            <span class="opacity-0 group-hover/toggles:opacity-100 transition-opacity ml-2">
+                {visible ? <Eye class="w-3.5 h-3.5" /> : <EyeOff class="w-3.5 h-3.5" />}
+            </span>
         </button>
     );
 });
@@ -108,18 +53,23 @@ export function TradingChart({
     grid_visible = true,
     on_volume_toggle,
     on_grid_toggle,
+    ema_data = [],
+    ema_visible = false,
+    ema_settings,
+    on_ema_toggle,
+    on_ema_settings_change,
 }: TradingChartProps) {
     const container_ref = useRef<HTMLDivElement>(null);
     const chart_ref = useRef<IChartApi | null>(null);
     const series_ref = useRef<ISeriesApi<'Candlestick'> | null>(null);
     const volume_series_ref = useRef<ISeriesApi<'Histogram'> | null>(null);
+    const ema_series_ref = useRef<ISeriesApi<'Line'> | null>(null);
     const prev_data_key = useRef<string | undefined>(undefined);
 
     const [chart, set_chart] = useState<IChartApi | null>(null);
     const [series, set_series] = useState<ISeriesApi<'Candlestick'> | null>(null);
-    const [is_compact, set_is_compact] = useState(false);
-    const [menu_expanded, set_menu_expanded] = useState(false);
-    const menu_ref = useRef<HTMLDivElement>(null);
+    const [ema_settings_open, set_ema_settings_open] = useState(false);
+    const ema_settings_ref = useRef<HTMLDivElement>(null);
 
     const first_candle_time = data.length > 0 ? data[0].time : null;
 
@@ -205,6 +155,14 @@ export function TradingChart({
             visible: false,
         });
 
+        const ema_series = chart.addSeries(LineSeries, {
+            color: EMA_CONSTANTS.COLOR,
+            lineWidth: EMA_CONSTANTS.LINE_WIDTH,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+        });
+
         const apply_theme = () => {
             const c = get_theme_colors(true);
             chart.applyOptions({
@@ -233,6 +191,7 @@ export function TradingChart({
         chart_ref.current = chart;
         series_ref.current = candle_series;
         volume_series_ref.current = volume_series;
+        ema_series_ref.current = ema_series;
         set_chart(chart);
         set_series(candle_series);
 
@@ -246,7 +205,6 @@ export function TradingChart({
                         width: container_ref.current.clientWidth,
                         height: height,
                     });
-                    set_is_compact(height < CHART_CONSTANTS.COMPACT_HEIGHT_THRESHOLD);
                 }
             }, CHART_CONSTANTS.RESIZE_DEBOUNCE_MS);
         };
@@ -263,6 +221,7 @@ export function TradingChart({
             chart_ref.current = null;
             series_ref.current = null;
             volume_series_ref.current = null;
+            ema_series_ref.current = null;
             set_chart(null);
             set_series(null);
         };
@@ -324,15 +283,33 @@ export function TradingChart({
     }, [grid_visible]);
 
     useEffect(() => {
-        if (!menu_expanded) return;
+        if (!ema_series_ref.current) return;
+        ema_series_ref.current.setData(ema_data as LineData<Time>[]);
+    }, [ema_data]);
+
+    useEffect(() => {
+        if (!ema_series_ref.current) return;
+        ema_series_ref.current.applyOptions({ visible: ema_visible });
+    }, [ema_visible]);
+
+    useEffect(() => {
+        if (!ema_series_ref.current || !ema_settings) return;
+        ema_series_ref.current.applyOptions({
+            color: ema_settings.color,
+            lineWidth: ema_settings.line_width as LineWidth,
+        });
+    }, [ema_settings?.color, ema_settings?.line_width]);
+
+    useEffect(() => {
+        if (!ema_settings_open) return;
         const handle_click_outside = (e: MouseEvent) => {
-            if (menu_ref.current && !menu_ref.current.contains(e.target as Node)) {
-                set_menu_expanded(false);
+            if (ema_settings_ref.current && !ema_settings_ref.current.contains(e.target as Node)) {
+                set_ema_settings_open(false);
             }
         };
         document.addEventListener('mousedown', handle_click_outside);
         return () => document.removeEventListener('mousedown', handle_click_outside);
-    }, [menu_expanded]);
+    }, [ema_settings_open]);
 
     const toggle_volume = useCallback(() => {
         on_volume_toggle?.();
@@ -342,9 +319,37 @@ export function TradingChart({
         on_grid_toggle?.();
     }, [on_grid_toggle]);
 
-    const toggle_menu = useCallback(() => {
-        set_menu_expanded((prev) => !prev);
+    const toggle_ema = useCallback(() => {
+        on_ema_toggle?.();
+    }, [on_ema_toggle]);
+
+    const toggle_ema_settings = useCallback(() => {
+        set_ema_settings_open((prev) => !prev);
     }, []);
+
+    const handle_ema_color_change = useCallback(
+        (color: string) => {
+            on_ema_settings_change?.({ color });
+        },
+        [on_ema_settings_change]
+    );
+
+    const handle_ema_period_change = useCallback(
+        (e: Event) => {
+            const value = parseInt((e.target as HTMLInputElement).value, 10);
+            if (value > 0 && value <= EMA_CONSTANTS.MAX_PERIOD) {
+                on_ema_settings_change?.({ period: value });
+            }
+        },
+        [on_ema_settings_change]
+    );
+
+    const handle_ema_line_width_change = useCallback(
+        (width: number) => {
+            on_ema_settings_change?.({ line_width: width });
+        },
+        [on_ema_settings_change]
+    );
 
     const has_data = data.length > 0;
     const show_spinner = loading && !has_data;
@@ -390,6 +395,44 @@ export function TradingChart({
                     measure_points={measure_points}
                     tick_size={tick_size}
                 />
+                <div class="absolute top-3 left-3 z-30">
+                    <div class="flex flex-col gap-1 group/toggles w-10 hover:w-24 overflow-hidden rounded-lg transition-all duration-200">
+                        <ToggleButton
+                            label="Vol"
+                            visible={volume_visible}
+                            on_toggle={toggle_volume}
+                        />
+                        <ToggleButton label="Grid" visible={grid_visible} on_toggle={toggle_grid} />
+                        <div class="flex items-center gap-0.5">
+                            <ToggleButton
+                                label="EMA"
+                                visible={ema_visible}
+                                on_toggle={toggle_ema}
+                            />
+                            <button
+                                type="button"
+                                onClick={toggle_ema_settings}
+                                class={`p-1 rounded transition-all items-center justify-center shrink-0 ${
+                                    ema_settings_open
+                                        ? 'flex bg-primary/20 text-primary'
+                                        : 'hidden group-hover/toggles:flex bg-base-200/50 group-hover/toggles:bg-base-200 hover:!bg-base-300 text-base-content'
+                                }`}
+                                title="EMA Settings"
+                            >
+                                <Settings class="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                    {ema_settings_open && ema_settings && (
+                        <EmaSettingsPanel
+                            ref_={ema_settings_ref}
+                            settings={ema_settings}
+                            on_period_change={handle_ema_period_change}
+                            on_line_width_change={handle_ema_line_width_change}
+                            on_color_change={handle_ema_color_change}
+                        />
+                    )}
+                </div>
                 <DrawingToolbar
                     active_tool={tool}
                     on_tool_change={set_tool}
@@ -400,59 +443,6 @@ export function TradingChart({
                     selected_color={selected_drawing?.color}
                     on_color_change={change_selected_color}
                 />
-                <div class={`absolute top-3 z-30 ${is_compact ? 'left-14' : 'left-3'}`}>
-                    {is_compact ? (
-                        <div ref={menu_ref} class="relative">
-                            <button
-                                type="button"
-                                onClick={toggle_menu}
-                                class="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-base-200 hover:bg-base-300 text-base-content transition-colors font-medium"
-                                title="Chart options"
-                                aria-expanded={menu_expanded}
-                                aria-haspopup="menu"
-                            >
-                                <span>Options</span>
-                                {menu_expanded ? (
-                                    <ChevronUp class="w-3.5 h-3.5" />
-                                ) : (
-                                    <ChevronDown class="w-3.5 h-3.5" />
-                                )}
-                            </button>
-                            {menu_expanded && (
-                                <div
-                                    class="absolute top-full left-0 mt-1 flex flex-col gap-1 bg-base-200 rounded p-1 shadow-lg"
-                                    role="menu"
-                                >
-                                    <ToggleButton
-                                        label="Vol"
-                                        visible={volume_visible}
-                                        on_toggle={toggle_volume}
-                                        with_background={false}
-                                    />
-                                    <ToggleButton
-                                        label="Grid"
-                                        visible={grid_visible}
-                                        on_toggle={toggle_grid}
-                                        with_background={false}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div class="flex flex-col gap-1">
-                            <ToggleButton
-                                label="Vol"
-                                visible={volume_visible}
-                                on_toggle={toggle_volume}
-                            />
-                            <ToggleButton
-                                label="Grid"
-                                visible={grid_visible}
-                                on_toggle={toggle_grid}
-                            />
-                        </div>
-                    )}
-                </div>
                 {show_spinner && (
                     <div class="absolute inset-0 flex items-center justify-center bg-base-100">
                         <div class="w-8 h-8 border-2 border-base-content/20 border-t-primary rounded-full animate-spin" />

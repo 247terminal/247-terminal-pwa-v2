@@ -9,9 +9,12 @@ import {
     Pencil,
     Trash2,
     Eraser,
+    ChevronRight,
+    ChevronLeft,
 } from 'lucide-preact';
 import type { DrawingTool, DrawingToolbarProps, ToolButtonProps } from '../../types/drawing.types';
 import { ColorPicker } from './color_picker';
+import { DRAWING_TOOLBAR_CONSTANTS } from '../../config/chart.constants';
 
 const ToolButton = memo(function ToolButton({
     active,
@@ -104,8 +107,30 @@ export const DrawingToolbar = memo(function DrawingToolbar({
     on_color_change,
 }: DrawingToolbarProps) {
     const [show_color_picker, set_show_color_picker] = useState(false);
+    const [is_collapsed, set_is_collapsed] = useState(false);
+    const [is_expanded, set_is_expanded] = useState(false);
     const toolbar_ref = useRef<HTMLDivElement>(null);
+    const container_ref = useRef<HTMLDivElement>(null);
     const [focused_index, set_focused_index] = useState(-1);
+
+    useEffect(() => {
+        const container = container_ref.current?.parentElement;
+        if (!container) return;
+
+        const check_height = () => {
+            const height = container.clientHeight;
+            set_is_collapsed(height < DRAWING_TOOLBAR_CONSTANTS.COLLAPSE_HEIGHT_THRESHOLD);
+            if (height >= DRAWING_TOOLBAR_CONSTANTS.COLLAPSE_HEIGHT_THRESHOLD) {
+                set_is_expanded(false);
+            }
+        };
+
+        const observer = new ResizeObserver(check_height);
+        observer.observe(container);
+        check_height();
+
+        return () => observer.disconnect();
+    }, []);
 
     const get_all_buttons = useCallback(() => {
         if (!toolbar_ref.current) return [];
@@ -170,15 +195,97 @@ export const DrawingToolbar = memo(function DrawingToolbar({
         set_show_color_picker((prev) => !prev);
     }, []);
 
-    const handle_color_close = useCallback(() => {
-        set_show_color_picker(false);
+    const toggle_expand = useCallback(() => {
+        set_is_expanded((prev) => !prev);
     }, []);
 
+    if (is_collapsed && !is_expanded) {
+        return (
+            <div ref={container_ref} class="absolute left-3 top-[96px] z-30">
+                <button
+                    type="button"
+                    onClick={toggle_expand}
+                    class="w-10 h-10 flex items-center justify-center rounded-lg bg-base-200/90 backdrop-blur-sm text-base-content/50 hover:text-base-content/70 hover:bg-base-300/90 transition-colors"
+                    title="Expand drawing tools"
+                    aria-label="Expand drawing tools"
+                >
+                    <ChevronRight class={ICON_CLASS} />
+                </button>
+            </div>
+        );
+    }
+
+    if (is_collapsed && is_expanded) {
+        return (
+            <div ref={container_ref} class="absolute left-3 top-[96px] z-30">
+                <div class="flex gap-1 bg-base-200/90 rounded-lg p-1 backdrop-blur-sm">
+                    <button
+                        type="button"
+                        onClick={toggle_expand}
+                        class="w-8 h-8 flex items-center justify-center rounded text-base-content/50 hover:text-base-content/70 hover:bg-base-300/50 transition-colors"
+                        title="Collapse drawing tools"
+                        aria-label="Collapse drawing tools"
+                    >
+                        <ChevronLeft class={ICON_CLASS} />
+                    </button>
+                    <div class="border-l border-base-content/10 mx-0.5" />
+                    {TOOLS.map(({ tool, Icon, title, aria_label }) => (
+                        <ToolButton
+                            key={tool}
+                            active={active_tool === tool}
+                            on_click={() => handle_tool_click(tool)}
+                            title={title}
+                            aria_label={aria_label}
+                        >
+                            <Icon />
+                        </ToolButton>
+                    ))}
+                    {selected_id && (
+                        <>
+                            <div class="border-l border-base-content/10 mx-0.5" />
+                            <ToolButton
+                                active={show_color_picker}
+                                on_click={handle_color_toggle}
+                                title="Change Color"
+                                aria_label="Change selected drawing color"
+                            >
+                                <ColorIcon color={selected_color} />
+                            </ToolButton>
+                            <ToolButton
+                                active={false}
+                                on_click={on_delete_selected}
+                                title="Delete Selected"
+                                aria_label="Delete selected drawing"
+                            >
+                                <Trash2 class={ICON_CLASS} />
+                            </ToolButton>
+                        </>
+                    )}
+                    {has_drawings && (
+                        <>
+                            <div class="border-l border-base-content/10 mx-0.5" />
+                            <ToolButton
+                                active={false}
+                                on_click={on_clear_all}
+                                title="Clear All Drawings"
+                                aria_label="Clear all drawings from chart"
+                            >
+                                <Eraser class={ICON_CLASS} />
+                            </ToolButton>
+                        </>
+                    )}
+                </div>
+                {show_color_picker && on_color_change && selected_id && (
+                    <div class="absolute left-0 top-full mt-2 z-10">
+                        <ColorPicker color={selected_color} on_change={on_color_change} />
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
-        <div
-            class="absolute left-3 z-30"
-            style={{ top: 'calc(50% - 13px)', transform: 'translateY(-50%)' }}
-        >
+        <div ref={container_ref} class="absolute left-3 top-[96px] z-30">
             <div
                 ref={toolbar_ref}
                 role="toolbar"
@@ -233,12 +340,8 @@ export const DrawingToolbar = memo(function DrawingToolbar({
                 )}
             </div>
             {show_color_picker && on_color_change && selected_id && (
-                <div class="absolute left-full top-1/2 -translate-y-1/2">
-                    <ColorPicker
-                        color={selected_color}
-                        on_change={on_color_change}
-                        on_close={handle_color_close}
-                    />
+                <div class="absolute left-full top-0 ml-2 z-10">
+                    <ColorPicker color={selected_color} on_change={on_color_change} />
                 </div>
             )}
         </div>

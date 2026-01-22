@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'preact/hooks';
 import { X } from 'lucide-preact';
+import type { Time } from 'lightweight-charts';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
 import { EXCHANGE_ORDER, type ExchangeId } from '../../types/exchange.types';
-import type { ChartSettings, ChartBlockProps } from '../../types/chart.types';
+import type { ChartSettings, ChartBlockProps, EmaSettings } from '../../types/chart.types';
+import type { EmaPoint, EmaState } from '../../types/indicator.types';
 import {
     fetch_ohlcv,
     watch_ohlcv,
@@ -15,7 +17,8 @@ import { exchange_connection_status } from '../../stores/credentials_store';
 import { is_sub_minute_timeframe, type SubMinuteTimeframe } from '../../types/candle.types';
 import { start_candle_generation } from '../../services/candle_generator';
 import { register_navigation_handler } from '../../stores/chart_navigation_store';
-import { STORAGE_CONSTANTS } from '../../config/chart.constants';
+import { STORAGE_CONSTANTS, EMA_CONSTANTS } from '../../config/chart.constants';
+import { calculate_ema_from_ohlcv, update_ema_point, finalize_ema_state } from '../../utils/ema';
 
 function get_default_exchange(connection_status: Record<ExchangeId, boolean>): ExchangeId {
     return EXCHANGE_ORDER.toSorted((a, b) => {
@@ -30,27 +33,34 @@ let save_timeout: ReturnType<typeof setTimeout> | null = null;
 
 function get_all_settings(): Record<string, ChartSettings> {
     if (settings_cache) return settings_cache;
+    let result: Record<string, ChartSettings> = {};
     try {
         const stored = localStorage.getItem(STORAGE_CONSTANTS.CHART_SETTINGS_KEY);
-        settings_cache = stored ? JSON.parse(stored) : {};
+        result = stored ? JSON.parse(stored) : {};
     } catch {
-        settings_cache = {};
+        result = {};
     }
-    return settings_cache!;
+    settings_cache = result;
+    return result;
 }
 
 function load_chart_settings(id: string, default_exchange: ExchangeId): ChartSettings {
     const all_settings = get_all_settings();
-    if (all_settings[id]) {
-        return all_settings[id];
-    }
-    return {
+    const defaults: ChartSettings = {
         exchange: default_exchange,
         symbol: 'BTC/USDT:USDT',
         timeframe: '1',
         volume_visible: true,
         grid_visible: true,
+        ema_visible: false,
+        ema_period: EMA_CONSTANTS.DEFAULT_PERIOD,
+        ema_color: EMA_CONSTANTS.COLOR,
+        ema_line_width: EMA_CONSTANTS.LINE_WIDTH,
     };
+    if (all_settings[id]) {
+        return { ...defaults, ...all_settings[id] };
+    }
+    return defaults;
 }
 
 function save_chart_settings(id: string, settings: ChartSettings): void {
@@ -65,7 +75,9 @@ function save_chart_settings(id: string, settings: ChartSettings): void {
                 STORAGE_CONSTANTS.CHART_SETTINGS_KEY,
                 JSON.stringify(all_settings)
             );
-        } catch {}
+        } catch (e) {
+            console.warn('Failed to save chart settings to localStorage', e);
+        }
     }, STORAGE_CONSTANTS.DEBOUNCE_MS);
 }
 
@@ -77,7 +89,17 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
         load_chart_settings(id, default_exchange)
     );
 
-    const { exchange, symbol, timeframe, volume_visible, grid_visible } = settings;
+    const {
+        exchange,
+        symbol,
+        timeframe,
+        volume_visible,
+        grid_visible,
+        ema_visible,
+        ema_period,
+        ema_color,
+        ema_line_width,
+    } = settings;
 
     const update_settings = useCallback(
         (updates: Partial<ChartSettings>) => {
@@ -91,6 +113,8 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
     );
     const [data, set_data] = useState<OHLCV[]>([]);
     const [loading, set_loading] = useState(true);
+    const [ema_data, set_ema_data] = useState<EmaPoint[]>([]);
+    const ema_state_ref = useRef<EmaState | null>(null);
 
     const state_ref = useRef({ exchange, symbol });
     state_ref.current = { exchange, symbol };
@@ -136,6 +160,7 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
 
         let cancelled = false;
         let cleanup_stream: (() => void) | null = null;
+        let last_candle_time: number | null = null;
 
         const chart_tf = is_sub_minute_timeframe(timeframe)
             ? '1'
@@ -143,6 +168,13 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
 
         const update_candle = (candle: OHLCV) => {
             if (cancelled) return;
+            const is_new_candle = last_candle_time !== null && candle.time > last_candle_time;
+
+            const ema_state = ema_state_ref.current;
+            if (is_new_candle && ema_state && ema_state.prev_ema !== null) {
+                ema_state_ref.current = finalize_ema_state(candle.close, ema_state);
+            }
+
             set_data((prev) => {
                 if (prev.length === 0) return prev;
                 const last = prev[prev.length - 1];
@@ -153,16 +185,45 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
                 }
                 return prev;
             });
+
+            const current_ema_state = ema_state_ref.current;
+            if (current_ema_state && current_ema_state.prev_ema !== null) {
+                const ema_point = update_ema_point(
+                    candle.close,
+                    candle.time as Time,
+                    current_ema_state
+                );
+                if (ema_point) {
+                    set_ema_data((prev) => {
+                        if (prev.length === 0) return prev;
+                        if (is_new_candle) {
+                            return [...prev, ema_point];
+                        }
+                        return [...prev.slice(0, -1), ema_point];
+                    });
+                }
+            }
+
+            last_candle_time = candle.time;
         };
 
         const load_chart_data = async () => {
             set_loading(true);
+            ema_state_ref.current = null;
+            set_ema_data([]);
             try {
                 const ohlcv = await fetch_ohlcv(exchange, symbol, chart_tf);
                 if (cancelled) return;
                 const market = get_market(exchange, symbol);
                 set_chart_tick_size(market?.tick_size ?? 0.01);
                 set_data(ohlcv);
+
+                if (ohlcv.length > 0) {
+                    const { points, state } = calculate_ema_from_ohlcv(ohlcv, ema_period);
+                    ema_state_ref.current = state;
+                    set_ema_data(points);
+                    last_candle_time = ohlcv[ohlcv.length - 1].time;
+                }
 
                 if (is_sub_minute_timeframe(timeframe) && ohlcv.length > 0) {
                     cleanup_stream = start_candle_generation(
@@ -176,6 +237,7 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
             } catch {
                 if (cancelled) return;
                 set_data([]);
+                set_ema_data([]);
             } finally {
                 if (!cancelled) {
                     set_loading(false);
@@ -194,6 +256,13 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
             if (cleanup_stream) cleanup_stream();
         };
     }, [exchange, symbol, timeframe]);
+
+    useEffect(() => {
+        if (data.length === 0) return;
+        const { points, state } = calculate_ema_from_ohlcv(data, ema_period);
+        ema_state_ref.current = state;
+        set_ema_data(points);
+    }, [ema_period]);
 
     const handle_symbol_change = useCallback(
         (ex: ExchangeId, s: string) => {
@@ -227,6 +296,39 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
             return next;
         });
     }, [id]);
+
+    const handle_ema_toggle = useCallback(() => {
+        set_settings((prev) => {
+            const next = { ...prev, ema_visible: !prev.ema_visible };
+            save_chart_settings(id, next);
+            return next;
+        });
+    }, [id]);
+
+    const handle_ema_settings_change = useCallback(
+        (updates: Partial<EmaSettings>) => {
+            set_settings((prev) => {
+                const next = {
+                    ...prev,
+                    ...(updates.period !== undefined && { ema_period: updates.period }),
+                    ...(updates.color !== undefined && { ema_color: updates.color }),
+                    ...(updates.line_width !== undefined && { ema_line_width: updates.line_width }),
+                };
+                save_chart_settings(id, next);
+                return next;
+            });
+        },
+        [id]
+    );
+
+    const ema_settings = useMemo<EmaSettings>(
+        () => ({
+            period: ema_period,
+            color: ema_color,
+            line_width: ema_line_width,
+        }),
+        [ema_period, ema_color, ema_line_width]
+    );
 
     return (
         <div class="h-full flex flex-col group">
@@ -262,6 +364,11 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
                     grid_visible={grid_visible}
                     on_volume_toggle={handle_volume_toggle}
                     on_grid_toggle={handle_grid_toggle}
+                    ema_data={ema_data}
+                    ema_visible={ema_visible}
+                    ema_settings={ema_settings}
+                    on_ema_toggle={handle_ema_toggle}
+                    on_ema_settings_change={handle_ema_settings_change}
                 />
             </div>
         </div>

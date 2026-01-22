@@ -84,7 +84,7 @@ export interface DrawingOverlayProps {
 export interface ColorPickerProps {
     color: string;
     on_change: (color: string) => void;
-    on_close: () => void;
+    on_close?: () => void;
 }
 
 export interface ColorState {

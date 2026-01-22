@@ -1,5 +1,14 @@
 import type { ExchangeId } from './exchange.types';
 import type { Timeframe } from './candle.types';
+import type { EmaPoint } from './indicator.types';
+
+export interface ThemeColors {
+    background: string;
+    text: string;
+    grid: string;
+    up: string;
+    down: string;
+}
 
 export interface MarketData {
     symbol: string;
@@ -51,6 +60,24 @@ export interface ChartSettings {
     timeframe: string;
     volume_visible: boolean;
     grid_visible: boolean;
+    ema_visible: boolean;
+    ema_period: number;
+    ema_color: string;
+    ema_line_width: number;
+}
+
+export interface EmaSettings {
+    period: number;
+    color: string;
+    line_width: number;
+}
+
+export interface EmaSettingsPanelProps {
+    ref_: preact.RefObject<HTMLDivElement>;
+    settings: EmaSettings;
+    on_period_change: (e: Event) => void;
+    on_line_width_change: (width: number) => void;
+    on_color_change: (color: string) => void;
 }
 
 export interface TradingChartProps {
@@ -63,13 +90,17 @@ export interface TradingChartProps {
     grid_visible?: boolean;
     on_volume_toggle?: () => void;
     on_grid_toggle?: () => void;
+    ema_data?: EmaPoint[];
+    ema_visible?: boolean;
+    ema_settings?: EmaSettings;
+    on_ema_toggle?: () => void;
+    on_ema_settings_change?: (settings: Partial<EmaSettings>) => void;
 }
 
 export interface ToggleButtonProps {
     label: string;
     visible: boolean;
     on_toggle: () => void;
-    with_background?: boolean;
 }
 
 export interface ChartBlockProps {
