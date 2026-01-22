@@ -88,6 +88,40 @@ function save_chart_settings(id: string, settings: ChartSettings): void {
     }, STORAGE_CONSTANTS.DEBOUNCE_MS);
 }
 
+export function delete_chart_settings(ids: string | string[]): void {
+    const id_array = Array.isArray(ids) ? ids : [ids];
+    if (id_array.length === 0) return;
+
+    const all_settings = get_all_settings();
+    let modified = false;
+
+    for (const id of id_array) {
+        if (id in all_settings) {
+            delete all_settings[id];
+            modified = true;
+        }
+    }
+
+    if (!modified) return;
+
+    settings_cache = all_settings;
+
+    try {
+        localStorage.setItem(STORAGE_CONSTANTS.CHART_SETTINGS_KEY, JSON.stringify(all_settings));
+    } catch (e) {
+        console.warn('failed to delete chart settings from localStorage', e);
+    }
+}
+
+export function clear_all_chart_settings(): void {
+    settings_cache = {};
+    try {
+        localStorage.removeItem(STORAGE_CONSTANTS.CHART_SETTINGS_KEY);
+    } catch (e) {
+        console.warn('failed to clear chart settings from localStorage', e);
+    }
+}
+
 export function ChartBlock({ id, on_remove }: ChartBlockProps) {
     const connection_status = exchange_connection_status.value;
     const default_exchange = get_default_exchange(connection_status);

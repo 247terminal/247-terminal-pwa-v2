@@ -6,6 +6,7 @@ import {
     fetch_layouts_from_server,
     merge_layouts,
 } from '@/services/layout/layout_sync.service';
+import { delete_chart_settings, clear_all_chart_settings } from '@/components/blocks/chart_block';
 
 const STORAGE_KEY = '247terminal_rigs';
 
@@ -274,6 +275,12 @@ export function add_block(type: BlockType): string {
 }
 
 export function remove_block(id: string): void {
+    const block = active_rig.value?.blocks.find((b) => b.id === id);
+
+    if (block?.type === 'chart') {
+        delete_chart_settings(id);
+    }
+
     update_active_rig((rig) => ({
         ...rig,
         blocks: rig.blocks.filter((b) => b.id !== id),
@@ -316,6 +323,14 @@ export function delete_rig(id: string): boolean {
 
     if (rig_ids.length <= 1) {
         return false;
+    }
+
+    const rig_to_delete = state.rigs[id];
+    if (rig_to_delete) {
+        const chart_ids = rig_to_delete.blocks.filter((b) => b.type === 'chart').map((b) => b.id);
+        if (chart_ids.length > 0) {
+            delete_chart_settings(chart_ids);
+        }
     }
 
     const { [id]: _removed, ...remaining_rigs } = state.rigs;
@@ -366,6 +381,7 @@ export function switch_rig(id: string): void {
 }
 
 export function reset_to_default_rigs(): void {
+    clear_all_chart_settings();
     const new_state = get_default_state();
     rigs_state.value = new_state;
     save_to_storage(new_state);
