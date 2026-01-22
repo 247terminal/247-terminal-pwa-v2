@@ -26,6 +26,7 @@ import { EmaSettingsPanel } from './ema_settings_panel';
 import { CHART_CONSTANTS, EMA_CONSTANTS } from '../../config/chart.constants';
 import { get_theme_colors } from '../../utils/theme';
 import { ohlcv_to_candle, ohlcv_to_volume } from '../../utils/chart_data_transform';
+import { privacy_mode } from '../../stores/account_store';
 
 const ToggleButton = memo(function ToggleButton({ label, visible, on_toggle }: ToggleButtonProps) {
     return (
@@ -116,6 +117,7 @@ export function TradingChart({
         current_price,
         data_key,
         colors: price_line_colors,
+        is_private: privacy_mode.value,
     });
 
     useEffect(() => {

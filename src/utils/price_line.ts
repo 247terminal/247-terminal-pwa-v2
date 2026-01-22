@@ -21,8 +21,13 @@ function get_line_style(type: PriceLineType): LineStyle {
     }
 }
 
-function get_entry_label(side: 'long' | 'short', unrealized_pnl: number): string {
+function get_entry_label(
+    side: 'long' | 'short',
+    unrealized_pnl: number,
+    is_private: boolean
+): string {
     const direction = side === 'long' ? 'LONG' : 'SHORT';
+    if (is_private) return direction;
     return `${direction} ${format_pnl(unrealized_pnl)}`;
 }
 
@@ -55,7 +60,8 @@ function apply_opacity(color: string, opacity: number): string {
 export function position_to_price_line_configs(
     position: Position,
     current_price: number | null,
-    colors: PriceLineColors
+    colors: PriceLineColors,
+    is_private = false
 ): PriceLineConfig[] {
     const configs: PriceLineConfig[] = [];
     const is_long = position.side === 'long';
@@ -75,7 +81,7 @@ export function position_to_price_line_configs(
         price: position.entry_price,
         color,
         line_style: LineStyle.Solid,
-        label: get_entry_label(position.side, unrealized_pnl),
+        label: get_entry_label(position.side, unrealized_pnl, is_private),
     });
 
     if (position.liquidation_price !== null) {

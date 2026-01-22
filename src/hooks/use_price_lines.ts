@@ -16,6 +16,7 @@ interface UsePriceLinesParams {
     current_price: number | null;
     data_key?: string;
     colors: PriceLineColors;
+    is_private?: boolean;
 }
 
 interface PriceLineEntry {
@@ -30,6 +31,7 @@ export function use_price_lines({
     current_price,
     data_key,
     colors,
+    is_private = false,
 }: UsePriceLinesParams): void {
     const lines_ref = useRef<Map<string, PriceLineEntry>>(new Map());
     const prev_data_key_ref = useRef<string | undefined>(undefined);
@@ -48,7 +50,9 @@ export function use_price_lines({
         const new_configs: PriceLineConfig[] = [];
 
         for (const position of positions) {
-            new_configs.push(...position_to_price_line_configs(position, current_price, colors));
+            new_configs.push(
+                ...position_to_price_line_configs(position, current_price, colors, is_private)
+            );
         }
 
         for (const order of orders) {
@@ -82,7 +86,7 @@ export function use_price_lines({
                 current_lines.set(config.id, { line, config });
             }
         }
-    }, [series, positions, orders, current_price, data_key, colors]);
+    }, [series, positions, orders, current_price, data_key, colors, is_private]);
 
     useEffect(() => {
         return () => {

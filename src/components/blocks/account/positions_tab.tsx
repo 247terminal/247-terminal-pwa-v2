@@ -106,25 +106,23 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
 
             <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content/70">
-                    {mask_value(format_price(position.entry_price, tick_size), is_private)}
+                    {format_price(position.entry_price, tick_size)}
                 </div>
-                <div class="text-base-content">
-                    {mask_value(format_price(last_price, tick_size), is_private)}
-                </div>
+                <div class="text-base-content">{format_price(last_price, tick_size)}</div>
             </div>
 
             <div class="flex-1 text-right text-error/70" role="cell">
-                {position.liquidation_price
-                    ? mask_value(format_price(position.liquidation_price, tick_size), is_private)
-                    : '-'}
+                {is_private
+                    ? '****'
+                    : position.liquidation_price
+                      ? format_price(position.liquidation_price, tick_size)
+                      : '--'}
             </div>
 
             {is_private ? (
                 <div class={`flex-1 text-right ${pnl_color}`} role="cell">
                     <div>{mask_value(format_pnl(pnl), is_private)}</div>
-                    <div class="text-[10px] opacity-70">
-                        {mask_value(format_pct(pnl_pct), is_private)}
-                    </div>
+                    <div class="text-[10px] opacity-70">{format_pct(pnl_pct)}</div>
                 </div>
             ) : (
                 <button

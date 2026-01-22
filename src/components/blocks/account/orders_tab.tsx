@@ -88,12 +88,12 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
 
             <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content">
-                    {mask_value(format_price(order.price, tick_size), is_private)}
+                    {is_private ? '****' : format_price(order.price, tick_size)}
                 </div>
             </div>
 
             <div class="flex-1 text-right text-base-content/50 font-mono text-[10px]" role="cell">
-                {order.id.slice(-8)}
+                {mask_value(order.id.slice(-8), is_private)}
             </div>
 
             <div class="flex-1 flex justify-end" role="cell">

@@ -115,20 +115,14 @@ const HistoryRow = memo(function HistoryRow({
             </div>
 
             <div class="flex-1 text-right" role="cell">
-                <div class="text-base-content/70">
-                    {mask_value(format_display_price(trade.entry_price), is_private)}
-                </div>
-                <div class="text-base-content">
-                    {mask_value(format_display_price(trade.close_price), is_private)}
-                </div>
+                <div class="text-base-content/70">{format_display_price(trade.entry_price)}</div>
+                <div class="text-base-content">{format_display_price(trade.close_price)}</div>
             </div>
 
             {is_private ? (
                 <div class={`flex-1 text-right ${pnl_color}`} role="cell">
                     <div>{mask_value(format_pnl(trade.realized_pnl), is_private)}</div>
-                    <div class="text-[10px] opacity-70">
-                        {mask_value(format_pct(roi_pct), is_private)}
-                    </div>
+                    <div class="text-[10px] opacity-70">{format_pct(roi_pct)}</div>
                 </div>
             ) : (
                 <button
