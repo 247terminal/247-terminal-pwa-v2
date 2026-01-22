@@ -9,13 +9,12 @@ import {
     fetch_closed_positions as fetch_closed_positions_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
-
-const PRIVACY_STORAGE_KEY = '247terminal_account_privacy';
-const HISTORY_LIMIT = 100;
+import { get_market, has_markets } from './exchange_store';
+import { STORAGE_CONSTANTS, ACCOUNT_CONSTANTS } from '../config/chart.constants';
 
 function load_privacy_mode(): boolean {
     try {
-        const stored = localStorage.getItem(PRIVACY_STORAGE_KEY);
+        const stored = localStorage.getItem(STORAGE_CONSTANTS.ACCOUNT_PRIVACY_KEY);
         if (stored) return stored === 'true';
     } catch {}
     return false;
@@ -23,7 +22,7 @@ function load_privacy_mode(): boolean {
 
 function save_privacy_mode(value: boolean): void {
     try {
-        localStorage.setItem(PRIVACY_STORAGE_KEY, String(value));
+        localStorage.setItem(STORAGE_CONSTANTS.ACCOUNT_PRIVACY_KEY, String(value));
     } catch {}
 }
 
@@ -109,6 +108,39 @@ export function clear_positions(): void {
     positions.value = new Map();
 }
 
+export function recalculate_blofin_positions(): void {
+    const current = positions.value;
+    let has_blofin = false;
+
+    for (const pos of current.values()) {
+        if (pos.exchange === 'blofin' && pos.contracts !== undefined) {
+            has_blofin = true;
+            break;
+        }
+    }
+
+    if (!has_blofin) return;
+
+    let changed = false;
+    const map = new Map(current);
+
+    for (const [id, pos] of map) {
+        if (pos.exchange !== 'blofin' || pos.contracts === undefined) continue;
+
+        const market = get_market('blofin', pos.symbol);
+        const contract_size = market?.contract_size;
+        if (!contract_size || contract_size <= 0) continue;
+
+        const new_size = pos.contracts * contract_size;
+        if (new_size !== pos.size) {
+            map.set(id, { ...pos, size: new_size });
+            changed = true;
+        }
+    }
+
+    if (changed) positions.value = map;
+}
+
 export function update_order(order: Order): void {
     const current = orders.value;
     const shouldRemove = order.status === 'closed' || order.status === 'canceled';
@@ -151,18 +183,23 @@ export function clear_orders(): void {
 }
 
 export function add_history(trade: TradeHistory): void {
-    history.value = [trade, ...history.value].slice(0, HISTORY_LIMIT);
+    history.value = [trade, ...history.value].slice(0, ACCOUNT_CONSTANTS.HISTORY_LIMIT);
 }
 
 export function add_history_batch(trades: TradeHistory[]): void {
     if (trades.length === 0) return;
     const current = history.value;
-    const merged = new Array<TradeHistory>(Math.min(trades.length + current.length, HISTORY_LIMIT));
+    const merged = new Array<TradeHistory>(
+        Math.min(trades.length + current.length, ACCOUNT_CONSTANTS.HISTORY_LIMIT)
+    );
     let ti = 0,
         ci = 0,
         mi = 0;
     const sorted_trades = trades.toSorted((a, b) => b.closed_at - a.closed_at);
-    while (mi < HISTORY_LIMIT && (ti < sorted_trades.length || ci < current.length)) {
+    while (
+        mi < ACCOUNT_CONSTANTS.HISTORY_LIMIT &&
+        (ti < sorted_trades.length || ci < current.length)
+    ) {
         if (ti >= sorted_trades.length) {
             merged[mi++] = current[ci++];
         } else if (ci >= current.length) {
@@ -241,9 +278,25 @@ export async function refresh_positions(exchange_id: ExchangeId): Promise<void> 
         for (const [id, p] of positions.value) {
             if (p.exchange !== exchange_id) map.set(id, p);
         }
+
+        const should_recalc = exchange_id === 'blofin' && has_markets('blofin');
+
         for (const pos of fetched) {
+            if (should_recalc && pos.contracts !== undefined) {
+                const market = get_market('blofin', pos.symbol);
+                const contract_size = market?.contract_size;
+                if (
+                    contract_size &&
+                    contract_size > 0 &&
+                    pos.size !== pos.contracts * contract_size
+                ) {
+                    map.set(pos.id, { ...pos, size: pos.contracts * contract_size });
+                    continue;
+                }
+            }
             map.set(pos.id, pos);
         }
+
         positions.value = map;
     } catch (err) {
         console.error(`failed to fetch ${exchange_id} positions:`, (err as Error).message);
@@ -314,7 +367,7 @@ export async function refresh_history(exchange_ids: ExchangeId[]): Promise<void>
         );
         const all_trades = results.flat();
         all_trades.sort((a, b) => b.closed_at - a.closed_at);
-        history.value = all_trades.slice(0, HISTORY_LIMIT);
+        history.value = all_trades.slice(0, ACCOUNT_CONSTANTS.HISTORY_LIMIT);
     } catch (err) {
         console.error('failed to fetch trade history:', (err as Error).message);
     } finally {

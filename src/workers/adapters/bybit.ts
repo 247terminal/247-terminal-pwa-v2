@@ -1,10 +1,8 @@
 import type bybit from 'ccxt/js/src/pro/bybit.js';
 import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
+import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
 
 export type BybitExchange = InstanceType<typeof bybit>;
-
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const HISTORY_WEEKS = 5;
 
 interface BybitPositionResponse {
     result?: {
@@ -55,6 +53,8 @@ interface BybitOrderResponse {
             triggerPrice: string;
             cumExecQty: string;
             createdTime: string;
+            stopOrderType?: string;
+            triggerDirection?: string;
         }>;
     };
 }
@@ -172,16 +172,36 @@ export async function fetch_orders(exchange: BybitExchange): Promise<RawOrder[]>
     if (!is_order_response(response)) return [];
     const list = response.result?.list;
     if (!Array.isArray(list)) return [];
-    return list.map((o) => ({
-        symbol: o.symbol.replace(/USDT$/, '/USDT:USDT'),
-        id: o.orderId,
-        side: o.side === 'Buy' ? 'buy' : 'sell',
-        type: o.orderType.toLowerCase(),
-        amount: Number(o.qty || 0),
-        price: Number(o.price || o.triggerPrice || 0),
-        filled: Number(o.cumExecQty || 0),
-        timestamp: Number(o.createdTime || Date.now()),
-    }));
+    return list.map((o) => {
+        const is_buy = o.side === 'Buy';
+        const trigger_above = o.triggerDirection === '1';
+
+        let type: string;
+        if (
+            o.stopOrderType === 'Stop' ||
+            o.stopOrderType === 'TakeProfit' ||
+            o.stopOrderType === 'StopLoss'
+        ) {
+            if (is_buy) {
+                type = trigger_above ? 'stop_loss' : 'take_profit';
+            } else {
+                type = trigger_above ? 'take_profit' : 'stop_loss';
+            }
+        } else {
+            type = o.orderType.toLowerCase();
+        }
+
+        return {
+            symbol: o.symbol.replace(/USDT$/, '/USDT:USDT'),
+            id: o.orderId,
+            side: is_buy ? 'buy' : 'sell',
+            type,
+            amount: Number(o.qty || 0),
+            price: Number(o.price || o.triggerPrice || 0),
+            filled: Number(o.cumExecQty || 0),
+            timestamp: Number(o.createdTime || Date.now()),
+        };
+    });
 }
 
 export async function fetch_closed_positions(
@@ -190,9 +210,9 @@ export async function fetch_closed_positions(
 ): Promise<RawClosedPosition[]> {
     const now = Date.now();
 
-    const promises = Array.from({ length: HISTORY_WEEKS }, (_, i) => {
-        const endTime = now - i * SEVEN_DAYS_MS;
-        const startTime = endTime - SEVEN_DAYS_MS;
+    const promises = Array.from({ length: HISTORY_FETCH_CONSTANTS.BYBIT_HISTORY_WEEKS }, (_, i) => {
+        const endTime = now - i * HISTORY_FETCH_CONSTANTS.SEVEN_DAYS_MS;
+        const startTime = endTime - HISTORY_FETCH_CONSTANTS.SEVEN_DAYS_MS;
         return exchange
             .privateGetV5PositionClosedPnl({
                 category: 'linear',

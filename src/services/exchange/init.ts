@@ -18,7 +18,7 @@ import {
     get_exchange_credentials,
 } from '../../stores/credentials_store';
 import { init_default_exchange } from '../../stores/trade_store';
-import { refresh_account } from '../../stores/account_store';
+import { refresh_account, recalculate_blofin_positions } from '../../stores/account_store';
 import { init_exchange } from './account_bridge';
 
 let initialized = false;
@@ -27,6 +27,11 @@ export async function load_exchange(ex: ExchangeId): Promise<void> {
     try {
         const market_list = await fetch_markets(ex);
         set_markets(ex, market_list);
+
+        if (ex === 'blofin') {
+            recalculate_blofin_positions();
+        }
+
         const [tickersResult, fundingResult] = await Promise.allSettled([
             fetch_tickers(ex),
             fetch_funding_rates(ex),
@@ -60,19 +65,21 @@ function get_connected_exchanges(): ExchangeId[] {
 }
 
 async function init_connected_exchange_instances(connected: ExchangeId[]): Promise<void> {
-    for (const ex of connected) {
-        const creds = get_exchange_credentials(ex);
-        if (creds.api_key || creds.wallet_address) {
-            await init_exchange(ex, {
-                api_key: creds.api_key,
-                api_secret: creds.api_secret,
-                passphrase: creds.passphrase,
-                wallet_address: creds.wallet_address,
-                private_key: creds.private_key,
-            });
-            refresh_account(ex).catch(console.error);
-        }
-    }
+    await Promise.all(
+        connected.map(async (ex) => {
+            const creds = get_exchange_credentials(ex);
+            if (creds.api_key || creds.wallet_address) {
+                await init_exchange(ex, {
+                    api_key: creds.api_key,
+                    api_secret: creds.api_secret,
+                    passphrase: creds.passphrase,
+                    wallet_address: creds.wallet_address,
+                    private_key: creds.private_key,
+                });
+                refresh_account(ex).catch(console.error);
+            }
+        })
+    );
 }
 
 export async function init_exchanges(): Promise<void> {
@@ -86,15 +93,15 @@ export async function init_exchanges(): Promise<void> {
     init_default_exchange();
 
     const connected = get_connected_exchanges();
+    const exchanges_to_load = connected.length > 0 ? connected : EXCHANGE_IDS;
+
+    const markets_promise = Promise.all(
+        exchanges_to_load.filter((ex) => !has_markets(ex)).map((ex) => load_exchange(ex))
+    );
+
+    markets_promise.catch(() => {});
 
     if (connected.length > 0) {
         await init_connected_exchange_instances(connected);
-    }
-
-    const exchanges_to_load = connected.length > 0 ? connected : EXCHANGE_IDS;
-
-    for (const ex of exchanges_to_load) {
-        if (has_markets(ex)) continue;
-        load_exchange(ex);
     }
 }

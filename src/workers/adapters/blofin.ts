@@ -1,9 +1,8 @@
 import type blofin from 'ccxt/js/src/pro/blofin.js';
 import type { RawPosition, RawOrder, RawClosedPosition } from '@/types/worker.types';
+import { POSITION_CONSTANTS } from '@/config/chart.constants';
 
 export type BlofinExchange = InstanceType<typeof blofin>;
-
-const POSITION_SIZE_THRESHOLD = 0.00001;
 
 interface BlofinPositionResponse {
     data?: Array<{
@@ -147,21 +146,96 @@ export async function fetch_positions(exchange: BlofinExchange): Promise<RawPosi
     }));
 }
 
+interface BlofinTpslOrderResponse {
+    data?: Array<{
+        tpslId: string;
+        instId: string;
+        side: string;
+        size: string;
+        tpTriggerPrice: string | null;
+        slTriggerPrice: string | null;
+        createTime: string;
+    }>;
+}
+
+interface BlofinAlgoOrderResponse {
+    data?: Array<{
+        algoId: string;
+        instId: string;
+        side: string;
+        size: string;
+        triggerPrice: string;
+        filledSize: string;
+        createTime: string;
+    }>;
+}
+
+function is_tpsl_order_response(data: unknown): data is BlofinTpslOrderResponse {
+    return data !== null && typeof data === 'object' && 'data' in data;
+}
+
+function is_algo_order_response(data: unknown): data is BlofinAlgoOrderResponse {
+    return data !== null && typeof data === 'object' && 'data' in data;
+}
+
 export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]> {
-    const response = await exchange.privateGetTradeOrdersPending();
-    if (!is_order_response(response)) return [];
-    const data = response.data;
-    if (!Array.isArray(data)) return [];
-    return data.map((o) => ({
-        symbol: o.instId.replace(/-/g, '/') + ':USDT',
-        id: o.orderId,
-        side: o.side === 'buy' ? 'buy' : 'sell',
-        type: o.orderType.toLowerCase(),
-        amount: Number(o.size || 0),
-        price: Number(o.price || o.triggerPrice || 0),
-        filled: Number(o.filledSize || 0),
-        timestamp: Number(o.createTime || Date.now()),
-    }));
+    const [pending_result, tpsl_result, trigger_result] = await Promise.all([
+        exchange.privateGetTradeOrdersPending().catch(() => null),
+        exchange.privateGetTradeOrdersTpslPending().catch(() => null),
+        exchange.privateGetTradeOrdersAlgoPending({ orderType: 'trigger' }).catch(() => null),
+    ]);
+
+    const orders: RawOrder[] = [];
+
+    if (is_order_response(pending_result) && Array.isArray(pending_result.data)) {
+        for (const o of pending_result.data) {
+            orders.push({
+                symbol: o.instId.replace(/-/g, '/') + ':USDT',
+                id: o.orderId,
+                side: o.side === 'buy' ? 'buy' : 'sell',
+                type: o.orderType.toLowerCase(),
+                amount: Number(o.size || 0),
+                price: Number(o.price || o.triggerPrice || 0),
+                filled: Number(o.filledSize || 0),
+                timestamp: Number(o.createTime || Date.now()),
+            });
+        }
+    }
+
+    if (is_tpsl_order_response(tpsl_result) && Array.isArray(tpsl_result.data)) {
+        for (const o of tpsl_result.data) {
+            const has_tp = o.tpTriggerPrice && Number(o.tpTriggerPrice) > 0;
+            const has_sl = o.slTriggerPrice && Number(o.slTriggerPrice) > 0;
+
+            orders.push({
+                symbol: o.instId.replace(/-/g, '/') + ':USDT',
+                id: o.tpslId,
+                side: o.side === 'buy' ? 'buy' : 'sell',
+                type: has_tp ? 'take_profit' : 'stop_loss',
+                amount: Number(o.size || 0),
+                price: has_tp ? Number(o.tpTriggerPrice) : Number(o.slTriggerPrice),
+                filled: 0,
+                timestamp: Number(o.createTime || Date.now()),
+            });
+        }
+    }
+
+    if (is_algo_order_response(trigger_result) && Array.isArray(trigger_result.data)) {
+        for (const o of trigger_result.data) {
+            orders.push({
+                symbol: o.instId.replace(/-/g, '/') + ':USDT',
+                id: o.algoId,
+                side: o.side === 'buy' ? 'buy' : 'sell',
+                type: 'stop',
+                amount: Number(o.size || 0),
+                price: Number(o.triggerPrice || 0),
+                filled: Number(o.filledSize || 0),
+                timestamp: Number(o.createTime || Date.now()),
+            });
+        }
+    }
+
+    return orders;
 }
 
 interface PositionState {
@@ -242,7 +316,7 @@ export async function fetch_closed_positions(
                 const close_size = Math.min(fill_amount, pos.size);
                 pos.size -= close_size;
 
-                if (pos.size <= POSITION_SIZE_THRESHOLD) {
+                if (pos.size <= POSITION_CONSTANTS.SIZE_THRESHOLD) {
                     closed.push({
                         symbol,
                         side: pos.side,
@@ -255,7 +329,7 @@ export async function fetch_closed_positions(
                     });
 
                     const excess = fill_amount - close_size;
-                    if (excess > POSITION_SIZE_THRESHOLD) {
+                    if (excess > POSITION_CONSTANTS.SIZE_THRESHOLD) {
                         pos = {
                             side: trade_side,
                             size: excess,

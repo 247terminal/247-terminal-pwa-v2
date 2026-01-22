@@ -12,6 +12,7 @@ export const DRAWING_TOOLBAR_CONSTANTS = {
 
 export const STORAGE_CONSTANTS = {
     CHART_SETTINGS_KEY: '247terminal_chart_settings',
+    ACCOUNT_PRIVACY_KEY: '247terminal_account_privacy',
     DEBOUNCE_MS: 300,
 } as const;
 
@@ -53,4 +54,22 @@ export const COLOR_PALETTE_CONSTANTS = {
         '#000000',
     ] as readonly string[],
     COLOR_HUES: [0, 30, 60, 90, 120, 165, 195, 225, 270, 330] as readonly number[],
+} as const;
+
+export const PRICE_LINE_CONSTANTS = {
+    LINE_WIDTH: 1,
+    LIQUIDATION_OPACITY: 0.5,
+} as const;
+
+export const ACCOUNT_CONSTANTS = {
+    HISTORY_LIMIT: 100,
+} as const;
+
+export const HISTORY_FETCH_CONSTANTS = {
+    SEVEN_DAYS_MS: 7 * 24 * 60 * 60 * 1000,
+    BYBIT_HISTORY_WEEKS: 5,
+} as const;
+
+export const POSITION_CONSTANTS = {
+    SIZE_THRESHOLD: 0.00001,
 } as const;

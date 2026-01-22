@@ -1,6 +1,7 @@
 import type { ExchangeId } from './exchange.types';
 import type { Timeframe } from './candle.types';
 import type { EmaPoint } from './indicator.types';
+import type { Position, Order } from './account.types';
 
 export interface ThemeColors {
     background: string;
@@ -95,6 +96,9 @@ export interface TradingChartProps {
     ema_settings?: EmaSettings;
     on_ema_toggle?: () => void;
     on_ema_settings_change?: (settings: Partial<EmaSettings>) => void;
+    positions?: Position[];
+    orders?: Order[];
+    current_price?: number | null;
 }
 
 export interface ToggleButtonProps {

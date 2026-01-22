@@ -25,10 +25,13 @@ interface OpenOrder {
     coin: string;
     oid: number;
     side: string;
-    orderType: string;
     sz: number;
-    limitPx: number;
+    limitPx: string;
     timestamp: number;
+    reduceOnly?: boolean;
+    orderType?: string;
+    triggerPx?: string;
+    triggerCondition?: string;
 }
 
 interface UserFill {
@@ -157,16 +160,35 @@ export async function fetch_orders(exchange: HyperliquidExchange): Promise<RawOr
         user: wallet,
     });
     if (!is_open_orders_array(response)) return [];
-    return response.map((o) => ({
-        symbol: `${o.coin}/USDC:USDC`,
-        id: String(o.oid),
-        side: o.side === 'B' ? 'buy' : 'sell',
-        type: o.orderType === 'Limit' ? 'limit' : 'market',
-        amount: Number(o.sz || 0),
-        price: Number(o.limitPx || 0),
-        filled: 0,
-        timestamp: Number(o.timestamp || Date.now()),
-    }));
+    return response.map((o) => {
+        const is_sell = o.side === 'A';
+        const has_trigger = o.triggerPx && Number(o.triggerPx) > 0;
+        const trigger_above = o.triggerCondition === 'gt';
+
+        let type: string;
+        if (has_trigger || o.reduceOnly) {
+            if (is_sell) {
+                type = trigger_above ? 'take_profit' : 'stop_loss';
+            } else {
+                type = trigger_above ? 'stop_loss' : 'take_profit';
+            }
+        } else if (o.limitPx && Number(o.limitPx) > 0) {
+            type = 'limit';
+        } else {
+            type = 'market';
+        }
+
+        return {
+            symbol: `${o.coin}/USDC:USDC`,
+            id: String(o.oid),
+            side: o.side === 'B' ? 'buy' : 'sell',
+            type,
+            amount: Number(o.sz || 0),
+            price: Number(o.triggerPx || o.limitPx || 0),
+            filled: 0,
+            timestamp: Number(o.timestamp || Date.now()),
+        };
+    });
 }
 
 export async function fetch_closed_positions(

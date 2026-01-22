@@ -14,6 +14,7 @@ import {
 } from '../../services/exchange/chart_data';
 import { markets, get_market } from '../../stores/exchange_store';
 import { exchange_connection_status } from '../../stores/credentials_store';
+import { positions_list, orders_list } from '../../stores/account_store';
 import { is_sub_minute_timeframe, type SubMinuteTimeframe } from '../../types/candle.types';
 import { start_candle_generation } from '../../services/candle_generator';
 import { register_navigation_handler } from '../../stores/chart_navigation_store';
@@ -76,7 +77,7 @@ function save_chart_settings(id: string, settings: ChartSettings): void {
                 JSON.stringify(all_settings)
             );
         } catch (e) {
-            console.warn('Failed to save chart settings to localStorage', e);
+            console.warn('failed to save chart settings to localStorage', e);
         }
     }, STORAGE_CONSTANTS.DEBOUNCE_MS);
 }
@@ -146,6 +147,24 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
     const has_any_markets = useMemo(
         () => Object.values(current_markets).some((m) => Object.keys(m).length > 0),
         [current_markets]
+    );
+
+    const all_positions = positions_list.value;
+    const all_orders = orders_list.value;
+
+    const filtered_positions = useMemo(
+        () => all_positions.filter((p) => p.exchange === exchange && p.symbol === symbol),
+        [all_positions, exchange, symbol]
+    );
+
+    const filtered_orders = useMemo(
+        () => all_orders.filter((o) => o.exchange === exchange && o.symbol === symbol),
+        [all_orders, exchange, symbol]
+    );
+
+    const current_price = useMemo(
+        () => (data.length > 0 ? data[data.length - 1].close : null),
+        [data]
     );
 
     const [chart_tick_size, set_chart_tick_size] = useState(() => {
@@ -369,6 +388,9 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
                     ema_settings={ema_settings}
                     on_ema_toggle={handle_ema_toggle}
                     on_ema_settings_change={handle_ema_settings_change}
+                    positions={filtered_positions}
+                    orders={filtered_orders}
+                    current_price={current_price}
                 />
             </div>
         </div>

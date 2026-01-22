@@ -6,6 +6,7 @@ export interface Position {
     symbol: string;
     side: 'long' | 'short';
     size: number;
+    contracts?: number;
     entry_price: number;
     last_price: number;
     liquidation_price: number | null;

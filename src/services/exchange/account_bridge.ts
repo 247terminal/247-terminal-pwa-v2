@@ -52,7 +52,9 @@ function getMarketMap(exchangeId: ExchangeId): Record<string, MarketInfo> {
         result[symbol] = { contract_size: markets[symbol].contract_size };
     }
 
-    marketMapCache.set(exchangeId, { data: result, timestamp: now });
+    if (Object.keys(result).length > 0) {
+        marketMapCache.set(exchangeId, { data: result, timestamp: now });
+    }
     return result;
 }
 

@@ -140,6 +140,7 @@ function mapPosition(
     symbol: string;
     side: 'long' | 'short';
     size: number;
+    contracts?: number;
     entry_price: number;
     last_price: number;
     liquidation_price: number | null;
@@ -153,25 +154,37 @@ function mapPosition(
     const side: 'long' | 'short' = raw.side === 'short' ? 'short' : 'long';
     const margin_mode = raw.margin_mode;
     const market = marketMap[raw.symbol];
-    const contract_size =
-        exchangeId === 'blofin' && market?.contract_size ? market.contract_size : 1;
+    const entry_price = Number(raw.entry_price ?? 0);
     const margin = Number(raw.initial_margin ?? 0);
+    const leverage = Number(raw.leverage ?? 1);
     const unrealized_pnl = Number(raw.unrealized_pnl ?? 0);
     const unrealized_pnl_pct = margin > 0 ? (unrealized_pnl / margin) * 100 : 0;
+
+    let size = raw.contracts;
+    let contracts: number | undefined;
+
+    if (exchangeId === 'blofin') {
+        contracts = raw.contracts;
+        const contract_size = market?.contract_size;
+        if (contract_size && contract_size > 0) {
+            size = raw.contracts * contract_size;
+        }
+    }
 
     return {
         id: `${exchangeId}-${raw.symbol}-${side}`,
         exchange: exchangeId,
         symbol: raw.symbol,
         side,
-        size: raw.contracts * contract_size,
-        entry_price: Number(raw.entry_price ?? 0),
+        size,
+        contracts,
+        entry_price,
         last_price: Number(raw.mark_price ?? raw.entry_price ?? 0),
         liquidation_price: raw.liquidation_price ? Number(raw.liquidation_price) : null,
         unrealized_pnl,
         unrealized_pnl_pct,
         margin,
-        leverage: Number(raw.leverage ?? 1),
+        leverage,
         margin_mode,
         updated_at: Date.now(),
     };
@@ -195,7 +208,9 @@ function mapOrder(
 } {
     const market = marketMap[raw.symbol];
     const contract_size =
-        exchangeId === 'blofin' && market?.contract_size ? market.contract_size : 1;
+        exchangeId === 'blofin' && market?.contract_size && market.contract_size > 0
+            ? market.contract_size
+            : 1;
     const size = raw.amount * contract_size;
     const filled = raw.filled * contract_size;
     const status: 'open' | 'partial' =

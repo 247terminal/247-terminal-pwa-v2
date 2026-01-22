@@ -17,6 +17,7 @@ import type { TradingChartProps, ToggleButtonProps } from '../../types/chart.typ
 import { tick_size_to_precision } from '../../utils/format';
 import { get_timeframe_seconds } from '../../services/chart/drawing_manager';
 import { use_chart_drawing } from '../../hooks/use_chart_drawing';
+import { use_price_lines } from '../../hooks/use_price_lines';
 import { DrawingToolbar } from './drawing_toolbar';
 import { DrawingOverlay } from './drawing_overlay';
 import { ErrorBoundary } from '../common/error_boundary';
@@ -58,6 +59,9 @@ export function TradingChart({
     ema_settings,
     on_ema_toggle,
     on_ema_settings_change,
+    positions = [],
+    orders = [],
+    current_price = null,
 }: TradingChartProps) {
     const container_ref = useRef<HTMLDivElement>(null);
     const chart_ref = useRef<IChartApi | null>(null);
@@ -69,6 +73,7 @@ export function TradingChart({
     const [chart, set_chart] = useState<IChartApi | null>(null);
     const [series, set_series] = useState<ISeriesApi<'Candlestick'> | null>(null);
     const [ema_settings_open, set_ema_settings_open] = useState(false);
+    const [theme_version, set_theme_version] = useState(0);
     const ema_settings_ref = useRef<HTMLDivElement>(null);
 
     const first_candle_time = data.length > 0 ? data[0].time : null;
@@ -97,6 +102,20 @@ export function TradingChart({
         container_ref,
         timeframe,
         first_candle_time,
+    });
+
+    const price_line_colors = useMemo(() => {
+        const theme = get_theme_colors();
+        return { up: theme.up, down: theme.down };
+    }, [theme_version]);
+
+    use_price_lines({
+        series,
+        positions,
+        orders,
+        current_price,
+        data_key,
+        colors: price_line_colors,
     });
 
     useEffect(() => {
@@ -180,6 +199,7 @@ export function TradingChart({
                 wickUpColor: c.up,
                 wickDownColor: c.down,
             });
+            set_theme_version((v) => v + 1);
         };
 
         const observer = new MutationObserver(apply_theme);
