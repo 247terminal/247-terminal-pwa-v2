@@ -11,7 +11,6 @@ import {
     positions_list,
     privacy_mode,
     loading,
-    close_position,
     open_tpsl_modal,
 } from '../../../stores/account_store';
 import { LogoSpinner } from '../../common/logo_spinner';
@@ -24,8 +23,10 @@ import { format_price, format_size } from '../../../utils/format';
 import { format_pnl, format_pct, format_usd, mask_value } from '../../../utils/account_format';
 import { calculate_position_pnl } from '../../../utils/pnl';
 import { SortHeader } from './sort_header';
+import { ClosePositionPanel } from './close_position_panel';
 
 const PositionRow = memo(function PositionRow({ position, is_private }: PositionRowProps) {
+    const [show_close_panel, set_show_close_panel] = useState(false);
     const is_long = position.side === 'long';
     const market = get_market(position.exchange, position.symbol);
     const tick_size = market?.tick_size ?? 0.01;
@@ -43,9 +44,13 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
     );
     const pnl_color = pnl >= 0 ? 'text-success' : 'text-error';
 
-    const handle_close = useCallback(() => {
-        close_position(position.exchange, position.symbol);
-    }, [position.exchange, position.symbol]);
+    const handle_toggle_close_panel = useCallback(() => {
+        set_show_close_panel((prev) => !prev);
+    }, []);
+
+    const handle_close_panel_dismiss = useCallback(() => {
+        set_show_close_panel(false);
+    }, []);
 
     const handle_tpsl = useCallback(() => {
         open_tpsl_modal(position);
@@ -138,7 +143,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </button>
             )}
 
-            <div class="flex-1 flex justify-end gap-1" role="cell">
+            <div class="flex-1 flex justify-end gap-1 relative" role="cell">
                 <button
                     type="button"
                     onClick={handle_tpsl}
@@ -149,12 +154,20 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </button>
                 <button
                     type="button"
-                    onClick={handle_close}
-                    class="px-1.5 py-0.5 text-[10px] rounded bg-error/20 hover:bg-error/40 text-error transition-colors"
+                    onClick={handle_toggle_close_panel}
+                    class={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                        show_close_panel
+                            ? 'bg-error text-error-content'
+                            : 'bg-error/20 hover:bg-error/40 text-error'
+                    }`}
                     aria-label={`Close ${format_symbol(position.symbol)} position`}
+                    aria-expanded={show_close_panel}
                 >
                     Close
                 </button>
+                {show_close_panel && (
+                    <ClosePositionPanel position={position} on_close={handle_close_panel_dismiss} />
+                )}
             </div>
         </div>
     );

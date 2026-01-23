@@ -8,6 +8,7 @@ import {
     fetch_orders as fetch_orders_api,
     fetch_closed_positions as fetch_closed_positions_api,
     cancel_order as cancel_order_api,
+    close_position_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
 import { get_market, has_markets } from './exchange_store';
@@ -401,8 +402,38 @@ export async function cancel_all_orders(exchange_ids?: ExchangeId[]): Promise<nu
     return cancelled_ids.length;
 }
 
-export async function close_position(_exchange_id: ExchangeId, _symbol: string): Promise<void> {
-    return;
+export async function close_position(
+    exchange_id: ExchangeId,
+    symbol: string,
+    percentage: number = 100,
+    order_type: 'market' | 'limit' = 'market',
+    limit_price?: number
+): Promise<boolean> {
+    try {
+        const success = await close_position_api(
+            exchange_id,
+            symbol,
+            percentage,
+            order_type,
+            limit_price
+        );
+
+        if (success && percentage === 100) {
+            const map = new Map(positions.value);
+            for (const [id, pos] of map) {
+                if (pos.exchange === exchange_id && pos.symbol === symbol) {
+                    map.delete(id);
+                    break;
+                }
+            }
+            positions.value = map;
+        }
+
+        return success;
+    } catch (err) {
+        console.error(`failed to close position ${symbol}:`, (err as Error).message);
+        return false;
+    }
 }
 
 export async function refresh_history(exchange_ids: ExchangeId[]): Promise<void> {

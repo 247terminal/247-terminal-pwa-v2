@@ -206,3 +206,19 @@ export function cancel_order(
 ): Promise<boolean> {
     return sendRequest<boolean>('CANCEL_ORDER', { exchangeId, orderId, symbol, category });
 }
+
+export function close_position_api(
+    exchangeId: ExchangeId,
+    symbol: string,
+    percentage: number,
+    order_type: 'market' | 'limit',
+    limit_price?: number
+): Promise<boolean> {
+    return sendRequest<boolean>('CLOSE_POSITION', {
+        exchangeId,
+        symbol,
+        percentage,
+        order_type,
+        limit_price,
+    });
+}
