@@ -1,4 +1,5 @@
 import { signal, computed } from '@preact/signals';
+import { toast } from 'sonner';
 import { EXCHANGE_ORDER, type ExchangeId } from '../types/exchange.types';
 import type {
     TradeFormState,
@@ -142,11 +143,16 @@ export function set_leverage(leverage: number): void {
 
     if (!has_exchange(exchange)) return;
 
+    const base = symbol.split('/')[0];
     set_exchange_leverage(exchange, symbol, clamped)
         .then(() => {
             set_symbol_leverages(exchange, { [symbol]: clamped });
+            toast.success(`${base} leverage set to ${clamped}x`);
         })
-        .catch(() => {});
+        .catch((err) => {
+            console.error('failed to set leverage:', (err as Error).message);
+            toast.error(`Failed to set ${base} leverage`);
+        });
 }
 
 export function update_limit_form(updates: Partial<LimitOrderForm>): void {

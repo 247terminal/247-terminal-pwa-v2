@@ -9,6 +9,7 @@ import {
     TrendingDown,
     ListX,
 } from 'lucide-preact';
+import { toast } from 'sonner';
 import type { TabButtonProps, NukeOption, NukeMenuOption } from '../../../types/account.types';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import {
@@ -67,16 +68,21 @@ function NukeMenu() {
 
     const toggle_menu = useCallback(() => set_is_open((prev) => !prev), []);
 
-    const handle_option_click = useCallback((option: NukeOption) => {
+    const handle_option_click = useCallback(async (option: NukeOption) => {
         set_is_open(false);
         switch (option) {
-            case 'orders':
-                cancel_all_orders().catch(() => null);
+            case 'orders': {
+                const count = await cancel_all_orders();
+                if (count > 0) {
+                    toast.success(`Cancelled ${count} order${count > 1 ? 's' : ''}`);
+                } else {
+                    toast.error('No orders to cancel');
+                }
                 break;
+            }
             case 'all':
             case 'longs':
             case 'shorts':
-                // TODO: Implement position closing
                 break;
         }
     }, []);

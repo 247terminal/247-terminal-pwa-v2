@@ -1,11 +1,13 @@
 import { useEffect } from 'preact/hooks';
 import { LocationProvider, Router, Route } from 'preact-iso';
+import { Toaster } from 'sonner';
 import { AuthGuard } from './components/auth/auth_guard';
 import { TradingPage } from './pages/trading';
 import { ThemeToggle } from './components/common/theme_toggle';
 import { PnlCardModal } from './components/common/pnl_card_modal';
 import { pnl_card_visible } from './stores/pnl_card_store';
 import { init_exchanges } from './services/exchange/init';
+import { current_theme } from './hooks/use_theme';
 
 function HomePage() {
     return (
@@ -58,6 +60,10 @@ export function App() {
                 </Router>
             </LocationProvider>
             {pnl_card_visible.value && <PnlCardModal />}
+            <Toaster
+                theme={current_theme.value === 'terminal-dark' ? 'dark' : 'light'}
+                closeButton
+            />
         </AuthGuard>
     );
 }

@@ -1,6 +1,7 @@
 import { memo } from 'preact/compat';
 import { useState, useMemo, useCallback } from 'preact/hooks';
 import { VList } from 'virtua';
+import { toast } from 'sonner';
 import type {
     Order,
     OrderSortKey,
@@ -36,9 +37,15 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
     const tick_size = market?.tick_size ?? 0.01;
     const qty_step = market?.qty_step ?? 0.001;
 
-    const handle_cancel = useCallback(() => {
-        cancel_order(order.exchange, order.id);
-    }, [order.exchange, order.id]);
+    const handle_cancel = useCallback(async () => {
+        const symbol_label = format_symbol(order.symbol);
+        const success = await cancel_order(order.exchange, order.id);
+        if (success) {
+            toast.success(`Cancelled ${symbol_label} order`);
+        } else {
+            toast.error(`Failed to cancel ${symbol_label} order`);
+        }
+    }, [order.exchange, order.id, order.symbol]);
 
     const handle_symbol_click = useCallback(() => {
         navigate_to_symbol(order.exchange, order.symbol);

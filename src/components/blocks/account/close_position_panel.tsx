@@ -1,11 +1,12 @@
 import { memo } from 'preact/compat';
 import { useState, useCallback, useRef, useEffect } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
+import { toast } from 'sonner';
 import type { Position } from '../../../types/account.types';
 import { close_position } from '../../../stores/account_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
 import { format_price, format_size } from '../../../utils/format';
-import { parse_symbol } from '../../chart/symbol_row';
+import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 
 type CloseOrderType = 'market' | 'limit';
 
@@ -66,11 +67,24 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
 
     const handle_submit = useCallback(async () => {
         set_is_submitting(true);
+        const symbol_label = format_symbol(position.symbol);
         try {
             const price = order_type === 'limit' ? parseFloat(limit_price) : undefined;
-            await close_position(position.exchange, position.symbol, percentage, order_type, price);
+            const success = await close_position(
+                position.exchange,
+                position.symbol,
+                percentage,
+                order_type,
+                price
+            );
+            if (success) {
+                toast.success(`Closed ${symbol_label} position`);
+            } else {
+                toast.error(`Failed to close ${symbol_label}`);
+            }
             on_close();
         } catch (err) {
+            toast.error(`Failed to close ${symbol_label}`);
             console.error('failed to close position:', (err as Error).message);
         } finally {
             set_is_submitting(false);

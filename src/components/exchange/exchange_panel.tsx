@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'preact/hooks';
 import { Eye, EyeOff, X, UserPlus, KeyRound, AlertTriangle } from 'lucide-preact';
+import { toast } from 'sonner';
 import { use_click_outside, use_escape_key } from '@/hooks';
 import {
     exchange_credentials,
@@ -170,7 +171,9 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
             const result = await validate_exchange_credentials(exchange_id, creds);
 
             if (!result.valid) {
+                const exchange_name = exchange_id.charAt(0).toUpperCase() + exchange_id.slice(1);
                 set_error(result.error || 'validation failed');
+                toast.error(`Failed to connect to ${exchange_name}`);
                 return;
             }
 
@@ -185,9 +188,14 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
             load_exchange(exchange_id).catch(console.error);
             refresh_account(exchange_id).catch(console.error);
 
+            const exchange_name = exchange_id.charAt(0).toUpperCase() + exchange_id.slice(1);
+            toast.success(`Connected to ${exchange_name}`);
             handle_close();
         } catch (err) {
-            set_error(err instanceof Error ? err.message : 'connection failed');
+            const exchange_name = exchange_id.charAt(0).toUpperCase() + exchange_id.slice(1);
+            const message = err instanceof Error ? err.message : 'connection failed';
+            set_error(message);
+            toast.error(`Failed to connect to ${exchange_name}`);
         } finally {
             set_testing(false);
         }
@@ -205,6 +213,8 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
             private_key: '',
         });
         set_error(null);
+        const exchange_name = exchange_id.charAt(0).toUpperCase() + exchange_id.slice(1);
+        toast.success(`Disconnected from ${exchange_name}`);
     }
 
     function open_link(url: string): void {
