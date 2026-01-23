@@ -1,4 +1,10 @@
-import { EXCHANGE_CONFIG, VALID_SETTLE, TIMEFRAME_MAP, PROXY_CONFIG } from '@/config';
+import {
+    EXCHANGE_CONFIG,
+    VALID_SETTLE,
+    TIMEFRAME_MAP,
+    PROXY_CONFIG,
+    BROKER_CONFIG,
+} from '@/config';
 import { fetchBlofinFundingRates } from './streams/blofin';
 import type {
     ExchangeId,
@@ -70,6 +76,20 @@ function createExchangeInstance(
     if (credentials?.wallet_address) {
         exchangeOptions.walletAddress = credentials.wallet_address;
         exchangeOptions.privateKey = credentials.private_key;
+    }
+
+    if (exchangeId === 'bybit') {
+        exchangeOptions.headers = {
+            ...(exchangeOptions.headers as Record<string, string> | undefined),
+            Referer: BROKER_CONFIG.bybit.referer,
+        };
+    }
+
+    if (exchangeId === 'hyperliquid') {
+        (exchangeOptions.options as Record<string, unknown>).builder =
+            BROKER_CONFIG.hyperliquid.builder;
+        (exchangeOptions.options as Record<string, unknown>).feeInt =
+            BROKER_CONFIG.hyperliquid.feeInt;
     }
 
     return new ExchangeClass(exchangeOptions) as unknown as CcxtExchange;

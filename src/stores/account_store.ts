@@ -11,7 +11,7 @@ import {
     close_position_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
-import { get_market, has_markets } from './exchange_store';
+import { get_market, has_markets, get_ticker } from './exchange_store';
 import { STORAGE_CONSTANTS, ACCOUNT_CONSTANTS } from '../config/chart.constants';
 
 function load_privacy_mode(): boolean {
@@ -389,7 +389,10 @@ export async function cancel_all_orders(exchange_ids?: ExchangeId[]): Promise<nu
                 .then(() => {
                     cancelled_ids.push(o.id);
                 })
-                .catch(() => null)
+                .catch((err) => {
+                    console.error('failed to cancel order:', (err as Error).message);
+                    return null;
+                })
         )
     );
 
@@ -409,23 +412,31 @@ export async function close_position(
     order_type: 'market' | 'limit' = 'market',
     limit_price?: number
 ): Promise<boolean> {
+    const position = Array.from(positions.value.values()).find(
+        (p) => p.exchange === exchange_id && p.symbol === symbol
+    );
+
+    if (!position) {
+        console.error(`position not found: ${symbol}`);
+        return false;
+    }
+
     try {
-        const success = await close_position_api(
-            exchange_id,
+        const ticker = get_ticker(exchange_id, symbol);
+        const success = await close_position_api(exchange_id, {
             symbol,
+            side: position.side,
+            size: position.size,
             percentage,
             order_type,
-            limit_price
-        );
+            margin_mode: position.margin_mode,
+            limit_price,
+            mark_price: ticker?.last_price,
+        });
 
-        if (success && percentage === 100) {
+        if (success && percentage === 100 && order_type === 'market') {
             const map = new Map(positions.value);
-            for (const [id, pos] of map) {
-                if (pos.exchange === exchange_id && pos.symbol === symbol) {
-                    map.delete(id);
-                    break;
-                }
-            }
+            map.delete(position.id);
             positions.value = map;
         }
 

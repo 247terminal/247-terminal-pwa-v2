@@ -29,6 +29,7 @@ import {
     setLeverage,
     cancelOrder,
     cancelAllOrders,
+    closePosition,
     hyperliquidAdapter,
     type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
@@ -328,6 +329,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 const exchangeId = payload?.exchangeId as ExchangeId;
                 const credentials = payload?.credentials as ExchangeAuthParams;
                 createAuthenticatedExchange(exchangeId, credentials);
+                await fetchAccountConfig(exchangeId);
                 result = { initialized: true };
                 break;
             }
@@ -405,6 +407,18 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                     payload?.exchangeId as ExchangeId,
                     payload?.symbol as string | undefined
                 );
+                break;
+            case 'CLOSE_POSITION':
+                result = await closePosition(payload?.exchangeId as ExchangeId, {
+                    symbol: payload?.symbol as string,
+                    side: payload?.side as 'long' | 'short',
+                    size: payload?.size as number,
+                    percentage: payload?.percentage as number,
+                    order_type: payload?.order_type as 'market' | 'limit',
+                    margin_mode: payload?.margin_mode as 'cross' | 'isolated',
+                    limit_price: payload?.limit_price as number | undefined,
+                    mark_price: payload?.mark_price as number | undefined,
+                });
                 break;
             default:
                 throw new Error(`unknown message type: ${type}`);

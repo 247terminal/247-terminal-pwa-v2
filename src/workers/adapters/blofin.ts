@@ -7,6 +7,8 @@ import type {
     OrderCategory,
 } from '@/types/worker.types';
 import { POSITION_CONSTANTS } from '@/config/chart.constants';
+import { BROKER_CONFIG } from '@/config';
+import type { ClosePositionParams } from '@/types/trading.types';
 import { blofin as sym } from '../symbol_utils';
 
 type BaseBlofinExchange = InstanceType<typeof blofin>;
@@ -23,6 +25,7 @@ export interface BlofinExchange extends BaseBlofinExchange {
     privatePostTradeCancelTpsl(params: unknown): Promise<unknown>;
     privatePostTradeCancelAlgo(params: unknown): Promise<unknown>;
     privatePostTradeCancelBatchOrders(params: unknown): Promise<unknown>;
+    privatePostTradeOrder(params: Record<string, unknown>): Promise<unknown>;
 }
 
 interface BlofinPositionResponse {
@@ -209,58 +212,72 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
         exchange.privateGetTradeOrdersAlgoPending({ orderType: 'trigger' }).catch(() => null),
     ]);
 
-    const orders: RawOrder[] = [];
+    const pending =
+        is_order_response(pending_result) && Array.isArray(pending_result.data)
+            ? pending_result.data
+            : [];
+    const tpsl =
+        is_tpsl_order_response(tpsl_result) && Array.isArray(tpsl_result.data)
+            ? tpsl_result.data
+            : [];
+    const algo =
+        is_algo_order_response(trigger_result) && Array.isArray(trigger_result.data)
+            ? trigger_result.data
+            : [];
 
-    if (is_order_response(pending_result) && Array.isArray(pending_result.data)) {
-        for (const o of pending_result.data) {
-            orders.push({
-                symbol: sym.toUnified(o.instId),
-                id: o.orderId,
-                side: o.side === 'buy' ? 'buy' : 'sell',
-                type: o.orderType.toLowerCase(),
-                amount: Number(o.size || 0),
-                price: Number(o.price || o.triggerPrice || 0),
-                filled: Number(o.filledSize || 0),
-                timestamp: Number(o.createTime || Date.now()),
-                category: 'regular',
-            });
-        }
+    const totalLen = pending.length + tpsl.length + algo.length;
+    if (totalLen === 0) return [];
+
+    const result: RawOrder[] = new Array(totalLen);
+    let idx = 0;
+
+    for (let i = 0; i < pending.length; i++) {
+        const o = pending[i];
+        result[idx++] = {
+            symbol: sym.toUnified(o.instId),
+            id: o.orderId,
+            side: o.side === 'buy' ? 'buy' : 'sell',
+            type: o.orderType.toLowerCase(),
+            amount: Number(o.size || 0),
+            price: Number(o.price || o.triggerPrice || 0),
+            filled: Number(o.filledSize || 0),
+            timestamp: Number(o.createTime || Date.now()),
+            category: 'regular',
+        };
     }
 
-    if (is_tpsl_order_response(tpsl_result) && Array.isArray(tpsl_result.data)) {
-        for (const o of tpsl_result.data) {
-            const has_tp = o.tpTriggerPrice && Number(o.tpTriggerPrice) > 0;
-            orders.push({
-                symbol: sym.toUnified(o.instId),
-                id: o.tpslId,
-                side: o.side === 'buy' ? 'buy' : 'sell',
-                type: has_tp ? 'take_profit' : 'stop_loss',
-                amount: Number(o.size || 0),
-                price: has_tp ? Number(o.tpTriggerPrice) : Number(o.slTriggerPrice),
-                filled: 0,
-                timestamp: Number(o.createTime || Date.now()),
-                category: 'tpsl',
-            });
-        }
+    for (let i = 0; i < tpsl.length; i++) {
+        const o = tpsl[i];
+        const has_tp = o.tpTriggerPrice && Number(o.tpTriggerPrice) > 0;
+        result[idx++] = {
+            symbol: sym.toUnified(o.instId),
+            id: o.tpslId,
+            side: o.side === 'buy' ? 'buy' : 'sell',
+            type: has_tp ? 'take_profit' : 'stop_loss',
+            amount: Number(o.size || 0),
+            price: has_tp ? Number(o.tpTriggerPrice) : Number(o.slTriggerPrice),
+            filled: 0,
+            timestamp: Number(o.createTime || Date.now()),
+            category: 'tpsl',
+        };
     }
 
-    if (is_algo_order_response(trigger_result) && Array.isArray(trigger_result.data)) {
-        for (const o of trigger_result.data) {
-            orders.push({
-                symbol: sym.toUnified(o.instId),
-                id: o.algoId,
-                side: o.side === 'buy' ? 'buy' : 'sell',
-                type: 'stop',
-                amount: Number(o.size || 0),
-                price: Number(o.triggerPrice || 0),
-                filled: Number(o.filledSize || 0),
-                timestamp: Number(o.createTime || Date.now()),
-                category: 'algo',
-            });
-        }
+    for (let i = 0; i < algo.length; i++) {
+        const o = algo[i];
+        result[idx++] = {
+            symbol: sym.toUnified(o.instId),
+            id: o.algoId,
+            side: o.side === 'buy' ? 'buy' : 'sell',
+            type: 'stop',
+            amount: Number(o.size || 0),
+            price: Number(o.triggerPrice || 0),
+            filled: Number(o.filledSize || 0),
+            timestamp: Number(o.createTime || Date.now()),
+            category: 'algo',
+        };
     }
 
-    return orders;
+    return result;
 }
 
 interface PositionState {
@@ -502,18 +519,61 @@ export async function cancel_all_orders(
                   .privatePostTradeCancelBatchOrders(
                       p.map((o) => ({ instId: o.instId, orderId: o.orderId }))
                   )
-                  .catch(() => null)
+                  .catch((err) => {
+                      console.error('failed to cancel batch orders:', (err as Error).message);
+                      return null;
+                  })
             : null,
         ...t.map((o) =>
             exchange
                 .privatePostTradeCancelTpsl({ instId: o.instId, tpslId: o.tpslId })
-                .catch(() => null)
+                .catch((err) => {
+                    console.error('failed to cancel tpsl:', (err as Error).message);
+                    return null;
+                })
         ),
         ...a.map((o) =>
             exchange
                 .privatePostTradeCancelAlgo({ instId: o.instId, algoId: o.algoId })
-                .catch(() => null)
+                .catch((err) => {
+                    console.error('failed to cancel algo:', (err as Error).message);
+                    return null;
+                })
         ),
     ]);
     return p.length + t.length + a.length;
+}
+
+export async function close_position(
+    exchange: BlofinExchange,
+    params: ClosePositionParams
+): Promise<boolean> {
+    const blofin_inst_id = to_blofin_inst_id(params.symbol);
+    const close_size = params.size * (params.percentage / 100);
+    const order_side = params.side === 'long' ? 'sell' : 'buy';
+
+    const order_params: Record<string, string | number> = {
+        instId: blofin_inst_id,
+        marginMode: params.margin_mode,
+        side: order_side,
+        orderType: params.order_type,
+        size: String(close_size),
+        reduceOnly: 'true',
+        brokerId: BROKER_CONFIG.blofin.brokerId,
+    };
+
+    if (params.order_type === 'limit' && params.limit_price) {
+        order_params.price = String(params.limit_price);
+    }
+
+    if (params.position_mode === 'hedge') {
+        order_params.positionSide = params.side;
+        delete order_params.reduceOnly;
+    } else {
+        order_params.positionSide = 'net';
+    }
+
+    await exchange.privatePostTradeOrder(order_params);
+
+    return true;
 }

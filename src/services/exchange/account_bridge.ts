@@ -1,6 +1,6 @@
 import { signal } from '@preact/signals';
 import type { ExchangeId } from '@/types/exchange.types';
-import type { PositionMode, MarginMode, Balance } from '@/types/trading.types';
+import type { PositionMode, MarginMode, Balance, ClosePositionParams } from '@/types/trading.types';
 import type { Position, Order, TradeHistory } from '@/types/account.types';
 import type { RawFill, OrderCategory } from '@/types/worker.types';
 import { getWorker, sendRequest, fetch_markets } from './chart_data';
@@ -209,16 +209,7 @@ export function cancel_order(
 
 export function close_position_api(
     exchangeId: ExchangeId,
-    symbol: string,
-    percentage: number,
-    order_type: 'market' | 'limit',
-    limit_price?: number
+    params: Omit<ClosePositionParams, 'position_mode'>
 ): Promise<boolean> {
-    return sendRequest<boolean>('CLOSE_POSITION', {
-        exchangeId,
-        symbol,
-        percentage,
-        order_type,
-        limit_price,
-    });
+    return sendRequest<boolean>('CLOSE_POSITION', { exchangeId, ...params });
 }

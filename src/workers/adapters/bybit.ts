@@ -7,6 +7,7 @@ import type {
     OrderCategory,
 } from '@/types/worker.types';
 import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
+import type { ClosePositionParams } from '@/types/trading.types';
 import { bybit as sym } from '../symbol_utils';
 
 type BaseBybitExchange = InstanceType<typeof bybit>;
@@ -19,6 +20,7 @@ export interface BybitExchange extends BaseBybitExchange {
     privateGetV5ExecutionList(params: Record<string, unknown>): Promise<unknown>;
     privatePostV5OrderCancel(params: Record<string, unknown>): Promise<unknown>;
     privatePostV5OrderCancelAll(params: Record<string, unknown>): Promise<unknown>;
+    privatePostV5OrderCreate(params: Record<string, unknown>): Promise<unknown>;
 }
 
 interface BybitPositionResponse {
@@ -389,4 +391,38 @@ export async function cancel_all_orders(exchange: BybitExchange, symbol?: string
     const response = await exchange.privatePostV5OrderCancelAll(params);
     const list = (response as { result?: { list?: unknown[] } })?.result?.list;
     return Array.isArray(list) ? list.length : 0;
+}
+
+export async function close_position(
+    exchange: BybitExchange,
+    params: ClosePositionParams
+): Promise<boolean> {
+    const bybit_symbol = sym.fromUnified(params.symbol);
+    const close_size = params.size * (params.percentage / 100);
+    const order_side = params.side === 'long' ? 'Sell' : 'Buy';
+
+    const order_params: Record<string, string | number | boolean> = {
+        category: 'linear',
+        symbol: bybit_symbol,
+        side: order_side,
+        orderType: params.order_type === 'market' ? 'Market' : 'Limit',
+        qty: String(close_size),
+        reduceOnly: true,
+        timeInForce: params.order_type === 'market' ? 'IOC' : 'GTC',
+    };
+
+    if (params.order_type === 'limit' && params.limit_price) {
+        order_params.price = String(params.limit_price);
+    }
+
+    if (params.position_mode === 'hedge') {
+        order_params.positionIdx = params.side === 'long' ? 1 : 2;
+        delete order_params.reduceOnly;
+    } else {
+        order_params.positionIdx = 0;
+    }
+
+    await exchange.privatePostV5OrderCreate(order_params);
+
+    return true;
 }

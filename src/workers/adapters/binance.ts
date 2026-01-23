@@ -6,6 +6,7 @@ import type {
     RawFill,
     OrderCategory,
 } from '@/types/worker.types';
+import type { ClosePositionParams } from '@/types/trading.types';
 import { binance as sym } from '../symbol_utils';
 
 type BaseBinanceExchange = InstanceType<typeof binanceusdm>;
@@ -22,6 +23,7 @@ export interface BinanceExchange extends BaseBinanceExchange {
     fapiPrivateDeleteOrder(params: Record<string, unknown>): Promise<unknown>;
     fapiPrivateDeleteAllOpenOrders(params: Record<string, unknown>): Promise<unknown>;
     fapiPrivateDeleteAlgoOpenOrders(params: Record<string, unknown>): Promise<unknown>;
+    fapiPrivatePostOrder(params: Record<string, unknown>): Promise<unknown>;
 }
 
 interface BinanceBalance {
@@ -419,8 +421,14 @@ export async function cancel_all_orders(
     if (symbol) {
         const binance_symbol = sym.fromUnified(symbol);
         const [regular, algo] = await Promise.all([
-            exchange.fapiPrivateDeleteAllOpenOrders({ symbol: binance_symbol }).catch(() => null),
-            exchange.fapiPrivateDeleteAlgoOpenOrders({ symbol: binance_symbol }).catch(() => null),
+            exchange.fapiPrivateDeleteAllOpenOrders({ symbol: binance_symbol }).catch((err) => {
+                console.error('failed to cancel regular orders:', (err as Error).message);
+                return null;
+            }),
+            exchange.fapiPrivateDeleteAlgoOpenOrders({ symbol: binance_symbol }).catch((err) => {
+                console.error('failed to cancel algo orders:', (err as Error).message);
+                return null;
+            }),
         ]);
         const regular_count = Array.isArray(regular) ? regular.length : 0;
         const algo_count = Array.isArray(algo) ? algo.length : 0;
@@ -441,11 +449,48 @@ export async function cancel_all_orders(
 
     const promises = Array.from(symbols).map((s) =>
         Promise.all([
-            exchange.fapiPrivateDeleteAllOpenOrders({ symbol: s }).catch(() => null),
-            exchange.fapiPrivateDeleteAlgoOpenOrders({ symbol: s }).catch(() => null),
+            exchange.fapiPrivateDeleteAllOpenOrders({ symbol: s }).catch((err) => {
+                console.error('failed to cancel regular orders:', (err as Error).message);
+                return null;
+            }),
+            exchange.fapiPrivateDeleteAlgoOpenOrders({ symbol: s }).catch((err) => {
+                console.error('failed to cancel algo orders:', (err as Error).message);
+                return null;
+            }),
         ])
     );
 
     await Promise.all(promises);
     return orders.length + algo.length;
+}
+
+export async function close_position(
+    exchange: BinanceExchange,
+    params: ClosePositionParams
+): Promise<boolean> {
+    const binance_symbol = sym.fromUnified(params.symbol);
+    const close_size = params.size * (params.percentage / 100);
+    const order_side = params.side === 'long' ? 'SELL' : 'BUY';
+
+    const order_params: Record<string, string | number | boolean> = {
+        symbol: binance_symbol,
+        side: order_side,
+        type: params.order_type === 'market' ? 'MARKET' : 'LIMIT',
+        quantity: close_size,
+        reduceOnly: 'true',
+    };
+
+    if (params.order_type === 'limit' && params.limit_price) {
+        order_params.price = params.limit_price;
+        order_params.timeInForce = 'GTC';
+    }
+
+    if (params.position_mode === 'hedge') {
+        order_params.positionSide = params.side === 'long' ? 'LONG' : 'SHORT';
+        delete order_params.reduceOnly;
+    }
+
+    await exchange.fapiPrivatePostOrder(order_params);
+
+    return true;
 }

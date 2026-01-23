@@ -4,6 +4,7 @@ export * as blofin from './blofin';
 export * as hyperliquid from './hyperliquid';
 export type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 export type { BinanceExchange } from './binance';
+export type { ClosePositionParams } from '@/types/trading.types';
 export type { BybitExchange } from './bybit';
 export type { BlofinExchange } from './blofin';
 export type { HyperliquidExchange } from './hyperliquid';

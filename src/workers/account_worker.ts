@@ -18,6 +18,7 @@ import {
     type BybitExchange,
     type BlofinExchange,
     type HyperliquidExchange,
+    type ClosePositionParams,
 } from './adapters';
 import type { ExchangeId, CcxtExchange, OrderCategory } from '@/types/worker.types';
 import { mapPosition, mapOrder, mapClosedPosition } from './position_mappers';
@@ -26,6 +27,12 @@ export type { ExchangeAuthParams };
 
 export interface MarketInfo {
     contract_size?: number;
+}
+
+const positionModeCache = new Map<ExchangeId, 'one_way' | 'hedge'>();
+
+export function getPositionMode(exchangeId: ExchangeId): 'one_way' | 'hedge' {
+    return positionModeCache.get(exchangeId) ?? 'one_way';
 }
 
 export function createAuthenticatedExchange(
@@ -38,6 +45,7 @@ export function createAuthenticatedExchange(
 
 export function destroyAuthenticatedExchange(exchangeId: ExchangeId): void {
     clearExchangeAuth(exchangeId);
+    positionModeCache.delete(exchangeId);
 }
 
 function getAuthenticatedExchange(exchangeId: ExchangeId): CcxtExchange {
@@ -72,6 +80,7 @@ export async function fetchAccountConfig(exchangeId: ExchangeId): Promise<{
             break;
     }
 
+    positionModeCache.set(exchangeId, position_mode);
     return { position_mode, default_margin_mode: 'cross' };
 }
 
@@ -463,6 +472,47 @@ export async function cancelAllOrders(exchangeId: ExchangeId, symbol?: string): 
         }
     } catch (err) {
         console.error(`failed to cancel all ${exchangeId} orders:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function closePosition(
+    exchangeId: ExchangeId,
+    params: Omit<ClosePositionParams, 'position_mode'>
+): Promise<boolean> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+    const fullParams: ClosePositionParams = {
+        ...params,
+        position_mode: getPositionMode(exchangeId),
+    };
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.close_position(
+                    exchange as unknown as BinanceExchange,
+                    fullParams
+                );
+            case 'bybit':
+                return await bybitAdapter.close_position(
+                    exchange as unknown as BybitExchange,
+                    fullParams
+                );
+            case 'blofin':
+                return await blofinAdapter.close_position(
+                    exchange as unknown as BlofinExchange,
+                    fullParams
+                );
+            case 'hyperliquid':
+                return await hyperliquidAdapter.close_position(
+                    exchange as unknown as HyperliquidExchange,
+                    fullParams
+                );
+            default:
+                return false;
+        }
+    } catch (err) {
+        console.error(`failed to close ${exchangeId} position:`, (err as Error).message);
         throw err;
     }
 }

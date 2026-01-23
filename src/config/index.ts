@@ -130,3 +130,16 @@ export const TIMEFRAME_MAP: Record<string | number, string> = {
     W: '1w',
     M: '1M',
 };
+
+export const BROKER_CONFIG = {
+    bybit: {
+        referer: 'Er000837',
+    },
+    blofin: {
+        brokerId: 'e1cf7ff239e77466',
+    },
+    hyperliquid: {
+        builder: '0xD128dD90Cd4eABFCf6EFC4D11dd9f46E53c893b8',
+        feeInt: 10,
+    },
+} as const;

@@ -38,3 +38,15 @@ export interface ExchangeAccountState {
 }
 
 export type TradingAccounts = Partial<Record<ExchangeId, ExchangeAccountState>>;
+
+export interface ClosePositionParams {
+    symbol: string;
+    side: 'long' | 'short';
+    size: number;
+    percentage: number;
+    order_type: 'market' | 'limit';
+    margin_mode: MarginMode;
+    position_mode: PositionMode;
+    limit_price?: number;
+    mark_price?: number;
+}

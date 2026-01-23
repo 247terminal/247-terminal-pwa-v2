@@ -7,6 +7,7 @@ import type {
     OrderCategory,
 } from '@/types/worker.types';
 import { HYPERLIQUID_CACHE_TTL, EXCHANGE_CONFIG } from '@/config';
+import type { ClosePositionParams } from '@/types/trading.types';
 import { hyperliquid as sym } from '../symbol_utils';
 
 type BaseHyperliquidExchange = InstanceType<typeof hyperliquid>;
@@ -366,9 +367,37 @@ export async function cancel_all_orders(
 
     await Promise.all(
         Object.entries(by_coin).map(([coin, ids]) =>
-            exchange.cancelOrders(ids, sym.toUnified(coin)).catch(() => null)
+            exchange.cancelOrders(ids, sym.toUnified(coin)).catch((err) => {
+                console.error('failed to cancel orders:', (err as Error).message);
+                return null;
+            })
         )
     );
 
     return orders_to_cancel.length;
+}
+
+export async function close_position(
+    exchange: HyperliquidExchange,
+    params: ClosePositionParams
+): Promise<boolean> {
+    const close_size = params.size * (params.percentage / 100);
+    const order_side = params.side === 'long' ? 'sell' : 'buy';
+
+    const order_params: Record<string, unknown> = {
+        reduceOnly: true,
+    };
+
+    const price = params.order_type === 'market' ? params.mark_price : params.limit_price;
+
+    await exchange.createOrder(
+        params.symbol,
+        params.order_type,
+        order_side,
+        close_size,
+        price,
+        order_params
+    );
+
+    return true;
 }
