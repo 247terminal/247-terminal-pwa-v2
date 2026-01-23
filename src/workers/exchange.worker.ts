@@ -367,7 +367,8 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             case 'FETCH_CLOSED_POSITIONS':
                 result = await fetchClosedPositions(
                     payload?.exchangeId as ExchangeId,
-                    (payload?.limit as number) || 50
+                    (payload?.limit as number) || 50,
+                    (payload?.marketMap as Record<string, AccountMarketInfo>) || undefined
                 );
                 break;
             case 'FETCH_LEVERAGE_SETTINGS':
@@ -380,7 +381,8 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 result = await fetchSymbolFills(
                     payload?.exchangeId as ExchangeId,
                     payload?.symbol as string,
-                    (payload?.limit as number) || 100
+                    (payload?.limit as number) || 100,
+                    (payload?.marketMap as Record<string, AccountMarketInfo>) || undefined
                 );
                 break;
             case 'SET_LEVERAGE':

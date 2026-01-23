@@ -7,7 +7,7 @@ export const bybit = binance;
 
 export const blofin = {
     toUnified: (instId: string): string => instId.replace(/-/g, '/') + ':USDT',
-    fromUnified: (symbol: string): string => symbol.replace(/\//, '-').replace(/:USDT$/, ''),
+    fromUnified: (symbol: string): string => symbol.replace(/\//, '-').replace(/:[A-Z]+$/, ''),
 };
 
 export const hyperliquid = {

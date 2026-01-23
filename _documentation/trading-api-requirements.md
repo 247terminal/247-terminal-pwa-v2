@@ -893,11 +893,6 @@ Auth: EIP-712 signature (r, s, v) + nonce
 2. Support `postOnly`, `reduceOnly` params
 3. Handle hedge mode position side
 
-### Phase 2.3 - Order Cancellation
-
-1. Implement `cancel_order(exchange, order_id, symbol)`
-2. Implement `cancel_all_orders(exchange, symbol?)`
-
 ### Phase 3.0 - WebSocket Setup
 
 1. Create WS connection manager per exchange

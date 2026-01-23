@@ -131,18 +131,29 @@ export async function fetch_positions(exchange: BlofinExchange): Promise<RawPosi
     if (!is_position_response(response)) return [];
     const data = response.data;
     if (!Array.isArray(data)) return [];
-    return data.map((p) => ({
-        symbol: sym.toUnified(p.instId),
-        contracts: Math.abs(Number(p.positions || 0)),
-        side: p.positionSide === 'long' ? 'long' : 'short',
-        entry_price: p.averagePrice,
-        mark_price: p.markPrice,
-        liquidation_price: p.liquidationPrice,
-        unrealized_pnl: p.unrealizedPnl,
-        leverage: p.leverage,
-        margin_mode: p.marginMode === 'isolated' ? 'isolated' : 'cross',
-        initial_margin: p.margin,
-    }));
+    return data.map((p) => {
+        const positions_value = Number(p.positions || 0);
+        let side: 'long' | 'short';
+        if (p.positionSide === 'long') {
+            side = 'long';
+        } else if (p.positionSide === 'short') {
+            side = 'short';
+        } else {
+            side = positions_value >= 0 ? 'long' : 'short';
+        }
+        return {
+            symbol: sym.toUnified(p.instId),
+            contracts: Math.abs(positions_value),
+            side,
+            entry_price: p.averagePrice,
+            mark_price: p.markPrice,
+            liquidation_price: p.liquidationPrice,
+            unrealized_pnl: p.unrealizedPnl,
+            leverage: p.leverage,
+            margin_mode: p.marginMode === 'isolated' ? 'isolated' : 'cross',
+            initial_margin: p.margin,
+        };
+    });
 }
 
 interface BlofinTpslOrderResponse {
@@ -380,8 +391,7 @@ export async function fetch_leverage_settings(
 
             if (is_leverage_response(response) && Array.isArray(response.data)) {
                 for (const item of response.data) {
-                    result[sym.toUnified(item.instId)] =
-                        parseFloat(item.leverage) || 1;
+                    result[sym.toUnified(item.instId)] = parseFloat(item.leverage) || 1;
                 }
             }
         }
@@ -395,7 +405,8 @@ export async function fetch_leverage_settings(
 export async function fetch_symbol_fills(
     exchange: BlofinExchange,
     symbol: string,
-    limit: number
+    limit: number,
+    contract_size?: number
 ): Promise<RawFill[]> {
     const response = await exchange.privateGetTradeFillsHistory({
         instId: to_blofin_inst_id(symbol),
@@ -404,6 +415,8 @@ export async function fetch_symbol_fills(
     if (!is_fill_response(response)) return [];
     const data = response.data;
     if (!Array.isArray(data)) return [];
+
+    const cs = contract_size && contract_size > 0 ? contract_size : 1;
 
     return data.map((f, idx) => {
         const is_buy = f.side?.toLowerCase() === 'buy';
@@ -424,7 +437,7 @@ export async function fetch_symbol_fills(
             symbol: sym.toUnified(f.instId),
             side: is_buy ? 'buy' : 'sell',
             price: Number(f.fillPrice || 0),
-            size: Number(f.fillSize || 0),
+            size: Number(f.fillSize || 0) * cs,
             time: Number(f.ts || Date.now()),
             closed_pnl: Number(f.fillPnl || 0),
             direction,

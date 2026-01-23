@@ -193,7 +193,8 @@ export async function fetchAccountData(
 
 export async function fetchClosedPositions(
     exchangeId: ExchangeId,
-    limit: number
+    limit: number,
+    marketMap?: Record<string, MarketInfo>
 ): Promise<ReturnType<typeof mapClosedPosition>[]> {
     const exchange = getAuthenticatedExchange(exchangeId);
 
@@ -210,9 +211,22 @@ export async function fetchClosedPositions(
             case 'bybit':
                 raw = await bybitAdapter.fetch_closed_positions(exchange as BybitExchange, limit);
                 break;
-            case 'blofin':
-                raw = await blofinAdapter.fetch_closed_positions(exchange as BlofinExchange, limit);
+            case 'blofin': {
+                let contract_values: Record<string, number> | undefined;
+                if (marketMap) {
+                    contract_values = {};
+                    for (const symbol in marketMap) {
+                        const cs = marketMap[symbol].contract_size;
+                        if (cs && cs > 0) contract_values[symbol] = cs;
+                    }
+                }
+                raw = await blofinAdapter.fetch_closed_positions(
+                    exchange as BlofinExchange,
+                    limit,
+                    contract_values
+                );
                 break;
+            }
             case 'hyperliquid':
                 raw = await hyperliquidAdapter.fetch_closed_positions(
                     exchange as HyperliquidExchange,
@@ -272,7 +286,8 @@ export async function fetchLeverageSettings(
 export async function fetchSymbolFills(
     exchangeId: ExchangeId,
     symbol: string,
-    limit: number
+    limit: number,
+    marketMap?: Record<string, MarketInfo>
 ): Promise<RawFill[]> {
     const exchange = getAuthenticatedExchange(exchangeId);
 
@@ -290,12 +305,15 @@ export async function fetchSymbolFills(
                     symbol,
                     limit
                 );
-            case 'blofin':
+            case 'blofin': {
+                const contract_size = marketMap?.[symbol]?.contract_size;
                 return await blofinAdapter.fetch_symbol_fills(
                     exchange as BlofinExchange,
                     symbol,
-                    limit
+                    limit,
+                    contract_size
                 );
+            }
             case 'hyperliquid':
                 return await hyperliquidAdapter.fetch_symbol_fills(
                     exchange as HyperliquidExchange,

@@ -3,8 +3,8 @@ import type { ExchangeId } from '@/types/exchange.types';
 import type { PositionMode, MarginMode, Balance } from '@/types/trading.types';
 import type { Position, Order, TradeHistory } from '@/types/account.types';
 import type { RawFill, OrderCategory } from '@/types/worker.types';
-import { getWorker, sendRequest } from './chart_data';
-import { get_exchange_markets } from '@/stores/exchange_store';
+import { getWorker, sendRequest, fetch_markets } from './chart_data';
+import { get_exchange_markets, has_markets, set_markets } from '@/stores/exchange_store';
 import { MARKET_MAP_CACHE_TTL } from '@/config';
 
 interface AccountConfig {
@@ -41,12 +41,17 @@ const inflightRequests = new Map<string, Promise<unknown>>();
 
 export const initialized_exchanges_signal = signal<Set<ExchangeId>>(new Set());
 
-function getMarketMap(exchangeId: ExchangeId): Record<string, MarketInfo> {
+async function getMarketMap(exchangeId: ExchangeId): Promise<Record<string, MarketInfo>> {
     const now = Date.now();
     const cached = marketMapCache.get(exchangeId);
 
     if (cached && now - cached.timestamp < MARKET_MAP_CACHE_TTL) {
         return cached.data;
+    }
+
+    if (!has_markets(exchangeId)) {
+        const market_list = await fetch_markets(exchangeId);
+        set_markets(exchangeId, market_list);
     }
 
     const markets = get_exchange_markets(exchangeId);
@@ -123,22 +128,22 @@ export function fetch_balance(exchangeId: ExchangeId): Promise<Balance | null> {
 }
 
 export function fetch_positions(exchangeId: ExchangeId): Promise<Position[]> {
-    return dedupeRequest(`positions:${exchangeId}`, () => {
-        const marketMap = getMarketMap(exchangeId);
+    return dedupeRequest(`positions:${exchangeId}`, async () => {
+        const marketMap = await getMarketMap(exchangeId);
         return sendRequest<Position[]>('FETCH_POSITIONS', { exchangeId, marketMap });
     });
 }
 
 export function fetch_orders(exchangeId: ExchangeId): Promise<Order[]> {
-    return dedupeRequest(`orders:${exchangeId}`, () => {
-        const marketMap = getMarketMap(exchangeId);
+    return dedupeRequest(`orders:${exchangeId}`, async () => {
+        const marketMap = await getMarketMap(exchangeId);
         return sendRequest<Order[]>('FETCH_ORDERS', { exchangeId, marketMap });
     });
 }
 
 export function fetch_account_data(exchangeId: ExchangeId): Promise<AccountData> {
-    return dedupeRequest(`account:${exchangeId}`, () => {
-        const marketMap = getMarketMap(exchangeId);
+    return dedupeRequest(`account:${exchangeId}`, async () => {
+        const marketMap = await getMarketMap(exchangeId);
         return sendRequest<AccountData>('FETCH_ACCOUNT_DATA', { exchangeId, marketMap });
     });
 }
@@ -147,9 +152,14 @@ export function fetch_closed_positions(
     exchangeId: ExchangeId,
     limit = 50
 ): Promise<TradeHistory[]> {
-    return dedupeRequest(`closed:${exchangeId}`, () =>
-        sendRequest<TradeHistory[]>('FETCH_CLOSED_POSITIONS', { exchangeId, limit })
-    );
+    return dedupeRequest(`closed:${exchangeId}`, async () => {
+        const marketMap = await getMarketMap(exchangeId);
+        return sendRequest<TradeHistory[]>('FETCH_CLOSED_POSITIONS', {
+            exchangeId,
+            limit,
+            marketMap,
+        });
+    });
 }
 
 export function fetch_leverage_settings(
@@ -169,9 +179,15 @@ export function fetch_symbol_fills(
     limit = 100
 ): Promise<RawFill[]> {
     const key = `fills:${exchangeId}:${symbol}`;
-    return dedupeRequest(key, () =>
-        sendRequest<RawFill[]>('FETCH_SYMBOL_FILLS', { exchangeId, symbol, limit })
-    );
+    return dedupeRequest(key, async () => {
+        const marketMap = await getMarketMap(exchangeId);
+        return sendRequest<RawFill[]>('FETCH_SYMBOL_FILLS', {
+            exchangeId,
+            symbol,
+            limit,
+            marketMap,
+        });
+    });
 }
 
 export function set_leverage(

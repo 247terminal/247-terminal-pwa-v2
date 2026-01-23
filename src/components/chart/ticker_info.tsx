@@ -109,8 +109,6 @@ export const TickerInfo = memo(function TickerInfo({ exchange, symbol }: TickerI
               ? 'animate-flash-down'
               : '';
 
-    if (!ticker) return null;
-
     return (
         <div class="flex items-center gap-4 text-xs no-drag cursor-default">
             <span class={`font-semibold text-sm tabular-nums ${price_flash_class}`}>${price}</span>
