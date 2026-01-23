@@ -12,6 +12,10 @@ import {
     draw_measure_tooltip,
 } from '../../services/chart/drawing_renderers';
 
+function lerp(current: number, target: number, factor: number): number {
+    return current + (target - current) * factor;
+}
+
 function get_pixels(
     points: ChartPoint[],
     chart: IChartApi,
@@ -25,6 +29,44 @@ function get_pixels(
         if (px) result.push(px);
     }
     return result;
+}
+
+function smooth_pixels(
+    current: PixelPoint[],
+    target: PixelPoint[],
+    factor: number
+): { pixels: PixelPoint[]; needs_animation: boolean } {
+    const result: PixelPoint[] = [];
+    let needs_animation = false;
+    const len = target.length;
+
+    for (let i = 0; i < len; i++) {
+        const t = target[i];
+        const c = current[i];
+
+        if (!c) {
+            result.push({ x: t.x, y: t.y });
+            continue;
+        }
+
+        const dx = Math.abs(t.x - c.x);
+        const dy = Math.abs(t.y - c.y);
+
+        if (
+            dx < DRAWING_CONSTANTS.SMOOTHING.THRESHOLD &&
+            dy < DRAWING_CONSTANTS.SMOOTHING.THRESHOLD
+        ) {
+            result.push({ x: t.x, y: t.y });
+        } else {
+            needs_animation = true;
+            result.push({
+                x: lerp(c.x, t.x, factor),
+                y: lerp(c.y, t.y, factor),
+            });
+        }
+    }
+
+    return { pixels: result, needs_animation };
 }
 
 export function DrawingOverlay({
@@ -47,6 +89,8 @@ export function DrawingOverlay({
     const measure_result_ref = useRef(measure_result);
     const measure_points_ref = useRef(measure_points);
     const tick_size_ref = useRef(tick_size);
+    const smoothed_pixels_ref = useRef<Map<string, PixelPoint[]>>(new Map());
+    const prev_drawing_count_ref = useRef(0);
 
     drawings_ref.current = drawings;
     active_ref.current = active_drawing;
@@ -83,18 +127,27 @@ export function DrawingOverlay({
             const width = chart.timeScale().width();
             const is_dark = document.documentElement.getAttribute('data-theme') === 'terminal-dark';
 
+            let needs_animation = false;
             const current_drawings = drawings_ref.current;
             const len = current_drawings.length;
             for (let i = 0; i < len; i++) {
                 const drawing = current_drawings[i];
-                const pixels = get_pixels(drawing.points, chart, series, timeframe_seconds);
+                const target_pixels = get_pixels(drawing.points, chart, series, timeframe_seconds);
+                const current_pixels = smoothed_pixels_ref.current.get(drawing.id) || [];
+                const smoothed = smooth_pixels(
+                    current_pixels,
+                    target_pixels,
+                    DRAWING_CONSTANTS.SMOOTHING.FACTOR
+                );
+                smoothed_pixels_ref.current.set(drawing.id, smoothed.pixels);
+                if (smoothed.needs_animation) needs_animation = true;
                 const is_selected = drawing.id === selected_ref.current;
 
                 switch (drawing.type) {
                     case 'horizontal_line':
                         draw_horizontal_line(
                             ctx,
-                            pixels,
+                            smoothed.pixels,
                             drawing.color,
                             is_selected,
                             width,
@@ -102,47 +155,69 @@ export function DrawingOverlay({
                         );
                         break;
                     case 'trend_line':
-                        draw_trend_line(ctx, pixels, drawing.color, is_selected, is_dark);
+                        draw_trend_line(ctx, smoothed.pixels, drawing.color, is_selected, is_dark);
                         break;
                     case 'rectangle':
-                        draw_rectangle(ctx, pixels, drawing.color, is_selected, is_dark);
+                        draw_rectangle(ctx, smoothed.pixels, drawing.color, is_selected, is_dark);
                         break;
                     case 'brush':
-                        draw_brush(ctx, pixels, drawing.color, is_selected, is_dark);
+                        draw_brush(ctx, smoothed.pixels, drawing.color, is_selected, is_dark);
                         break;
                     case 'measure':
-                        draw_measure(ctx, pixels);
+                        draw_measure(ctx, smoothed.pixels);
                         break;
                 }
             }
 
             const active = active_ref.current;
             if (active?.points?.length) {
-                const pixels = get_pixels(
+                const active_id = '__active__';
+                const target_pixels = get_pixels(
                     active.points as ChartPoint[],
                     chart,
                     series,
                     timeframe_seconds
                 );
+                const current_pixels = smoothed_pixels_ref.current.get(active_id) || [];
+                const smoothed = smooth_pixels(
+                    current_pixels,
+                    target_pixels,
+                    DRAWING_CONSTANTS.SMOOTHING.FACTOR
+                );
+                smoothed_pixels_ref.current.set(active_id, smoothed.pixels);
+                if (smoothed.needs_animation) needs_animation = true;
                 const color = active.color || DRAWING_CONSTANTS.DEFAULT_COLOR;
 
                 switch (active.type) {
                     case 'horizontal_line':
-                        draw_horizontal_line(ctx, pixels, color, false, width, is_dark);
+                        draw_horizontal_line(ctx, smoothed.pixels, color, false, width, is_dark);
                         break;
                     case 'trend_line':
-                        draw_trend_line(ctx, pixels, color, false, is_dark);
+                        draw_trend_line(ctx, smoothed.pixels, color, false, is_dark);
                         break;
                     case 'rectangle':
-                        draw_rectangle(ctx, pixels, color, false, is_dark);
+                        draw_rectangle(ctx, smoothed.pixels, color, false, is_dark);
                         break;
                     case 'brush':
-                        draw_brush(ctx, pixels, color, false, is_dark);
+                        draw_brush(ctx, smoothed.pixels, color, false, is_dark);
                         break;
                     case 'measure':
-                        draw_measure(ctx, pixels);
+                        draw_measure(ctx, smoothed.pixels);
                         break;
                 }
+            }
+
+            if (needs_animation) {
+                schedule_render();
+            }
+
+            if (len !== prev_drawing_count_ref.current) {
+                prev_drawing_count_ref.current = len;
+                const valid_ids = new Set(current_drawings.map((d) => d.id));
+                valid_ids.add('__active__');
+                smoothed_pixels_ref.current.forEach((_, id) => {
+                    if (!valid_ids.has(id)) smoothed_pixels_ref.current.delete(id);
+                });
             }
 
             const mr = measure_result_ref.current;

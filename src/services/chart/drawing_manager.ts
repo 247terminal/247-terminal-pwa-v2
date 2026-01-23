@@ -87,7 +87,25 @@ export function chart_to_pixel(
     let x: number | null = null;
 
     if (point._logical !== undefined) {
-        x = chart.timeScale().logicalToCoordinate(point._logical as Logical);
+        const logical = point._logical;
+        const floor_logical = Math.floor(logical) as Logical;
+        const ceil_logical = Math.ceil(logical) as Logical;
+
+        if (floor_logical === ceil_logical) {
+            x = chart.timeScale().logicalToCoordinate(floor_logical);
+        } else {
+            const floor_x = chart.timeScale().logicalToCoordinate(floor_logical);
+            const ceil_x = chart.timeScale().logicalToCoordinate(ceil_logical);
+
+            if (floor_x !== null && ceil_x !== null) {
+                const t = logical - floor_logical;
+                x = floor_x + (ceil_x - floor_x) * t;
+            } else if (floor_x !== null) {
+                x = floor_x;
+            } else if (ceil_x !== null) {
+                x = ceil_x;
+            }
+        }
     }
 
     if (x !== null) {

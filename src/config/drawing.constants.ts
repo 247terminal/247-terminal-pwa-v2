@@ -35,4 +35,8 @@ export const DRAWING_CONSTANTS = {
     CACHE: {
         MAX_COLOR_CACHE_SIZE: 100,
     },
+    SMOOTHING: {
+        FACTOR: 0.35,
+        THRESHOLD: 0.5,
+    },
 } as const;

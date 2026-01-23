@@ -455,6 +455,16 @@ export function use_chart_drawing({
         }
     }, [tool, active_drawing, resizing, chart_ref]);
 
+    const handle_wheel = useCallback(() => {
+        if (completed_measure_id) {
+            set_drawings((prev) => prev.filter((d) => d.id !== completed_measure_id));
+            set_completed_measure_id(null);
+            set_measure_result(null);
+            set_measure_points(null);
+            set_tool('select');
+        }
+    }, [completed_measure_id]);
+
     const selected_drawing = drawings.find((d) => d.id === selected_id);
     const is_drawing_mode = tool !== 'select' && tool !== 'delete';
     const show_overlay = is_drawing_mode || resizing || active_drawing !== null;
@@ -477,5 +487,6 @@ export function use_chart_drawing({
         handle_chart_click,
         handle_mouse_move,
         handle_mouse_up,
+        handle_wheel,
     };
 }

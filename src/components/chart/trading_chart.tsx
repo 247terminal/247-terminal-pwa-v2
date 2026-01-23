@@ -100,6 +100,7 @@ export function TradingChart({
         handle_chart_click,
         handle_mouse_move,
         handle_mouse_up,
+        handle_wheel,
     } = use_chart_drawing({
         chart_ref,
         series_ref,
@@ -404,6 +405,7 @@ export function TradingChart({
                     onTouchMove={handle_mouse_move}
                     onMouseUp={handle_mouse_up}
                     onTouchEnd={handle_mouse_up}
+                    onWheel={handle_wheel}
                 />
                 {show_overlay && (
                     <div
@@ -416,6 +418,7 @@ export function TradingChart({
                         onTouchMove={handle_mouse_move}
                         onMouseUp={handle_mouse_up}
                         onTouchEnd={handle_mouse_up}
+                        onWheel={handle_wheel}
                     />
                 )}
                 <DrawingOverlay
