@@ -11,6 +11,7 @@ import {
     isDexSymbol,
     getNextHourTimestamp,
 } from '../stream_utils';
+import { hyperliquid as sym } from '../symbol_utils';
 import type {
     PostUpdateSimpleFn,
     CcxtExchange,
@@ -71,9 +72,8 @@ function buildDexMarketMaps(exchange: CcxtExchange, isLinearSwap: IsLinearSwapFn
         if (!isDexSymbol(market.symbol)) continue;
         if (!isLinearSwap(market)) continue;
 
-        const [prefix, rest] = market.symbol.split('-');
-        const ticker = rest.split('/')[0];
-        const dexName = prefix.toLowerCase();
+        const dexName = sym.getDexPrefix(market.symbol).toLowerCase();
+        const ticker = sym.getDexTicker(market.symbol);
         const key = `${dexName}:${ticker}`;
         dexStreams.markets[key] = market.symbol;
 

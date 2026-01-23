@@ -8,6 +8,7 @@ import {
     createWebSocket,
     safeClose,
 } from '../stream_utils';
+import { binance as sym } from '../symbol_utils';
 import type {
     TickerEntry,
     PostUpdateFn,
@@ -179,12 +180,7 @@ function connectMarkPriceStream(): void {
 
 function connectKlineStreams(symbols: string[]): void {
     const config = EXCHANGE_CONFIG.binance;
-    const streamNames = symbols.map((s) => {
-        const parts = s.split('/');
-        const base = parts[0];
-        const quote = parts[1]?.split(':')[0] || 'USDT';
-        return `${base.toLowerCase()}${quote.toLowerCase()}@kline_1m`;
-    });
+    const streamNames = symbols.map((s) => `${sym.fromUnified(s).toLowerCase()}@kline_1m`);
 
     binanceStreams.klineSymbolBatches = [];
     binanceStreams.klineConnections = [];

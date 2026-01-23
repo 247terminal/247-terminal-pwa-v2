@@ -9,6 +9,7 @@ import {
     safeClose,
     safeSend,
 } from '../stream_utils';
+import { blofin as sym } from '../symbol_utils';
 import type { PostUpdateFn, CcxtExchange, BlofinStreamsState } from '@/types/worker.types';
 
 const blofinStreams: BlofinStreamsState = {
@@ -208,13 +209,7 @@ function scheduleBlofinFundingReconnect(): void {
     }, delay);
 }
 
-function toBlofinInstId(symbol: string): string {
-    const parts = symbol.split('/');
-    if (parts.length < 2) return symbol;
-    const base = parts[0];
-    const quote = parts[1].split(':')[0];
-    return `${base}-${quote}`;
-}
+const toBlofinInstId = sym.fromUnified;
 
 export function convertBlofinSymbol(instId: string): string | null {
     const parts = instId.split('-');

@@ -7,6 +7,7 @@ import type {
     OrderCategory,
 } from '@/types/worker.types';
 import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
+import { bybit as sym } from '../symbol_utils';
 
 export type BybitExchange = InstanceType<typeof bybit>;
 
@@ -178,7 +179,7 @@ export async function fetch_positions(exchange: BybitExchange): Promise<RawPosit
     const list = response.result?.list;
     if (!Array.isArray(list)) return [];
     return list.map((p) => ({
-        symbol: p.symbol.replace(/USDT$/, '/USDT:USDT'),
+        symbol: sym.toUnified(p.symbol),
         contracts: Math.abs(Number(p.size || 0)),
         side: p.side === 'Buy' ? 'long' : 'short',
         entry_price: p.avgPrice,
@@ -219,7 +220,7 @@ export async function fetch_orders(exchange: BybitExchange): Promise<RawOrder[]>
         }
 
         return {
-            symbol: o.symbol.replace(/USDT$/, '/USDT:USDT'),
+            symbol: sym.toUnified(o.symbol),
             id: o.orderId,
             side: is_buy ? 'buy' : 'sell',
             type,
@@ -262,7 +263,7 @@ export async function fetch_closed_positions(
     for (let i = 0; i < count; i++) {
         const p = list[i];
         result[i] = {
-            symbol: p.symbol.replace(/USDT$/, '/USDT:USDT'),
+            symbol: sym.toUnified(p.symbol),
             side: p.side === 'Buy' ? 'long' : 'short',
             size: Number(p.qty || 0),
             entry_price: Number(p.avgEntryPrice || 0),
@@ -280,7 +281,7 @@ export async function fetch_symbol_fills(
     symbol: string,
     limit: number
 ): Promise<RawFill[]> {
-    const bybit_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    const bybit_symbol = sym.fromUnified(symbol);
     const response = await exchange.privateGetV5ExecutionList({
         category: 'linear',
         symbol: bybit_symbol,
@@ -299,7 +300,7 @@ export async function fetch_symbol_fills(
         return {
             id: f.execId,
             order_id: f.orderId,
-            symbol: f.symbol.replace(/USDT$/, '/USDT:USDT'),
+            symbol: sym.toUnified(f.symbol),
             side: is_buy ? 'buy' : 'sell',
             price: Number(f.execPrice || 0),
             size: Number(f.execQty || 0),
@@ -315,7 +316,7 @@ export async function set_leverage(
     symbol: string,
     leverage: number
 ): Promise<number> {
-    const bybit_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    const bybit_symbol = sym.fromUnified(symbol);
     await exchange.setLeverage(leverage, bybit_symbol);
     return leverage;
 }
@@ -327,7 +328,7 @@ export async function fetch_leverage_settings(
     const results = await Promise.all(
         symbols.map(async (symbol) => {
             try {
-                const bybit_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+                const bybit_symbol = sym.fromUnified(symbol);
                 const response = await exchange.privateGetV5PositionList({
                     category: 'linear',
                     symbol: bybit_symbol,
@@ -358,7 +359,7 @@ export async function cancel_order(
     symbol: string,
     _category: OrderCategory
 ): Promise<boolean> {
-    const bybit_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    const bybit_symbol = sym.fromUnified(symbol);
     await exchange.privatePostV5OrderCancel({
         category: 'linear',
         symbol: bybit_symbol,
@@ -370,7 +371,7 @@ export async function cancel_order(
 export async function cancel_all_orders(exchange: BybitExchange, symbol?: string): Promise<number> {
     const params: Record<string, string> = { category: 'linear' };
     if (symbol) {
-        params.symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+        params.symbol = sym.fromUnified(symbol);
     } else {
         params.settleCoin = 'USDT';
     }

@@ -7,6 +7,7 @@ import type {
     OrderCategory,
 } from '@/types/worker.types';
 import { POSITION_CONSTANTS } from '@/config/chart.constants';
+import { blofin as sym } from '../symbol_utils';
 
 export type BlofinExchange = InstanceType<typeof blofin>;
 
@@ -131,7 +132,7 @@ export async function fetch_positions(exchange: BlofinExchange): Promise<RawPosi
     const data = response.data;
     if (!Array.isArray(data)) return [];
     return data.map((p) => ({
-        symbol: p.instId.replace(/-/g, '/') + ':USDT',
+        symbol: sym.toUnified(p.instId),
         contracts: Math.abs(Number(p.positions || 0)),
         side: p.positionSide === 'long' ? 'long' : 'short',
         entry_price: p.averagePrice,
@@ -188,7 +189,7 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
     if (is_order_response(pending_result) && Array.isArray(pending_result.data)) {
         for (const o of pending_result.data) {
             orders.push({
-                symbol: o.instId.replace(/-/g, '/') + ':USDT',
+                symbol: sym.toUnified(o.instId),
                 id: o.orderId,
                 side: o.side === 'buy' ? 'buy' : 'sell',
                 type: o.orderType.toLowerCase(),
@@ -205,7 +206,7 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
         for (const o of tpsl_result.data) {
             const has_tp = o.tpTriggerPrice && Number(o.tpTriggerPrice) > 0;
             orders.push({
-                symbol: o.instId.replace(/-/g, '/') + ':USDT',
+                symbol: sym.toUnified(o.instId),
                 id: o.tpslId,
                 side: o.side === 'buy' ? 'buy' : 'sell',
                 type: has_tp ? 'take_profit' : 'stop_loss',
@@ -221,7 +222,7 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
     if (is_algo_order_response(trigger_result) && Array.isArray(trigger_result.data)) {
         for (const o of trigger_result.data) {
             orders.push({
-                symbol: o.instId.replace(/-/g, '/') + ':USDT',
+                symbol: sym.toUnified(o.instId),
                 id: o.algoId,
                 side: o.side === 'buy' ? 'buy' : 'sell',
                 type: 'stop',
@@ -261,9 +262,9 @@ export async function fetch_closed_positions(
     const by_symbol: Record<string, typeof sorted_fills> = {};
 
     for (const f of sorted_fills) {
-        const sym = f.instId.replace(/-/g, '/') + ':USDT';
-        if (!by_symbol[sym]) by_symbol[sym] = [];
-        by_symbol[sym].push(f);
+        const s = sym.toUnified(f.instId);
+        if (!by_symbol[s]) by_symbol[s] = [];
+        by_symbol[s].push(f);
     }
 
     const closed: RawClosedPosition[] = [];
@@ -347,9 +348,7 @@ export async function fetch_closed_positions(
     return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
 }
 
-function to_blofin_inst_id(symbol: string): string {
-    return symbol.replace(/\//, '-').replace(/:USDT$/, '');
-}
+const to_blofin_inst_id = sym.fromUnified;
 
 export async function set_leverage(
     exchange: BlofinExchange,
@@ -372,10 +371,7 @@ export async function fetch_leverage_settings(
     try {
         for (let i = 0; i < symbols.length; i += batch_size) {
             const batch = symbols.slice(i, i + batch_size);
-            const inst_ids = batch.map((s) => {
-                const base = s.split('/')[0];
-                return `${base}-USDT`;
-            });
+            const inst_ids = batch.map((s) => sym.fromUnified(s));
 
             const response = await exchange.privateGetAccountBatchLeverageInfo({
                 instId: inst_ids.join(','),
@@ -384,7 +380,7 @@ export async function fetch_leverage_settings(
 
             if (is_leverage_response(response) && Array.isArray(response.data)) {
                 for (const item of response.data) {
-                    result[item.instId.replace(/-/g, '/') + ':USDT'] =
+                    result[sym.toUnified(item.instId)] =
                         parseFloat(item.leverage) || 1;
                 }
             }
@@ -425,7 +421,7 @@ export async function fetch_symbol_fills(
         return {
             id: f.tradeId || `${f.ts}-${idx}`,
             order_id: f.orderId || `${f.ts}-${idx}`,
-            symbol: f.instId.replace(/-/g, '/') + ':USDT',
+            symbol: sym.toUnified(f.instId),
             side: is_buy ? 'buy' : 'sell',
             price: Number(f.fillPrice || 0),
             size: Number(f.fillSize || 0),

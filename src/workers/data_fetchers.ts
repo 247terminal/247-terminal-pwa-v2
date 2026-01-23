@@ -7,6 +7,7 @@ import type {
     CcxtExchange,
     CcxtMarket,
 } from '@/types/worker.types';
+import { binance as binanceSym } from './symbol_utils';
 
 export type { ExchangeAuthParams };
 
@@ -204,7 +205,7 @@ export async function fetchBinanceMaxLeverage(): Promise<Record<string, number>>
             if (!Array.isArray(response)) return;
 
             for (const item of response as BinanceLeverageBracket[]) {
-                const symbol = item.symbol.replace(/USDT$/, '/USDT:USDT');
+                const symbol = binanceSym.toUnified(item.symbol);
                 const maxLev = item.brackets?.[0]?.initialLeverage;
                 if (maxLev) {
                     binanceMaxLeverageCache[symbol] = maxLev;

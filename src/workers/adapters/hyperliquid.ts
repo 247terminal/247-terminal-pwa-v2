@@ -7,6 +7,7 @@ import type {
     OrderCategory,
 } from '@/types/worker.types';
 import { HYPERLIQUID_CACHE_TTL, EXCHANGE_CONFIG } from '@/config';
+import { hyperliquid as sym } from '../symbol_utils';
 
 export type HyperliquidExchange = InstanceType<typeof hyperliquid>;
 
@@ -145,7 +146,7 @@ export async function fetch_positions(exchange: HyperliquidExchange): Promise<Ra
         const szi = p.szi ?? 0;
         const lev = p.leverage;
         return {
-            symbol: `${p.coin}/USDC:USDC`,
+            symbol: sym.toUnified(p.coin),
             contracts: Math.abs(szi),
             side: szi >= 0 ? 'long' : 'short',
             entry_price: p.entryPx,
@@ -186,7 +187,7 @@ export async function fetch_orders(exchange: HyperliquidExchange): Promise<RawOr
         }
 
         return {
-            symbol: `${o.coin}/USDC:USDC`,
+            symbol: sym.toUnified(o.coin),
             id: String(o.oid),
             side: o.side === 'B' ? 'buy' : 'sell',
             type,
@@ -232,7 +233,7 @@ export async function fetch_closed_positions(
         const entry_price = position_side === 'long' ? price - pnl_per_unit : price + pnl_per_unit;
 
         closed.push({
-            symbol: `${fill.coin}/USDC:USDC`,
+            symbol: sym.toUnified(fill.coin),
             side: position_side,
             size,
             entry_price: Math.max(0, entry_price),
@@ -267,7 +268,7 @@ export async function fetch_leverage_settings(
     const leverages: Record<string, number> = {};
 
     const requests = symbols.map(async (symbol) => {
-        const coin = symbol.split('/')[0];
+        const coin = sym.fromUnified(symbol);
         const response = await fetch(HYPERLIQUID_INFO_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -297,7 +298,7 @@ export async function fetch_symbol_fills(
     const wallet = exchange.walletAddress;
     if (!wallet) return [];
 
-    const coin = symbol.split('/')[0];
+    const coin = sym.fromUnified(symbol);
     const response = await exchange.publicPostInfo({
         type: 'userFills',
         user: wallet,
@@ -313,7 +314,7 @@ export async function fetch_symbol_fills(
         return {
             id: `${f.time}-${idx}`,
             order_id: String(f.oid || `${f.time}-${idx}`),
-            symbol: `${f.coin}/USDC:USDC`,
+            symbol: sym.toUnified(f.coin),
             side: is_buy ? 'buy' : 'sell',
             price: Number(f.px || 0),
             size: Number(f.sz || 0),
@@ -348,7 +349,7 @@ export async function cancel_all_orders(
     if (!is_open_orders_array(response)) return 0;
 
     const orders_to_cancel = symbol
-        ? response.filter((o) => o.coin === symbol.split('/')[0])
+        ? response.filter((o) => o.coin === sym.fromUnified(symbol))
         : response;
 
     if (orders_to_cancel.length === 0) return 0;
@@ -361,7 +362,7 @@ export async function cancel_all_orders(
 
     await Promise.all(
         Object.entries(by_coin).map(([coin, ids]) =>
-            exchange.cancelOrders(ids, `${coin}/USDC:USDC`).catch(() => null)
+            exchange.cancelOrders(ids, sym.toUnified(coin)).catch(() => null)
         )
     );
 

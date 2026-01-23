@@ -6,6 +6,7 @@ import type {
     RawFill,
     OrderCategory,
 } from '@/types/worker.types';
+import { binance as sym } from '../symbol_utils';
 
 export type BinanceExchange = InstanceType<typeof binanceusdm>;
 
@@ -150,7 +151,7 @@ export async function fetch_positions(exchange: BinanceExchange): Promise<RawPos
     return response.map((p) => {
         const positionAmt = Number(p.positionAmt);
         return {
-            symbol: p.symbol.replace(/USDT$/, '/USDT:USDT'),
+            symbol: sym.toUnified(p.symbol),
             contracts: Math.abs(positionAmt),
             side: positionAmt >= 0 ? 'long' : 'short',
             entry_price: p.entryPrice,
@@ -178,7 +179,7 @@ export async function fetch_orders(exchange: BinanceExchange): Promise<RawOrder[
     for (let i = 0; i < regularLen; i++) {
         const o = regular[i];
         result[idx++] = {
-            symbol: o.symbol.replace(/USDT$/, '/USDT:USDT'),
+            symbol: sym.toUnified(o.symbol),
             id: o.orderId,
             side: o.side.toLowerCase() as 'buy' | 'sell',
             type: o.type.toLowerCase(),
@@ -192,7 +193,7 @@ export async function fetch_orders(exchange: BinanceExchange): Promise<RawOrder[
     for (let i = 0; i < algoLen; i++) {
         const o = algo[i];
         result[idx++] = {
-            symbol: o.symbol.replace(/USDT$/, '/USDT:USDT'),
+            symbol: sym.toUnified(o.symbol),
             id: o.algoId,
             side: o.side.toLowerCase() as 'buy' | 'sell',
             type: o.orderType.toLowerCase(),
@@ -206,9 +207,7 @@ export async function fetch_orders(exchange: BinanceExchange): Promise<RawOrder[
     return result;
 }
 
-function normalize_symbol(symbol: string): string {
-    return symbol.replace(/USDT$/, '/USDT:USDT');
-}
+const normalize_symbol = sym.toUnified;
 
 export async function fetch_closed_positions(
     exchange: BinanceExchange,
@@ -330,7 +329,7 @@ export async function set_leverage(
     symbol: string,
     leverage: number
 ): Promise<number> {
-    const binance_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    const binance_symbol = sym.fromUnified(symbol);
     await exchange.setLeverage(leverage, binance_symbol);
     return leverage;
 }
@@ -340,7 +339,7 @@ export async function fetch_symbol_fills(
     symbol: string,
     limit: number
 ): Promise<RawFill[]> {
-    const binance_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    const binance_symbol = sym.fromUnified(symbol);
     const tradesRaw = await exchange.fapiPrivateGetUserTrades({
         symbol: binance_symbol,
         limit: Math.min(limit, 1000),
@@ -381,7 +380,7 @@ export async function cancel_order(
     symbol: string,
     category: OrderCategory
 ): Promise<boolean> {
-    const binance_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    const binance_symbol = sym.fromUnified(symbol);
 
     if (category === 'algo') {
         await exchange.fapiPrivateDeleteAlgoOrder({
@@ -402,7 +401,7 @@ export async function cancel_all_orders(
     symbol?: string
 ): Promise<number> {
     if (symbol) {
-        const binance_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+        const binance_symbol = sym.fromUnified(symbol);
         const [regular, algo] = await Promise.all([
             exchange.fapiPrivateDeleteAllOpenOrders({ symbol: binance_symbol }).catch(() => null),
             exchange.fapiPrivateDeleteAlgoOpenOrders({ symbol: binance_symbol }).catch(() => null),
