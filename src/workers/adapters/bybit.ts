@@ -302,6 +302,16 @@ export async function fetch_symbol_fills(
     });
 }
 
+export async function set_leverage(
+    exchange: BybitExchange,
+    symbol: string,
+    leverage: number
+): Promise<number> {
+    const bybit_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    await exchange.setLeverage(leverage, bybit_symbol);
+    return leverage;
+}
+
 export async function fetch_leverage_settings(
     exchange: BybitExchange,
     symbols: string[]

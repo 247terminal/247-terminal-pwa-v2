@@ -317,6 +317,16 @@ export async function fetch_leverage_settings(
     }
 }
 
+export async function set_leverage(
+    exchange: BinanceExchange,
+    symbol: string,
+    leverage: number
+): Promise<number> {
+    const binance_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    await exchange.setLeverage(leverage, binance_symbol);
+    return leverage;
+}
+
 export async function fetch_symbol_fills(
     exchange: BinanceExchange,
     symbol: string,

@@ -311,4 +311,42 @@ export async function fetchSymbolFills(
     }
 }
 
+export async function setLeverage(
+    exchangeId: ExchangeId,
+    symbol: string,
+    leverage: number
+): Promise<number> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.set_leverage(
+                    exchange as BinanceExchange,
+                    symbol,
+                    leverage
+                );
+            case 'bybit':
+                return await bybitAdapter.set_leverage(exchange as BybitExchange, symbol, leverage);
+            case 'blofin':
+                return await blofinAdapter.set_leverage(
+                    exchange as BlofinExchange,
+                    symbol,
+                    leverage
+                );
+            case 'hyperliquid':
+                return await hyperliquidAdapter.set_leverage(
+                    exchange as HyperliquidExchange,
+                    symbol,
+                    leverage
+                );
+            default:
+                return leverage;
+        }
+    } catch (err) {
+        console.error(`failed to set ${exchangeId} leverage:`, (err as Error).message);
+        throw err;
+    }
+}
+
 export { hyperliquidAdapter };

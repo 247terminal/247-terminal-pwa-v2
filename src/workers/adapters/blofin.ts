@@ -354,6 +354,16 @@ function from_blofin_inst_id(instId: string): string {
     return instId.replace(/-/g, '/') + ':USDT';
 }
 
+export async function set_leverage(
+    exchange: BlofinExchange,
+    symbol: string,
+    leverage: number
+): Promise<number> {
+    const inst_id = symbol.replace(/\//, '-').replace(/:USDT$/, '');
+    await exchange.setLeverage(leverage, inst_id);
+    return leverage;
+}
+
 export async function fetch_leverage_settings(
     exchange: BlofinExchange,
     symbols: string[]

@@ -98,8 +98,6 @@ export async function init_exchanges(): Promise<void> {
         await init_credentials();
     }
 
-    init_default_exchange();
-
     const connected = get_connected_exchanges();
     const exchanges_to_load = connected.length > 0 ? connected : EXCHANGE_IDS;
 
@@ -112,4 +110,6 @@ export async function init_exchanges(): Promise<void> {
     if (connected.length > 0) {
         await init_connected_exchange_instances(connected);
     }
+
+    init_default_exchange();
 }

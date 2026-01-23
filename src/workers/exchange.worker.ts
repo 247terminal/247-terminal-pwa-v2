@@ -26,6 +26,7 @@ import {
     fetchClosedPositions,
     fetchLeverageSettings,
     fetchSymbolFills,
+    setLeverage,
     hyperliquidAdapter,
     type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
@@ -377,6 +378,13 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                     payload?.exchangeId as ExchangeId,
                     payload?.symbol as string,
                     (payload?.limit as number) || 100
+                );
+                break;
+            case 'SET_LEVERAGE':
+                result = await setLeverage(
+                    payload?.exchangeId as ExchangeId,
+                    payload?.symbol as string,
+                    payload?.leverage as number
                 );
                 break;
             default:

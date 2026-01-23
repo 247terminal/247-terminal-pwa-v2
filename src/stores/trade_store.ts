@@ -15,7 +15,11 @@ import {
     set_symbol_leverages,
 } from './exchange_store';
 import { exchange_connection_status } from './credentials_store';
-import { fetch_leverage_settings, has_exchange } from '../services/exchange/account_bridge';
+import {
+    fetch_leverage_settings,
+    has_exchange,
+    set_leverage as set_exchange_leverage,
+} from '../services/exchange/account_bridge';
 
 function get_default_exchange(): ExchangeId {
     const status = exchange_connection_status.value;
@@ -131,9 +135,18 @@ export function set_order_type(order_type: OrderType): void {
 }
 
 export function set_leverage(leverage: number): void {
+    const { exchange, symbol } = trade_state.value;
     const max = max_leverage.value;
     const clamped = Math.min(Math.max(1, leverage), max);
     trade_state.value = { ...trade_state.value, leverage: clamped };
+
+    if (!has_exchange(exchange)) return;
+
+    set_exchange_leverage(exchange, symbol, clamped)
+        .then(() => {
+            set_symbol_leverages(exchange, { [symbol]: clamped });
+        })
+        .catch(() => {});
 }
 
 export function update_limit_form(updates: Partial<LimitOrderForm>): void {
@@ -194,5 +207,7 @@ export function init_default_exchange(): void {
     const default_exchange = get_default_exchange();
     if (trade_state.value.exchange !== default_exchange) {
         set_exchange(default_exchange);
+    } else {
+        apply_symbol_leverage(default_exchange, trade_state.value.symbol);
     }
 }

@@ -241,6 +241,15 @@ export async function fetch_closed_positions(
 
 const HYPERLIQUID_INFO_URL = `${EXCHANGE_CONFIG.hyperliquid.restUrl}/info`;
 
+export async function set_leverage(
+    exchange: HyperliquidExchange,
+    symbol: string,
+    leverage: number
+): Promise<number> {
+    await exchange.setLeverage(leverage, symbol);
+    return leverage;
+}
+
 export async function fetch_leverage_settings(
     exchange: HyperliquidExchange,
     symbols: string[]

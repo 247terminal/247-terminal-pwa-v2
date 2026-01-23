@@ -1,23 +1,43 @@
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useCallback, useEffect, useMemo } from 'preact/hooks';
 import { selected_leverage, max_leverage, set_leverage } from '../../../stores/trade_store';
 
-const PRESET_LEVERAGES = [1, 5, 10, 25, 50];
+function get_presets(max: number): number[] {
+    if (max < 10) return [1, 3, 5, 7, max].filter((v, i, a) => v <= max && a.indexOf(v) === i);
+    if (max < 15) return [1, 3, 5, 10, max].filter((v, i, a) => v <= max && a.indexOf(v) === i);
+    return [1, 5, 10, 15, 20].filter((v) => v <= max);
+}
 
 export function LeverageSelector() {
     const [open, set_open] = useState(false);
     const leverage = selected_leverage.value;
     const max = max_leverage.value;
+    const [slider_value, set_slider_value] = useState(leverage);
 
-    const handle_slider = useCallback((e: Event) => {
+    useEffect(() => {
+        set_slider_value(leverage);
+    }, [leverage]);
+
+    const handle_slider_input = useCallback((e: Event) => {
         const input = e.target as HTMLInputElement;
-        set_leverage(parseInt(input.value, 10));
+        set_slider_value(parseInt(input.value, 10));
     }, []);
+
+    const handle_slider_release = useCallback(
+        (e: Event) => {
+            const input = e.target as HTMLInputElement;
+            const value = parseInt(input.value, 10);
+            if (value !== leverage) {
+                set_leverage(value);
+            }
+        },
+        [leverage]
+    );
 
     const handle_preset = useCallback((value: number) => {
         set_leverage(value);
     }, []);
 
-    const available_presets = PRESET_LEVERAGES.filter((p) => p <= max);
+    const available_presets = useMemo(() => get_presets(max), [max]);
 
     return (
         <div class="relative">
@@ -37,15 +57,17 @@ export function LeverageSelector() {
                     <div class="absolute top-full left-0 mt-1 bg-base-200 rounded shadow-lg z-50 w-52 p-2 no-drag cursor-default">
                         <div class="flex items-center justify-between mb-2 text-xs">
                             <span class="text-base-content/50">1x</span>
-                            <span class="font-medium text-base-content">{leverage}x</span>
+                            <span class="font-medium text-base-content">{slider_value}x</span>
                             <span class="text-base-content/50">{max}x</span>
                         </div>
                         <input
                             type="range"
                             min={1}
                             max={max}
-                            value={leverage}
-                            onInput={handle_slider}
+                            value={slider_value}
+                            onInput={handle_slider_input}
+                            onMouseUp={handle_slider_release}
+                            onTouchEnd={handle_slider_release}
                             class="range range-xs range-primary w-full mb-2"
                         />
                         <div class="grid grid-cols-5 gap-1">

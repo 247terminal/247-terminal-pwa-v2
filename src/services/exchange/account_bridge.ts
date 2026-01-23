@@ -173,3 +173,11 @@ export function fetch_symbol_fills(
         sendRequest<RawFill[]>('FETCH_SYMBOL_FILLS', { exchangeId, symbol, limit })
     );
 }
+
+export function set_leverage(
+    exchangeId: ExchangeId,
+    symbol: string,
+    leverage: number
+): Promise<number> {
+    return sendRequest<number>('SET_LEVERAGE', { exchangeId, symbol, leverage });
+}
