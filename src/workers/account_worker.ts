@@ -19,7 +19,7 @@ import {
     type BlofinExchange,
     type HyperliquidExchange,
 } from './adapters';
-import type { ExchangeId, CcxtExchange } from '@/types/worker.types';
+import type { ExchangeId, CcxtExchange, OrderCategory } from '@/types/worker.types';
 import { mapPosition, mapOrder, mapClosedPosition } from './position_mappers';
 
 export type { ExchangeAuthParams };
@@ -345,6 +345,78 @@ export async function setLeverage(
         }
     } catch (err) {
         console.error(`failed to set ${exchangeId} leverage:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function cancelOrder(
+    exchangeId: ExchangeId,
+    orderId: string,
+    symbol: string,
+    category: OrderCategory
+): Promise<boolean> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.cancel_order(
+                    exchange as BinanceExchange,
+                    orderId,
+                    symbol,
+                    category
+                );
+            case 'bybit':
+                return await bybitAdapter.cancel_order(
+                    exchange as BybitExchange,
+                    orderId,
+                    symbol,
+                    category
+                );
+            case 'blofin':
+                return await blofinAdapter.cancel_order(
+                    exchange as BlofinExchange,
+                    orderId,
+                    symbol,
+                    category
+                );
+            case 'hyperliquid':
+                return await hyperliquidAdapter.cancel_order(
+                    exchange as HyperliquidExchange,
+                    orderId,
+                    symbol,
+                    category
+                );
+            default:
+                return false;
+        }
+    } catch (err) {
+        console.error(`failed to cancel ${exchangeId} order:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function cancelAllOrders(exchangeId: ExchangeId, symbol?: string): Promise<number> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.cancel_all_orders(exchange as BinanceExchange, symbol);
+            case 'bybit':
+                return await bybitAdapter.cancel_all_orders(exchange as BybitExchange, symbol);
+            case 'blofin':
+                return await blofinAdapter.cancel_all_orders(exchange as BlofinExchange, symbol);
+            case 'hyperliquid':
+                return await hyperliquidAdapter.cancel_all_orders(
+                    exchange as HyperliquidExchange,
+                    symbol
+                );
+            default:
+                return 0;
+        }
+    } catch (err) {
+        console.error(`failed to cancel all ${exchangeId} orders:`, (err as Error).message);
         throw err;
     }
 }

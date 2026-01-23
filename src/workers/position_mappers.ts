@@ -1,4 +1,4 @@
-import type { ExchangeId } from '@/types/worker.types';
+import type { ExchangeId, OrderCategory } from '@/types/worker.types';
 import type { RawPosition, RawOrder, RawClosedPosition } from './adapters';
 import type { MarketInfo } from './account_worker';
 import { calculate_roi_pct } from '@/utils/pnl';
@@ -38,6 +38,7 @@ export interface MappedOrder {
     symbol: string;
     side: 'buy' | 'sell';
     type: string;
+    category: OrderCategory;
     size: number;
     price: number;
     filled: number;
@@ -124,6 +125,7 @@ export function mapOrder(
         symbol: raw.symbol,
         side: raw.side,
         type: ORDER_TYPE_MAP[raw.type as keyof typeof ORDER_TYPE_MAP] ?? 'limit',
+        category: raw.category,
         size,
         price: raw.price,
         filled,

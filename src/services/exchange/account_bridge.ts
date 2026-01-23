@@ -2,7 +2,7 @@ import { signal } from '@preact/signals';
 import type { ExchangeId } from '@/types/exchange.types';
 import type { PositionMode, MarginMode, Balance } from '@/types/trading.types';
 import type { Position, Order, TradeHistory } from '@/types/account.types';
-import type { RawFill } from '@/types/worker.types';
+import type { RawFill, OrderCategory } from '@/types/worker.types';
 import { getWorker, sendRequest } from './chart_data';
 import { get_exchange_markets } from '@/stores/exchange_store';
 import { MARKET_MAP_CACHE_TTL } from '@/config';
@@ -180,4 +180,13 @@ export function set_leverage(
     leverage: number
 ): Promise<number> {
     return sendRequest<number>('SET_LEVERAGE', { exchangeId, symbol, leverage });
+}
+
+export function cancel_order(
+    exchangeId: ExchangeId,
+    orderId: string,
+    symbol: string,
+    category: OrderCategory
+): Promise<boolean> {
+    return sendRequest<boolean>('CANCEL_ORDER', { exchangeId, orderId, symbol, category });
 }

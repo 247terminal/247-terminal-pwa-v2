@@ -1,5 +1,11 @@
 import type bybit from 'ccxt/js/src/pro/bybit.js';
-import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
+import type {
+    RawPosition,
+    RawOrder,
+    RawClosedPosition,
+    RawFill,
+    OrderCategory,
+} from '@/types/worker.types';
 import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
 
 export type BybitExchange = InstanceType<typeof bybit>;
@@ -119,7 +125,8 @@ export async function fetch_position_mode(exchange: BybitExchange): Promise<'hed
         if (!Array.isArray(list)) return 'one_way';
         const has_hedge = list.some((p) => p.positionIdx === '1' || p.positionIdx === '2');
         return has_hedge ? 'hedge' : 'one_way';
-    } catch {
+    } catch (err) {
+        console.error('failed to fetch bybit position mode:', (err as Error).message);
         return 'one_way';
     }
 }
@@ -220,6 +227,7 @@ export async function fetch_orders(exchange: BybitExchange): Promise<RawOrder[]>
             price: Number(o.price || o.triggerPrice || 0),
             filled: Number(o.cumExecQty || 0),
             timestamp: Number(o.createdTime || Date.now()),
+            category: 'regular',
         };
     });
 }
@@ -330,7 +338,8 @@ export async function fetch_leverage_settings(
                 const leverage = Number(list[0].leverage || 0);
                 if (leverage > 0) return { symbol, leverage };
                 return null;
-            } catch {
+            } catch (err) {
+                console.error('failed to fetch bybit leverage:', (err as Error).message);
                 return null;
             }
         })
@@ -341,4 +350,32 @@ export async function fetch_leverage_settings(
         if (item) result[item.symbol] = item.leverage;
     }
     return result;
+}
+
+export async function cancel_order(
+    exchange: BybitExchange,
+    order_id: string,
+    symbol: string,
+    _category: OrderCategory
+): Promise<boolean> {
+    const bybit_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    await exchange.privatePostV5OrderCancel({
+        category: 'linear',
+        symbol: bybit_symbol,
+        orderId: order_id,
+    });
+    return true;
+}
+
+export async function cancel_all_orders(exchange: BybitExchange, symbol?: string): Promise<number> {
+    const params: Record<string, string> = { category: 'linear' };
+    if (symbol) {
+        params.symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+    } else {
+        params.settleCoin = 'USDT';
+    }
+
+    const response = await exchange.privatePostV5OrderCancelAll(params);
+    const list = (response as { result?: { list?: unknown[] } })?.result?.list;
+    return Array.isArray(list) ? list.length : 0;
 }

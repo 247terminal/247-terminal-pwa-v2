@@ -20,6 +20,7 @@ import {
     toggle_privacy,
     loading,
     refresh_all_accounts,
+    cancel_all_orders,
 } from '../../../stores/account_store';
 import { exchange_connection_status } from '../../../stores/credentials_store';
 
@@ -66,9 +67,18 @@ function NukeMenu() {
 
     const toggle_menu = useCallback(() => set_is_open((prev) => !prev), []);
 
-    const handle_option_click = useCallback((_option: NukeOption) => {
+    const handle_option_click = useCallback((option: NukeOption) => {
         set_is_open(false);
-        // TODO: Implement actual nuke functionality
+        switch (option) {
+            case 'orders':
+                cancel_all_orders().catch(() => null);
+                break;
+            case 'all':
+            case 'longs':
+            case 'shorts':
+                // TODO: Implement position closing
+                break;
+        }
     }, []);
 
     return (

@@ -27,6 +27,8 @@ import {
     fetchLeverageSettings,
     fetchSymbolFills,
     setLeverage,
+    cancelOrder,
+    cancelAllOrders,
     hyperliquidAdapter,
     type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
@@ -50,6 +52,7 @@ import type {
     CcxtExchange,
     TickerStreamState,
     CcxtTickerData,
+    OrderCategory,
 } from '@/types/worker.types';
 
 registerExchangeClass(
@@ -385,6 +388,20 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                     payload?.exchangeId as ExchangeId,
                     payload?.symbol as string,
                     payload?.leverage as number
+                );
+                break;
+            case 'CANCEL_ORDER':
+                result = await cancelOrder(
+                    payload?.exchangeId as ExchangeId,
+                    payload?.orderId as string,
+                    payload?.symbol as string,
+                    payload?.category as OrderCategory
+                );
+                break;
+            case 'CANCEL_ALL_ORDERS':
+                result = await cancelAllOrders(
+                    payload?.exchangeId as ExchangeId,
+                    payload?.symbol as string | undefined
                 );
                 break;
             default:

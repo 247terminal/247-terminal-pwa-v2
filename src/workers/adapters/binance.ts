@@ -1,5 +1,11 @@
 import type binanceusdm from 'ccxt/js/src/pro/binanceusdm.js';
-import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
+import type {
+    RawPosition,
+    RawOrder,
+    RawClosedPosition,
+    RawFill,
+    OrderCategory,
+} from '@/types/worker.types';
 
 export type BinanceExchange = InstanceType<typeof binanceusdm>;
 
@@ -91,7 +97,8 @@ export async function fetch_position_mode(exchange: BinanceExchange): Promise<'h
     try {
         const response = await exchange.fapiPrivateGetPositionSideDual();
         return response?.dualSidePosition ? 'hedge' : 'one_way';
-    } catch {
+    } catch (err) {
+        console.error('failed to fetch binance position mode:', (err as Error).message);
         return 'one_way';
     }
 }
@@ -179,6 +186,7 @@ export async function fetch_orders(exchange: BinanceExchange): Promise<RawOrder[
             price: Number(o.price || o.stopPrice),
             filled: Number(o.executedQty),
             timestamp: Number(o.time),
+            category: 'regular',
         };
     }
     for (let i = 0; i < algoLen; i++) {
@@ -192,6 +200,7 @@ export async function fetch_orders(exchange: BinanceExchange): Promise<RawOrder[
             price: Number(o.triggerPrice || o.price),
             filled: 0,
             timestamp: Number(o.createTime),
+            category: 'algo',
         };
     }
     return result;
@@ -209,7 +218,6 @@ export async function fetch_closed_positions(
         limit: Math.min(limit * 10, 1000),
     });
     if (!is_trade_array(tradesRaw)) return [];
-    const trades = tradesRaw;
 
     const order_map: Record<
         string,
@@ -225,7 +233,7 @@ export async function fetch_closed_positions(
         }
     > = {};
 
-    for (const t of trades) {
+    for (const t of tradesRaw) {
         const pnl = Number(t.realizedPnl) || 0;
         const order_id = t.orderId;
         const qty = Number(t.qty) || 0;
@@ -365,4 +373,64 @@ export async function fetch_symbol_fills(
             direction,
         };
     });
+}
+
+export async function cancel_order(
+    exchange: BinanceExchange,
+    order_id: string,
+    symbol: string,
+    category: OrderCategory
+): Promise<boolean> {
+    const binance_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+
+    if (category === 'algo') {
+        await exchange.fapiPrivateDeleteAlgoOrder({
+            symbol: binance_symbol,
+            algoId: order_id,
+        });
+    } else {
+        await exchange.fapiPrivateDeleteOrder({
+            symbol: binance_symbol,
+            orderId: order_id,
+        });
+    }
+    return true;
+}
+
+export async function cancel_all_orders(
+    exchange: BinanceExchange,
+    symbol?: string
+): Promise<number> {
+    if (symbol) {
+        const binance_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+        const [regular, algo] = await Promise.all([
+            exchange.fapiPrivateDeleteAllOpenOrders({ symbol: binance_symbol }).catch(() => null),
+            exchange.fapiPrivateDeleteAlgoOpenOrders({ symbol: binance_symbol }).catch(() => null),
+        ]);
+        const regular_count = Array.isArray(regular) ? regular.length : 0;
+        const algo_count = Array.isArray(algo) ? algo.length : 0;
+        return regular_count + algo_count;
+    }
+
+    const [orders_raw, algo_raw] = await Promise.all([
+        exchange.fapiPrivateGetOpenOrders(),
+        exchange.fapiPrivateGetOpenAlgoOrders().catch(() => []),
+    ]);
+
+    const orders = is_order_array(orders_raw) ? orders_raw : [];
+    const algo = Array.isArray(algo_raw) ? (algo_raw as BinanceAlgoOrder[]) : [];
+
+    const symbols = new Set<string>();
+    for (const o of orders) symbols.add(o.symbol);
+    for (const o of algo) symbols.add(o.symbol);
+
+    const promises = Array.from(symbols).map((s) =>
+        Promise.all([
+            exchange.fapiPrivateDeleteAllOpenOrders({ symbol: s }).catch(() => null),
+            exchange.fapiPrivateDeleteAlgoOpenOrders({ symbol: s }).catch(() => null),
+        ])
+    );
+
+    await Promise.all(promises);
+    return orders.length + algo.length;
 }

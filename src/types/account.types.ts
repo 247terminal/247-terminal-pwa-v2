@@ -1,4 +1,5 @@
 import type { ExchangeId } from './exchange.types';
+import type { OrderCategory } from './worker.types';
 
 export interface Position {
     id: string;
@@ -24,6 +25,7 @@ export interface Order {
     symbol: string;
     side: 'buy' | 'sell';
     type: 'limit' | 'market' | 'stop' | 'take_profit' | 'stop_loss';
+    category: OrderCategory;
     size: number;
     price: number;
     filled: number;

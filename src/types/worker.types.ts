@@ -329,6 +329,8 @@ export interface RawPosition {
     initial_margin: string | number;
 }
 
+export type OrderCategory = 'regular' | 'algo' | 'tpsl';
+
 export interface RawOrder {
     symbol: string;
     id: string;
@@ -338,6 +340,7 @@ export interface RawOrder {
     price: number;
     filled: number;
     timestamp: number;
+    category: OrderCategory;
 }
 
 export interface RawClosedPosition {

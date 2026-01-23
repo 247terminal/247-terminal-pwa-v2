@@ -7,6 +7,7 @@ import {
     fetch_positions as fetch_positions_api,
     fetch_orders as fetch_orders_api,
     fetch_closed_positions as fetch_closed_positions_api,
+    cancel_order as cancel_order_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
 import { get_market, has_markets } from './exchange_store';
@@ -16,14 +17,18 @@ function load_privacy_mode(): boolean {
     try {
         const stored = localStorage.getItem(STORAGE_CONSTANTS.ACCOUNT_PRIVACY_KEY);
         if (stored) return stored === 'true';
-    } catch {}
+    } catch (err) {
+        console.error('failed to load privacy mode:', (err as Error).message);
+    }
     return false;
 }
 
 function save_privacy_mode(value: boolean): void {
     try {
         localStorage.setItem(STORAGE_CONSTANTS.ACCOUNT_PRIVACY_KEY, String(value));
-    } catch {}
+    } catch (err) {
+        console.error('failed to save privacy mode:', (err as Error).message);
+    }
 }
 
 export const balances = signal<Map<ExchangeId, Balance>>(new Map());
@@ -348,8 +353,52 @@ export function close_tpsl_modal(): void {
     tpsl_modal_position.value = null;
 }
 
-export async function cancel_order(_exchange_id: ExchangeId, _order_id: string): Promise<void> {
-    return;
+export async function cancel_order(exchange_id: ExchangeId, order_id: string): Promise<boolean> {
+    const order = orders.value.get(order_id);
+    if (!order) return false;
+
+    try {
+        await cancel_order_api(exchange_id, order_id, order.symbol, order.category);
+        const map = new Map(orders.value);
+        map.delete(order_id);
+        orders.value = map;
+        return true;
+    } catch (err) {
+        console.error(`failed to cancel order ${order_id}:`, (err as Error).message);
+        return false;
+    }
+}
+
+export async function cancel_all_orders(exchange_ids?: ExchangeId[]): Promise<number> {
+    const targets =
+        exchange_ids ??
+        Array.from(new Set(Array.from(orders.value.values()).map((o) => o.exchange)));
+    if (targets.length === 0) return 0;
+
+    const target_set = new Set(targets);
+    const orders_to_cancel = Array.from(orders.value.values()).filter((o) =>
+        target_set.has(o.exchange)
+    );
+    if (orders_to_cancel.length === 0) return 0;
+
+    const cancelled_ids: string[] = [];
+    await Promise.all(
+        orders_to_cancel.map((o) =>
+            cancel_order_api(o.exchange, o.id, o.symbol, o.category)
+                .then(() => {
+                    cancelled_ids.push(o.id);
+                })
+                .catch(() => null)
+        )
+    );
+
+    if (cancelled_ids.length > 0) {
+        const map = new Map(orders.value);
+        for (const id of cancelled_ids) map.delete(id);
+        orders.value = map;
+    }
+
+    return cancelled_ids.length;
 }
 
 export async function close_position(_exchange_id: ExchangeId, _symbol: string): Promise<void> {

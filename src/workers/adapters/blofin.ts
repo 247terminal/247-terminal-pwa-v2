@@ -1,5 +1,11 @@
 import type blofin from 'ccxt/js/src/pro/blofin.js';
-import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
+import type {
+    RawPosition,
+    RawOrder,
+    RawClosedPosition,
+    RawFill,
+    OrderCategory,
+} from '@/types/worker.types';
 import { POSITION_CONSTANTS } from '@/config/chart.constants';
 
 export type BlofinExchange = InstanceType<typeof blofin>;
@@ -67,25 +73,14 @@ interface BlofinLeverageResponse {
     }>;
 }
 
-function is_position_response(data: unknown): data is BlofinPositionResponse {
-    return data !== null && typeof data === 'object' && 'data' in data;
+function has_data(d: unknown): d is { data: unknown } {
+    return d !== null && typeof d === 'object' && 'data' in d;
 }
-
-function is_balance_response(data: unknown): data is BlofinBalanceResponse {
-    return data !== null && typeof data === 'object' && 'data' in data;
-}
-
-function is_order_response(data: unknown): data is BlofinOrderResponse {
-    return data !== null && typeof data === 'object' && 'data' in data;
-}
-
-function is_fill_response(data: unknown): data is BlofinFillResponse {
-    return data !== null && typeof data === 'object' && 'data' in data;
-}
-
-function is_leverage_response(data: unknown): data is BlofinLeverageResponse {
-    return data !== null && typeof data === 'object' && 'data' in data;
-}
+const is_position_response = has_data as (d: unknown) => d is BlofinPositionResponse;
+const is_balance_response = has_data as (d: unknown) => d is BlofinBalanceResponse;
+const is_order_response = has_data as (d: unknown) => d is BlofinOrderResponse;
+const is_fill_response = has_data as (d: unknown) => d is BlofinFillResponse;
+const is_leverage_response = has_data as (d: unknown) => d is BlofinLeverageResponse;
 
 export async function fetch_position_mode(exchange: BlofinExchange): Promise<'hedge' | 'one_way'> {
     try {
@@ -95,7 +90,8 @@ export async function fetch_position_mode(exchange: BlofinExchange): Promise<'he
         if (!Array.isArray(data)) return 'one_way';
         const has_hedge = data.some((p) => p.positionSide === 'long' || p.positionSide === 'short');
         return has_hedge ? 'hedge' : 'one_way';
-    } catch {
+    } catch (err) {
+        console.error('failed to fetch blofin position mode:', (err as Error).message);
         return 'one_way';
     }
 }
@@ -200,6 +196,7 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
                 price: Number(o.price || o.triggerPrice || 0),
                 filled: Number(o.filledSize || 0),
                 timestamp: Number(o.createTime || Date.now()),
+                category: 'regular',
             });
         }
     }
@@ -207,8 +204,6 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
     if (is_tpsl_order_response(tpsl_result) && Array.isArray(tpsl_result.data)) {
         for (const o of tpsl_result.data) {
             const has_tp = o.tpTriggerPrice && Number(o.tpTriggerPrice) > 0;
-            const has_sl = o.slTriggerPrice && Number(o.slTriggerPrice) > 0;
-
             orders.push({
                 symbol: o.instId.replace(/-/g, '/') + ':USDT',
                 id: o.tpslId,
@@ -218,6 +213,7 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
                 price: has_tp ? Number(o.tpTriggerPrice) : Number(o.slTriggerPrice),
                 filled: 0,
                 timestamp: Number(o.createTime || Date.now()),
+                category: 'tpsl',
             });
         }
     }
@@ -233,6 +229,7 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
                 price: Number(o.triggerPrice || 0),
                 filled: Number(o.filledSize || 0),
                 timestamp: Number(o.createTime || Date.now()),
+                category: 'algo',
             });
         }
     }
@@ -350,8 +347,8 @@ export async function fetch_closed_positions(
     return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
 }
 
-function from_blofin_inst_id(instId: string): string {
-    return instId.replace(/-/g, '/') + ':USDT';
+function to_blofin_inst_id(symbol: string): string {
+    return symbol.replace(/\//, '-').replace(/:USDT$/, '');
 }
 
 export async function set_leverage(
@@ -359,8 +356,7 @@ export async function set_leverage(
     symbol: string,
     leverage: number
 ): Promise<number> {
-    const inst_id = symbol.replace(/\//, '-').replace(/:USDT$/, '');
-    await exchange.setLeverage(leverage, inst_id);
+    await exchange.setLeverage(leverage, to_blofin_inst_id(symbol));
     return leverage;
 }
 
@@ -388,8 +384,8 @@ export async function fetch_leverage_settings(
 
             if (is_leverage_response(response) && Array.isArray(response.data)) {
                 for (const item of response.data) {
-                    const symbol = from_blofin_inst_id(item.instId);
-                    result[symbol] = parseFloat(item.leverage) || 1;
+                    result[item.instId.replace(/-/g, '/') + ':USDT'] =
+                        parseFloat(item.leverage) || 1;
                 }
             }
         }
@@ -405,9 +401,8 @@ export async function fetch_symbol_fills(
     symbol: string,
     limit: number
 ): Promise<RawFill[]> {
-    const inst_id = symbol.replace(/\//, '-').replace(/:USDT$/, '');
     const response = await exchange.privateGetTradeFillsHistory({
-        instId: inst_id,
+        instId: to_blofin_inst_id(symbol),
         limit: String(limit),
     });
     if (!is_fill_response(response)) return [];
@@ -439,4 +434,63 @@ export async function fetch_symbol_fills(
             direction,
         };
     });
+}
+
+export async function cancel_order(
+    exchange: BlofinExchange,
+    order_id: string,
+    symbol: string,
+    category: OrderCategory
+): Promise<boolean> {
+    const i = to_blofin_inst_id(symbol);
+    switch (category) {
+        case 'tpsl':
+            await exchange.privatePostTradeCancelTpsl([{ instId: i, tpslId: order_id }]);
+            break;
+        case 'algo':
+            await exchange.privatePostTradeCancelAlgo([{ instId: i, algoId: order_id }]);
+            break;
+        default:
+            await exchange.privatePostTradeCancelOrder({ instId: i, orderId: order_id });
+    }
+    return true;
+}
+
+export async function cancel_all_orders(
+    exchange: BlofinExchange,
+    symbol?: string
+): Promise<number> {
+    const params = symbol ? { instId: to_blofin_inst_id(symbol) } : {};
+    const [pending, tpsl, algo] = await Promise.all([
+        exchange.privateGetTradeOrdersPending(params).catch(() => null),
+        exchange.privateGetTradeOrdersTpslPending(params).catch(() => null),
+        exchange
+            .privateGetTradeOrdersAlgoPending({ ...params, orderType: 'trigger' })
+            .catch(() => null),
+    ]);
+
+    const p = is_order_response(pending) ? pending.data || [] : [];
+    const t = is_tpsl_order_response(tpsl) ? tpsl.data || [] : [];
+    const a = is_algo_order_response(algo) ? algo.data || [] : [];
+
+    await Promise.all([
+        p.length > 0
+            ? exchange
+                  .privatePostTradeCancelBatchOrders(
+                      p.map((o) => ({ instId: o.instId, orderId: o.orderId }))
+                  )
+                  .catch(() => null)
+            : null,
+        ...t.map((o) =>
+            exchange
+                .privatePostTradeCancelTpsl({ instId: o.instId, tpslId: o.tpslId })
+                .catch(() => null)
+        ),
+        ...a.map((o) =>
+            exchange
+                .privatePostTradeCancelAlgo({ instId: o.instId, algoId: o.algoId })
+                .catch(() => null)
+        ),
+    ]);
+    return p.length + t.length + a.length;
 }

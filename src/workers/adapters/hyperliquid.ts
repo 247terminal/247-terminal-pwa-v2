@@ -1,5 +1,11 @@
 import type hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
-import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
+import type {
+    RawPosition,
+    RawOrder,
+    RawClosedPosition,
+    RawFill,
+    OrderCategory,
+} from '@/types/worker.types';
 import { HYPERLIQUID_CACHE_TTL, EXCHANGE_CONFIG } from '@/config';
 
 export type HyperliquidExchange = InstanceType<typeof hyperliquid>;
@@ -188,6 +194,7 @@ export async function fetch_orders(exchange: HyperliquidExchange): Promise<RawOr
             price: Number(o.triggerPx || o.limitPx || 0),
             filled: 0,
             timestamp: Number(o.timestamp || Date.now()),
+            category: 'regular',
         };
     });
 }
@@ -315,4 +322,48 @@ export async function fetch_symbol_fills(
             direction: is_close ? 'close' : 'open',
         };
     });
+}
+
+export async function cancel_order(
+    exchange: HyperliquidExchange,
+    order_id: string,
+    symbol: string,
+    _category: OrderCategory
+): Promise<boolean> {
+    await exchange.cancelOrder(order_id, symbol);
+    return true;
+}
+
+export async function cancel_all_orders(
+    exchange: HyperliquidExchange,
+    symbol?: string
+): Promise<number> {
+    const wallet = exchange.walletAddress;
+    if (!wallet) return 0;
+
+    const response = await exchange.publicPostInfo({
+        type: 'openOrders',
+        user: wallet,
+    });
+    if (!is_open_orders_array(response)) return 0;
+
+    const orders_to_cancel = symbol
+        ? response.filter((o) => o.coin === symbol.split('/')[0])
+        : response;
+
+    if (orders_to_cancel.length === 0) return 0;
+
+    const by_coin: Record<string, string[]> = {};
+    for (const o of orders_to_cancel) {
+        if (!by_coin[o.coin]) by_coin[o.coin] = [];
+        by_coin[o.coin].push(String(o.oid));
+    }
+
+    await Promise.all(
+        Object.entries(by_coin).map(([coin, ids]) =>
+            exchange.cancelOrders(ids, `${coin}/USDC:USDC`).catch(() => null)
+        )
+    );
+
+    return orders_to_cancel.length;
 }
