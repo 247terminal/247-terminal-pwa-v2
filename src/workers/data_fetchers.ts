@@ -23,6 +23,8 @@ const exchangeCredentials: Record<string, ExchangeAuthParams> = {};
 const marketCache: Record<string, Record<string, CcxtMarket>> = {};
 const marketsByIdCache: Record<string, Record<string, CcxtMarket>> = {};
 const marketLoadPromises: Record<string, Promise<Record<string, CcxtMarket>>> = {};
+const binanceMaxLeverageCache: Record<string, number> = {};
+let binanceLeveragePromise: Promise<void> | null = null;
 
 function getProxyOptions(exchangeId: ExchangeId): {
     proxy?: string;
@@ -176,8 +178,62 @@ export function getSwapSymbols(exchange: CcxtExchange): string[] {
         .map((m) => m.symbol);
 }
 
+interface BinanceLeverageBracket {
+    symbol: string;
+    brackets: { initialLeverage: number }[];
+}
+
+export async function fetchBinanceMaxLeverage(): Promise<Record<string, number>> {
+    if (Object.keys(binanceMaxLeverageCache).length > 0) {
+        return binanceMaxLeverageCache;
+    }
+
+    if (binanceLeveragePromise) {
+        await binanceLeveragePromise;
+        return binanceMaxLeverageCache;
+    }
+
+    const exchange = exchanges.binance;
+    if (!exchange || !exchangeCredentials.binance) {
+        return binanceMaxLeverageCache;
+    }
+
+    binanceLeveragePromise = (async () => {
+        try {
+            const response = await exchange.fapiPrivateGetLeverageBracket();
+            if (!Array.isArray(response)) return;
+
+            for (const item of response as BinanceLeverageBracket[]) {
+                const symbol = item.symbol.replace(/USDT$/, '/USDT:USDT');
+                const maxLev = item.brackets?.[0]?.initialLeverage;
+                if (maxLev) {
+                    binanceMaxLeverageCache[symbol] = maxLev;
+                }
+            }
+        } catch (err) {
+            console.error('failed to fetch binance leverage brackets:', (err as Error).message);
+        }
+    })();
+
+    await binanceLeveragePromise;
+    binanceLeveragePromise = null;
+    return binanceMaxLeverageCache;
+}
+
+function getMaxLeverage(market: CcxtMarket, exchangeId: ExchangeId): number | null {
+    if (exchangeId === 'binance') {
+        return binanceMaxLeverageCache[market.symbol] ?? null;
+    }
+    return market.limits?.leverage?.max ?? null;
+}
+
 export async function fetchMarkets(exchangeId: ExchangeId): Promise<MarketInfo[]> {
     const markets = await loadMarkets(exchangeId);
+
+    if (exchangeId === 'binance') {
+        await fetchBinanceMaxLeverage();
+    }
+
     return Object.values(markets)
         .filter((m) => isLinearSwapForExchange(m, exchangeId))
         .map((market) => ({
@@ -192,7 +248,7 @@ export async function fetchMarkets(exchangeId: ExchangeId): Promise<MarketInfo[]
             max_qty: market.limits?.amount?.max ?? 1000000,
             qty_step: market.precision?.amount ?? 0.001,
             contract_size: market.contractSize ?? 1,
-            max_leverage: market.limits?.leverage?.max ?? null,
+            max_leverage: getMaxLeverage(market, exchangeId),
         }))
         .sort((a, b) => a.symbol.localeCompare(b.symbol));
 }

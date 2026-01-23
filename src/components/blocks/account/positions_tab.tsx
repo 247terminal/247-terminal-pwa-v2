@@ -218,7 +218,9 @@ export function PositionsTab() {
                 {is_loading ? (
                     <LogoSpinner size={32} />
                 ) : (
-                    <div class="text-xs text-base-content/50 text-center py-8">No open positions</div>
+                    <div class="text-xs text-base-content/50 text-center py-8">
+                        No open positions
+                    </div>
                 )}
             </div>
         );

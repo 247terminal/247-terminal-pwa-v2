@@ -36,7 +36,9 @@ export function TerminalSection() {
 
                 {terminal.push_notifications && (
                     <div class="flex items-center justify-between">
-                        <span class="text-xs text-base-content/70 uppercase">Notification filter</span>
+                        <span class="text-xs text-base-content/70 uppercase">
+                            Notification filter
+                        </span>
                         <select
                             class="bg-base-300 px-2 py-1 rounded text-xs text-base-content outline-none"
                             value={terminal.notification_filter}

@@ -102,6 +102,31 @@ export function set_markets(exchange_id: ExchangeId, market_list: MarketData[]) 
     markets.value = { ...markets.value, [exchange_id]: market_map };
 }
 
+export function update_max_leverage(
+    exchange_id: ExchangeId,
+    leverage_map: Record<string, number>
+): void {
+    const current = markets.value[exchange_id];
+    if (!current || Object.keys(leverage_map).length === 0) return;
+
+    let hasChanges = false;
+    const updated: Record<string, MarketData> = {};
+
+    for (const [symbol, market] of Object.entries(current)) {
+        const maxLev = leverage_map[symbol];
+        if (maxLev && market.max_leverage !== maxLev) {
+            updated[symbol] = { ...market, max_leverage: maxLev };
+            hasChanges = true;
+        } else {
+            updated[symbol] = market;
+        }
+    }
+
+    if (hasChanges) {
+        markets.value = { ...markets.value, [exchange_id]: updated };
+    }
+}
+
 export function update_ticker(exchange_id: ExchangeId, ticker: TickerUpdate) {
     const sig = get_ticker_signal(exchange_id, ticker.symbol);
     const current = sig.value;

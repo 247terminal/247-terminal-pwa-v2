@@ -250,7 +250,9 @@ export function HistoryTab() {
                 {is_loading ? (
                     <LogoSpinner size={32} />
                 ) : (
-                    <div class="text-xs text-base-content/50 text-center py-8">No trade history</div>
+                    <div class="text-xs text-base-content/50 text-center py-8">
+                        No trade history
+                    </div>
                 )}
             </div>
         );

@@ -153,6 +153,10 @@ export function fetch_funding_rates(
     return sendRequest<Record<string, FundingInfo>>('FETCH_FUNDING_RATES', { exchangeId }, signal);
 }
 
+export function fetch_binance_max_leverage(): Promise<Record<string, number>> {
+    return sendRequest<Record<string, number>>('FETCH_BINANCE_MAX_LEVERAGE', {});
+}
+
 export function fetch_ohlcv(
     exchangeId: ExchangeId,
     symbol: string,

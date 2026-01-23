@@ -91,7 +91,9 @@ export function BackupSection() {
                             set_include_credentials((e.target as HTMLInputElement).checked)
                         }
                     />
-                    <span class="text-xs text-base-content/70 uppercase">Include API credentials</span>
+                    <span class="text-xs text-base-content/70 uppercase">
+                        Include API credentials
+                    </span>
                 </label>
                 {include_credentials && (
                     <div class="flex items-start gap-2 p-2 bg-warning/10 rounded">

@@ -69,9 +69,7 @@ function AccordionSection({
 
 export function SettingsDrawer({ is_open, on_close }: SettingsDrawerProps) {
     const drawer_ref = useRef<HTMLDivElement>(null);
-    const [expanded_section, set_expanded_section] = useState<SettingsSectionId | null>(
-        'terminal'
-    );
+    const [expanded_section, set_expanded_section] = useState<SettingsSectionId | null>('terminal');
 
     const handle_close = useCallback(() => {
         on_close();

@@ -162,7 +162,9 @@ export function OrdersTab() {
                 {is_loading ? (
                     <LogoSpinner size={32} />
                 ) : (
-                    <div class="text-xs text-base-content/50 text-center py-8">No active orders</div>
+                    <div class="text-xs text-base-content/50 text-center py-8">
+                        No active orders
+                    </div>
                 )}
             </div>
         );

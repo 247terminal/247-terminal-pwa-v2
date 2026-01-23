@@ -40,6 +40,7 @@ import {
     fetchTickers,
     fetchFundingRates,
     fetchOHLCV,
+    fetchBinanceMaxLeverage,
 } from './data_fetchers';
 import type {
     ExchangeId,
@@ -282,6 +283,9 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 break;
             case 'FETCH_FUNDING_RATES':
                 result = await fetchFundingRates(payload?.exchangeId as ExchangeId);
+                break;
+            case 'FETCH_BINANCE_MAX_LEVERAGE':
+                result = await fetchBinanceMaxLeverage();
                 break;
             case 'FETCH_OHLCV':
                 result = await fetchOHLCV(

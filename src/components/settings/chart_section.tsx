@@ -2,23 +2,9 @@ import { useState, useRef, useEffect } from 'preact/hooks';
 import { settings, set_setting } from '@/stores/settings_store';
 import { TIMEFRAME_OPTIONS } from '@/services/settings/settings.constants';
 
-const GREEN_PRESETS = [
-    '#0B3D0B',
-    '#228B22',
-    '#32CD32',
-    '#57D657',
-    '#7FE57F',
-    '#A8F0A8',
-] as const;
+const GREEN_PRESETS = ['#0B3D0B', '#228B22', '#32CD32', '#57D657', '#7FE57F', '#A8F0A8'] as const;
 
-const RED_PRESETS = [
-    '#5C0A0A',
-    '#8B1A1A',
-    '#B22222',
-    '#DC3545',
-    '#E85C5C',
-    '#F08080',
-] as const;
+const RED_PRESETS = ['#5C0A0A', '#8B1A1A', '#B22222', '#DC3545', '#E85C5C', '#F08080'] as const;
 
 interface CandleColorPickerProps {
     label: string;

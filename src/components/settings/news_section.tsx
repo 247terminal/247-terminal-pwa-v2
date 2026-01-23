@@ -24,7 +24,13 @@ interface ProviderToggleProps {
     placeholder?: string;
 }
 
-function ProviderToggle({ label, checked, on_change, on_connect, placeholder }: ProviderToggleProps) {
+function ProviderToggle({
+    label,
+    checked,
+    on_change,
+    on_connect,
+    placeholder,
+}: ProviderToggleProps) {
     const [api_key, set_api_key] = useState('');
 
     return (

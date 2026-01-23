@@ -3,6 +3,7 @@ import {
     fetch_markets,
     fetch_tickers,
     fetch_funding_rates,
+    fetch_binance_max_leverage,
     start_ticker_stream,
 } from './chart_data';
 import {
@@ -10,6 +11,7 @@ import {
     has_markets,
     set_initial_tickers,
     update_initial_funding,
+    update_max_leverage,
 } from '../../stores/exchange_store';
 import {
     init_credentials,
@@ -77,6 +79,12 @@ async function init_connected_exchange_instances(connected: ExchangeId[]): Promi
                     private_key: creds.private_key,
                 });
                 refresh_account(ex).catch(console.error);
+
+                if (ex === 'binance') {
+                    fetch_binance_max_leverage()
+                        .then((leverages) => update_max_leverage('binance', leverages))
+                        .catch(console.error);
+                }
             }
         })
     );

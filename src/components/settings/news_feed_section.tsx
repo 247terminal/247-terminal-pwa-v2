@@ -29,7 +29,11 @@ export function NewsFeedSection() {
                     class="toggle toggle-xs toggle-primary"
                     checked={trading.freeze_on_hover}
                     onChange={(e) =>
-                        set_setting('trading', 'freeze_on_hover', (e.target as HTMLInputElement).checked)
+                        set_setting(
+                            'trading',
+                            'freeze_on_hover',
+                            (e.target as HTMLInputElement).checked
+                        )
                     }
                 />
             </label>
@@ -41,7 +45,11 @@ export function NewsFeedSection() {
                     class="toggle toggle-xs toggle-primary"
                     checked={trading.full_size_media}
                     onChange={(e) =>
-                        set_setting('trading', 'full_size_media', (e.target as HTMLInputElement).checked)
+                        set_setting(
+                            'trading',
+                            'full_size_media',
+                            (e.target as HTMLInputElement).checked
+                        )
                     }
                 />
             </label>
@@ -53,7 +61,11 @@ export function NewsFeedSection() {
                     class="toggle toggle-xs toggle-primary"
                     checked={trading.disable_media}
                     onChange={(e) =>
-                        set_setting('trading', 'disable_media', (e.target as HTMLInputElement).checked)
+                        set_setting(
+                            'trading',
+                            'disable_media',
+                            (e.target as HTMLInputElement).checked
+                        )
                     }
                 />
             </label>
