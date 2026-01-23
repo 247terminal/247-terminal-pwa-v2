@@ -1,6 +1,15 @@
-import { useState, useCallback } from 'preact/hooks';
-import { Eye, EyeOff, RefreshCw, Radiation } from 'lucide-preact';
-import type { AccountTab, TabButtonProps } from '../../../types/account.types';
+import { useState, useCallback, useRef, useEffect } from 'preact/hooks';
+import {
+    Eye,
+    EyeOff,
+    RefreshCw,
+    Radiation,
+    X,
+    TrendingUp,
+    TrendingDown,
+    ListX,
+} from 'lucide-preact';
+import type { TabButtonProps, NukeOption, NukeMenuOption } from '../../../types/account.types';
 import { EXCHANGE_IDS } from '../../../types/exchange.types';
 import {
     active_tab,
@@ -13,6 +22,96 @@ import {
     refresh_all_accounts,
 } from '../../../stores/account_store';
 import { exchange_connection_status } from '../../../stores/credentials_store';
+
+const NUKE_OPTIONS: NukeMenuOption[] = [
+    { id: 'all', label: 'All', icon: <X class="w-3 h-3" />, description: 'Positions & orders' },
+    { id: 'orders', label: 'Orders', icon: <ListX class="w-3 h-3" />, description: 'Cancel all' },
+    {
+        id: 'longs',
+        label: 'Longs',
+        icon: <TrendingUp class="w-3 h-3" />,
+        description: 'Close longs',
+    },
+    {
+        id: 'shorts',
+        label: 'Shorts',
+        icon: <TrendingDown class="w-3 h-3" />,
+        description: 'Close shorts',
+    },
+];
+
+function NukeMenu() {
+    const [is_open, set_is_open] = useState(false);
+    const container_ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!is_open) return;
+
+        const handle_keydown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') set_is_open(false);
+        };
+        const handle_click_outside = (e: MouseEvent) => {
+            if (container_ref.current && !container_ref.current.contains(e.target as Node)) {
+                set_is_open(false);
+            }
+        };
+
+        window.addEventListener('keydown', handle_keydown);
+        document.addEventListener('mousedown', handle_click_outside);
+        return () => {
+            window.removeEventListener('keydown', handle_keydown);
+            document.removeEventListener('mousedown', handle_click_outside);
+        };
+    }, [is_open]);
+
+    const toggle_menu = useCallback(() => set_is_open((prev) => !prev), []);
+
+    const handle_option_click = useCallback((_option: NukeOption) => {
+        set_is_open(false);
+        // TODO: Implement actual nuke functionality
+    }, []);
+
+    return (
+        <div ref={container_ref} class="relative">
+            <button
+                type="button"
+                onClick={toggle_menu}
+                class={`p-1 rounded transition-colors ${
+                    is_open
+                        ? 'text-error bg-error/10'
+                        : 'text-base-content/50 hover:text-error hover:bg-base-300'
+                }`}
+                title="Close positions"
+            >
+                <Radiation class="w-4 h-4" />
+            </button>
+            {is_open && (
+                <div class="absolute right-0 top-full mt-1 w-40 bg-base-200 rounded-md shadow-lg border border-base-300 overflow-hidden z-50">
+                    {NUKE_OPTIONS.map((option) => (
+                        <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => handle_option_click(option.id)}
+                            class="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-error/10 hover:text-error transition-colors group"
+                        >
+                            <span class="text-base-content/50 group-hover:text-error transition-colors">
+                                {option.icon}
+                            </span>
+                            <div class="flex flex-col gap-0.5">
+                                <span class="text-xs font-medium text-base-content group-hover:text-error transition-colors leading-none">
+                                    {option.label}
+                                </span>
+                                <span class="text-[10px] text-base-content/40 group-hover:text-error/60 transition-colors leading-none">
+                                    {option.description}
+                                </span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 function TabButton({ tab, label, count }: TabButtonProps) {
     const is_active = active_tab.value === tab;
@@ -83,13 +182,7 @@ export function AccountToolbar() {
                 <RefreshCw class={`w-4 h-4 ${refreshing || is_loading ? 'animate-spin' : ''}`} />
             </button>
 
-            <button
-                type="button"
-                class="p-1 rounded text-base-content/50 hover:text-error hover:bg-base-300 transition-colors"
-                title="Close all positions"
-            >
-                <Radiation class="w-4 h-4" />
-            </button>
+            <NukeMenu />
         </div>
     );
 }

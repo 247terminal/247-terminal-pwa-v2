@@ -91,3 +91,12 @@ export interface PnlResult {
     pnl: number;
     pnl_pct: number;
 }
+
+export type NukeOption = 'all' | 'orders' | 'longs' | 'shorts';
+
+export interface NukeMenuOption {
+    id: NukeOption;
+    label: string;
+    icon: preact.JSX.Element;
+    description: string;
+}
