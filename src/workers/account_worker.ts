@@ -256,7 +256,10 @@ export async function fetchLeverageSettings(
                     symbols
                 );
             case 'bybit':
-                return {};
+                return await bybitAdapter.fetch_leverage_settings(
+                    exchange as BybitExchange,
+                    symbols
+                );
             default:
                 return {};
         }

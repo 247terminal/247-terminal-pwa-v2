@@ -301,3 +301,34 @@ export async function fetch_symbol_fills(
         };
     });
 }
+
+export async function fetch_leverage_settings(
+    exchange: BybitExchange,
+    symbols: string[]
+): Promise<Record<string, number>> {
+    const results = await Promise.all(
+        symbols.map(async (symbol) => {
+            try {
+                const bybit_symbol = symbol.replace(/\/USDT:USDT$/, 'USDT');
+                const response = await exchange.privateGetV5PositionList({
+                    category: 'linear',
+                    symbol: bybit_symbol,
+                });
+                if (!is_position_response(response)) return null;
+                const list = response.result?.list;
+                if (!Array.isArray(list) || list.length === 0) return null;
+                const leverage = Number(list[0].leverage || 0);
+                if (leverage > 0) return { symbol, leverage };
+                return null;
+            } catch {
+                return null;
+            }
+        })
+    );
+
+    const result: Record<string, number> = {};
+    for (const item of results) {
+        if (item) result[item.symbol] = item.leverage;
+    }
+    return result;
+}

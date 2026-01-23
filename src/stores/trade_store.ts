@@ -8,8 +8,14 @@ import type {
     ScaleOrderForm,
     TwapOrderForm,
 } from '../types/trade.types';
-import { get_market, get_ticker } from './exchange_store';
+import {
+    get_market,
+    get_ticker,
+    get_symbol_leverage,
+    set_symbol_leverages,
+} from './exchange_store';
 import { exchange_connection_status } from './credentials_store';
+import { fetch_leverage_settings, has_exchange } from '../services/exchange/account_bridge';
 
 function get_default_exchange(): ExchangeId {
     const status = exchange_connection_status.value;
@@ -80,16 +86,44 @@ export const max_leverage = computed(() => {
     return market?.max_leverage ?? 100;
 });
 
+function apply_symbol_leverage(exchange: ExchangeId, symbol: string): void {
+    const cached = get_symbol_leverage(exchange, symbol);
+    if (cached !== null) {
+        const max = get_market(exchange, symbol)?.max_leverage ?? 100;
+        const clamped = Math.min(cached, max);
+        trade_state.value = { ...trade_state.value, leverage: clamped };
+        return;
+    }
+
+    if (!has_exchange(exchange)) return;
+
+    fetch_leverage_settings(exchange, [symbol])
+        .then((result) => {
+            const lev = result[symbol];
+            if (lev === undefined) return;
+            set_symbol_leverages(exchange, result);
+            const max = get_market(exchange, symbol)?.max_leverage ?? 100;
+            const clamped = Math.min(lev, max);
+            if (trade_state.value.exchange === exchange && trade_state.value.symbol === symbol) {
+                trade_state.value = { ...trade_state.value, leverage: clamped };
+            }
+        })
+        .catch(() => {});
+}
+
 export function set_exchange(exchange: ExchangeId): void {
     trade_state.value = { ...trade_state.value, exchange };
+    apply_symbol_leverage(exchange, trade_state.value.symbol);
 }
 
 export function set_symbol(symbol: string): void {
     trade_state.value = { ...trade_state.value, symbol };
+    apply_symbol_leverage(trade_state.value.exchange, symbol);
 }
 
 export function set_exchange_symbol(exchange: ExchangeId, symbol: string): void {
     trade_state.value = { ...trade_state.value, exchange, symbol };
+    apply_symbol_leverage(exchange, symbol);
 }
 
 export function set_order_type(order_type: OrderType): void {
