@@ -4,7 +4,12 @@ import type { Time } from 'lightweight-charts';
 import { TradingChart } from '../chart/trading_chart';
 import { ChartToolbar, type Timeframe, type ExchangeSymbols } from '../chart/chart_toolbar';
 import { EXCHANGE_ORDER, type ExchangeId } from '../../types/exchange.types';
-import type { ChartSettings, ChartBlockProps, EmaSettings } from '../../types/chart.types';
+import type {
+    ChartSettings,
+    ChartBlockProps,
+    EmaSettings,
+    ChartTimeframe,
+} from '../../types/chart.types';
 import type { EmaPoint, EmaState } from '../../types/indicator.types';
 import type { RawFill } from '../../types/worker.types';
 import {
@@ -15,7 +20,6 @@ import {
 } from '../../services/exchange/chart_data';
 import {
     fetch_symbol_fills,
-    has_exchange,
     initialized_exchanges_signal,
 } from '../../services/exchange/account_bridge';
 import { markets, get_market } from '../../stores/exchange_store';
@@ -222,7 +226,7 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
         let cleanup_stream: (() => void) | null = null;
         let last_candle_time: number | null = null;
 
-        const chart_tf = is_sub_minute_timeframe(timeframe)
+        const chart_tf: ChartTimeframe = is_sub_minute_timeframe(timeframe)
             ? '1'
             : toolbar_to_chart_timeframe(timeframe);
 

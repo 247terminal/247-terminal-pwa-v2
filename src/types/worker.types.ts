@@ -100,6 +100,7 @@ export interface CcxtMarket {
 
 export interface CcxtExchange {
     markets: Record<string, CcxtMarket>;
+    markets_by_id?: Record<string, CcxtMarket>;
     loadMarkets(): Promise<Record<string, CcxtMarket>>;
     fetchTickers(symbols?: string[]): Promise<Record<string, CcxtTicker>>;
     fetchFundingRates(symbols: string[]): Promise<Record<string, CcxtFundingRate>>;
@@ -111,6 +112,9 @@ export interface CcxtExchange {
     ): Promise<number[][]>;
     watchOHLCV(symbol: string, timeframe: string): Promise<number[][]>;
     watchTickers(symbols: string[]): Promise<Record<string, CcxtTicker>>;
+    setLeverage(leverage: number, symbol: string): Promise<unknown>;
+    close?(): Promise<void>;
+    fapiPrivateGetLeverageBracket?(): Promise<unknown>;
     has?: Record<string, boolean>;
 }
 

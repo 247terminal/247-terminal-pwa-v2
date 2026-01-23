@@ -8,7 +8,21 @@ import type {
 } from '@/types/worker.types';
 import { binance as sym } from '../symbol_utils';
 
-export type BinanceExchange = InstanceType<typeof binanceusdm>;
+type BaseBinanceExchange = InstanceType<typeof binanceusdm>;
+
+export interface BinanceExchange extends BaseBinanceExchange {
+    fapiPrivateGetPositionSideDual(): Promise<unknown>;
+    fapiPrivateV2GetBalance(): Promise<unknown>;
+    fapiPrivateV2GetPositionRisk(): Promise<unknown>;
+    fapiPrivateGetOpenOrders(params?: Record<string, unknown>): Promise<unknown>;
+    fapiPrivateGetOpenAlgoOrders(params?: Record<string, unknown>): Promise<unknown>;
+    fapiPrivateGetUserTrades(params: Record<string, unknown>): Promise<unknown>;
+    fapiPrivateGetSymbolConfig(params?: Record<string, unknown>): Promise<unknown>;
+    fapiPrivateDeleteAlgoOrder(params: Record<string, unknown>): Promise<unknown>;
+    fapiPrivateDeleteOrder(params: Record<string, unknown>): Promise<unknown>;
+    fapiPrivateDeleteAllOpenOrders(params: Record<string, unknown>): Promise<unknown>;
+    fapiPrivateDeleteAlgoOpenOrders(params: Record<string, unknown>): Promise<unknown>;
+}
 
 interface BinanceBalance {
     asset: string;
@@ -96,7 +110,9 @@ function is_symbol_config_array(data: unknown): data is BinanceSymbolConfig[] {
 
 export async function fetch_position_mode(exchange: BinanceExchange): Promise<'hedge' | 'one_way'> {
     try {
-        const response = await exchange.fapiPrivateGetPositionSideDual();
+        const response = (await exchange.fapiPrivateGetPositionSideDual()) as {
+            dualSidePosition?: boolean;
+        };
         return response?.dualSidePosition ? 'hedge' : 'one_way';
     } catch (err) {
         console.error('failed to fetch binance position mode:', (err as Error).message);

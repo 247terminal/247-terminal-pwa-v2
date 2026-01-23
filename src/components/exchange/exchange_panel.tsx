@@ -17,7 +17,6 @@ import { load_exchange } from '@/services/exchange/init';
 import { refresh_account, clear_exchange_data } from '@/stores/account_store';
 import { get_exchange_icon, get_exchange_logo } from '@/components/common/exchanges';
 import type {
-    ExchangeId,
     ExchangePanelProps,
     PasswordInputProps,
     HelpModalProps,

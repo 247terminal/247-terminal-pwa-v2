@@ -9,7 +9,21 @@ import type {
 import { POSITION_CONSTANTS } from '@/config/chart.constants';
 import { blofin as sym } from '../symbol_utils';
 
-export type BlofinExchange = InstanceType<typeof blofin>;
+type BaseBlofinExchange = InstanceType<typeof blofin>;
+
+export interface BlofinExchange extends BaseBlofinExchange {
+    privateGetAccountPositions(): Promise<unknown>;
+    privateGetAccountBalance(): Promise<unknown>;
+    privateGetTradeOrdersPending(params?: Record<string, unknown>): Promise<unknown>;
+    privateGetTradeOrdersTpslPending(params?: Record<string, unknown>): Promise<unknown>;
+    privateGetTradeOrdersAlgoPending(params?: Record<string, unknown>): Promise<unknown>;
+    privateGetTradeFillsHistory(params?: Record<string, unknown>): Promise<unknown>;
+    privateGetAccountBatchLeverageInfo(params: Record<string, unknown>): Promise<unknown>;
+    privatePostTradeCancelOrder(params: Record<string, unknown>): Promise<unknown>;
+    privatePostTradeCancelTpsl(params: unknown): Promise<unknown>;
+    privatePostTradeCancelAlgo(params: unknown): Promise<unknown>;
+    privatePostTradeCancelBatchOrders(params: unknown): Promise<unknown>;
+}
 
 interface BlofinPositionResponse {
     data?: Array<{

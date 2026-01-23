@@ -56,13 +56,19 @@ export async function fetchAccountConfig(exchangeId: ExchangeId): Promise<{
 
     switch (exchangeId) {
         case 'binance':
-            position_mode = await binanceAdapter.fetch_position_mode(exchange as BinanceExchange);
+            position_mode = await binanceAdapter.fetch_position_mode(
+                exchange as unknown as BinanceExchange
+            );
             break;
         case 'bybit':
-            position_mode = await bybitAdapter.fetch_position_mode(exchange as BybitExchange);
+            position_mode = await bybitAdapter.fetch_position_mode(
+                exchange as unknown as BybitExchange
+            );
             break;
         case 'blofin':
-            position_mode = await blofinAdapter.fetch_position_mode(exchange as BlofinExchange);
+            position_mode = await blofinAdapter.fetch_position_mode(
+                exchange as unknown as BlofinExchange
+            );
             break;
     }
 
@@ -81,13 +87,15 @@ export async function fetchBalance(exchangeId: ExchangeId): Promise<{
     try {
         switch (exchangeId) {
             case 'binance':
-                return await binanceAdapter.fetch_balance(exchange as BinanceExchange);
+                return await binanceAdapter.fetch_balance(exchange as unknown as BinanceExchange);
             case 'bybit':
-                return await bybitAdapter.fetch_balance(exchange as BybitExchange);
+                return await bybitAdapter.fetch_balance(exchange as unknown as BybitExchange);
             case 'blofin':
-                return await blofinAdapter.fetch_balance(exchange as BlofinExchange);
+                return await blofinAdapter.fetch_balance(exchange as unknown as BlofinExchange);
             case 'hyperliquid':
-                return await hyperliquidAdapter.fetch_balance(exchange as HyperliquidExchange);
+                return await hyperliquidAdapter.fetch_balance(
+                    exchange as unknown as HyperliquidExchange
+                );
             default:
                 return null;
         }
@@ -108,16 +116,18 @@ export async function fetchPositions(
 
         switch (exchangeId) {
             case 'binance':
-                raw = await binanceAdapter.fetch_positions(exchange as BinanceExchange);
+                raw = await binanceAdapter.fetch_positions(exchange as unknown as BinanceExchange);
                 break;
             case 'bybit':
-                raw = await bybitAdapter.fetch_positions(exchange as BybitExchange);
+                raw = await bybitAdapter.fetch_positions(exchange as unknown as BybitExchange);
                 break;
             case 'blofin':
-                raw = await blofinAdapter.fetch_positions(exchange as BlofinExchange);
+                raw = await blofinAdapter.fetch_positions(exchange as unknown as BlofinExchange);
                 break;
             case 'hyperliquid':
-                raw = await hyperliquidAdapter.fetch_positions(exchange as HyperliquidExchange);
+                raw = await hyperliquidAdapter.fetch_positions(
+                    exchange as unknown as HyperliquidExchange
+                );
                 break;
         }
 
@@ -150,16 +160,18 @@ export async function fetchOrders(
 
         switch (exchangeId) {
             case 'binance':
-                raw = await binanceAdapter.fetch_orders(exchange as BinanceExchange);
+                raw = await binanceAdapter.fetch_orders(exchange as unknown as BinanceExchange);
                 break;
             case 'bybit':
-                raw = await bybitAdapter.fetch_orders(exchange as BybitExchange);
+                raw = await bybitAdapter.fetch_orders(exchange as unknown as BybitExchange);
                 break;
             case 'blofin':
-                raw = await blofinAdapter.fetch_orders(exchange as BlofinExchange);
+                raw = await blofinAdapter.fetch_orders(exchange as unknown as BlofinExchange);
                 break;
             case 'hyperliquid':
-                raw = await hyperliquidAdapter.fetch_orders(exchange as HyperliquidExchange);
+                raw = await hyperliquidAdapter.fetch_orders(
+                    exchange as unknown as HyperliquidExchange
+                );
                 break;
         }
 
@@ -204,12 +216,15 @@ export async function fetchClosedPositions(
         switch (exchangeId) {
             case 'binance':
                 raw = await binanceAdapter.fetch_closed_positions(
-                    exchange as BinanceExchange,
+                    exchange as unknown as BinanceExchange,
                     limit
                 );
                 break;
             case 'bybit':
-                raw = await bybitAdapter.fetch_closed_positions(exchange as BybitExchange, limit);
+                raw = await bybitAdapter.fetch_closed_positions(
+                    exchange as unknown as BybitExchange,
+                    limit
+                );
                 break;
             case 'blofin': {
                 let contract_values: Record<string, number> | undefined;
@@ -221,7 +236,7 @@ export async function fetchClosedPositions(
                     }
                 }
                 raw = await blofinAdapter.fetch_closed_positions(
-                    exchange as BlofinExchange,
+                    exchange as unknown as BlofinExchange,
                     limit,
                     contract_values
                 );
@@ -229,7 +244,7 @@ export async function fetchClosedPositions(
             }
             case 'hyperliquid':
                 raw = await hyperliquidAdapter.fetch_closed_positions(
-                    exchange as HyperliquidExchange,
+                    exchange as unknown as HyperliquidExchange,
                     limit
                 );
                 break;
@@ -256,22 +271,22 @@ export async function fetchLeverageSettings(
         switch (exchangeId) {
             case 'binance':
                 return await binanceAdapter.fetch_leverage_settings(
-                    exchange as BinanceExchange,
+                    exchange as unknown as BinanceExchange,
                     symbols
                 );
             case 'blofin':
                 return await blofinAdapter.fetch_leverage_settings(
-                    exchange as BlofinExchange,
+                    exchange as unknown as BlofinExchange,
                     symbols
                 );
             case 'hyperliquid':
                 return await hyperliquidAdapter.fetch_leverage_settings(
-                    exchange as HyperliquidExchange,
+                    exchange as unknown as HyperliquidExchange,
                     symbols
                 );
             case 'bybit':
                 return await bybitAdapter.fetch_leverage_settings(
-                    exchange as BybitExchange,
+                    exchange as unknown as BybitExchange,
                     symbols
                 );
             default:
@@ -295,20 +310,20 @@ export async function fetchSymbolFills(
         switch (exchangeId) {
             case 'binance':
                 return await binanceAdapter.fetch_symbol_fills(
-                    exchange as BinanceExchange,
+                    exchange as unknown as BinanceExchange,
                     symbol,
                     limit
                 );
             case 'bybit':
                 return await bybitAdapter.fetch_symbol_fills(
-                    exchange as BybitExchange,
+                    exchange as unknown as BybitExchange,
                     symbol,
                     limit
                 );
             case 'blofin': {
                 const contract_size = marketMap?.[symbol]?.contract_size;
                 return await blofinAdapter.fetch_symbol_fills(
-                    exchange as BlofinExchange,
+                    exchange as unknown as BlofinExchange,
                     symbol,
                     limit,
                     contract_size
@@ -316,7 +331,7 @@ export async function fetchSymbolFills(
             }
             case 'hyperliquid':
                 return await hyperliquidAdapter.fetch_symbol_fills(
-                    exchange as HyperliquidExchange,
+                    exchange as unknown as HyperliquidExchange,
                     symbol,
                     limit
                 );
@@ -340,21 +355,25 @@ export async function setLeverage(
         switch (exchangeId) {
             case 'binance':
                 return await binanceAdapter.set_leverage(
-                    exchange as BinanceExchange,
+                    exchange as unknown as BinanceExchange,
                     symbol,
                     leverage
                 );
             case 'bybit':
-                return await bybitAdapter.set_leverage(exchange as BybitExchange, symbol, leverage);
+                return await bybitAdapter.set_leverage(
+                    exchange as unknown as BybitExchange,
+                    symbol,
+                    leverage
+                );
             case 'blofin':
                 return await blofinAdapter.set_leverage(
-                    exchange as BlofinExchange,
+                    exchange as unknown as BlofinExchange,
                     symbol,
                     leverage
                 );
             case 'hyperliquid':
                 return await hyperliquidAdapter.set_leverage(
-                    exchange as HyperliquidExchange,
+                    exchange as unknown as HyperliquidExchange,
                     symbol,
                     leverage
                 );
@@ -379,28 +398,28 @@ export async function cancelOrder(
         switch (exchangeId) {
             case 'binance':
                 return await binanceAdapter.cancel_order(
-                    exchange as BinanceExchange,
+                    exchange as unknown as BinanceExchange,
                     orderId,
                     symbol,
                     category
                 );
             case 'bybit':
                 return await bybitAdapter.cancel_order(
-                    exchange as BybitExchange,
+                    exchange as unknown as BybitExchange,
                     orderId,
                     symbol,
                     category
                 );
             case 'blofin':
                 return await blofinAdapter.cancel_order(
-                    exchange as BlofinExchange,
+                    exchange as unknown as BlofinExchange,
                     orderId,
                     symbol,
                     category
                 );
             case 'hyperliquid':
                 return await hyperliquidAdapter.cancel_order(
-                    exchange as HyperliquidExchange,
+                    exchange as unknown as HyperliquidExchange,
                     orderId,
                     symbol,
                     category
@@ -420,14 +439,23 @@ export async function cancelAllOrders(exchangeId: ExchangeId, symbol?: string): 
     try {
         switch (exchangeId) {
             case 'binance':
-                return await binanceAdapter.cancel_all_orders(exchange as BinanceExchange, symbol);
+                return await binanceAdapter.cancel_all_orders(
+                    exchange as unknown as BinanceExchange,
+                    symbol
+                );
             case 'bybit':
-                return await bybitAdapter.cancel_all_orders(exchange as BybitExchange, symbol);
+                return await bybitAdapter.cancel_all_orders(
+                    exchange as unknown as BybitExchange,
+                    symbol
+                );
             case 'blofin':
-                return await blofinAdapter.cancel_all_orders(exchange as BlofinExchange, symbol);
+                return await blofinAdapter.cancel_all_orders(
+                    exchange as unknown as BlofinExchange,
+                    symbol
+                );
             case 'hyperliquid':
                 return await hyperliquidAdapter.cancel_all_orders(
-                    exchange as HyperliquidExchange,
+                    exchange as unknown as HyperliquidExchange,
                     symbol
                 );
             default:

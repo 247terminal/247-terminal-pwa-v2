@@ -215,11 +215,13 @@ export function OrdersTab() {
                     Actions
                 </div>
             </div>
-            <VList class="flex-1" role="rowgroup">
-                {sorted_orders.map((order) => (
-                    <OrderRow key={order.id} order={order} is_private={is_private} />
-                ))}
-            </VList>
+            <div class="flex-1" role="rowgroup">
+                <VList style={{ height: '100%' }}>
+                    {sorted_orders.map((order) => (
+                        <OrderRow key={order.id} order={order} is_private={is_private} />
+                    ))}
+                </VList>
+            </div>
         </div>
     );
 }

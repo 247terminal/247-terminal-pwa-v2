@@ -59,7 +59,7 @@ export type ChartTimeframe =
 export interface ChartSettings {
     exchange: ExchangeId;
     symbol: string;
-    timeframe: string;
+    timeframe: Timeframe;
     volume_visible: boolean;
     grid_visible: boolean;
     ema_visible: boolean;

@@ -280,11 +280,13 @@ export function PositionsTab() {
                     Actions
                 </div>
             </div>
-            <VList class="flex-1" role="rowgroup">
-                {sorted_positions.map((pos) => (
-                    <PositionRow key={pos.id} position={pos} is_private={is_private} />
-                ))}
-            </VList>
+            <div class="flex-1" role="rowgroup">
+                <VList style={{ height: '100%' }}>
+                    {sorted_positions.map((pos) => (
+                        <PositionRow key={pos.id} position={pos} is_private={is_private} />
+                    ))}
+                </VList>
+            </div>
         </div>
     );
 }

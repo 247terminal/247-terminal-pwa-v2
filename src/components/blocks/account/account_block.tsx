@@ -4,7 +4,11 @@ import { PositionsTab } from './positions_tab';
 import { OrdersTab } from './orders_tab';
 import { HistoryTab } from './history_tab';
 
-export function AccountBlock() {
+interface AccountBlockProps {
+    on_remove?: () => void;
+}
+
+export function AccountBlock(_props: AccountBlockProps) {
     const current_tab = active_tab.value;
 
     return (

@@ -1,6 +1,5 @@
 import { useCallback } from 'preact/hooks';
 import type {
-    SizeUnit,
     PriceDistribution,
     SizeDistribution,
     PriceInputProps,

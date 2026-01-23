@@ -9,7 +9,17 @@ import type {
 import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
 import { bybit as sym } from '../symbol_utils';
 
-export type BybitExchange = InstanceType<typeof bybit>;
+type BaseBybitExchange = InstanceType<typeof bybit>;
+
+export interface BybitExchange extends BaseBybitExchange {
+    privateGetV5PositionList(params: Record<string, unknown>): Promise<unknown>;
+    privateGetV5AccountWalletBalance(params: Record<string, unknown>): Promise<unknown>;
+    privateGetV5OrderRealtime(params: Record<string, unknown>): Promise<unknown>;
+    privateGetV5PositionClosedPnl(params: Record<string, unknown>): Promise<unknown>;
+    privateGetV5ExecutionList(params: Record<string, unknown>): Promise<unknown>;
+    privatePostV5OrderCancel(params: Record<string, unknown>): Promise<unknown>;
+    privatePostV5OrderCancelAll(params: Record<string, unknown>): Promise<unknown>;
+}
 
 interface BybitPositionResponse {
     result?: {
@@ -249,7 +259,7 @@ export async function fetch_closed_positions(
                 endTime,
                 limit: Math.min(limit, 100),
             })
-            .then((r) => (r as BybitClosedPnlResponse)?.result?.list ?? [])
+            .then((r: unknown) => (r as BybitClosedPnlResponse)?.result?.list ?? [])
             .catch(() => [] as NonNullable<BybitClosedPnlResponse['result']>['list']);
     });
 
@@ -261,7 +271,7 @@ export async function fetch_closed_positions(
     const count = Math.min(list.length, limit);
     const result: RawClosedPosition[] = new Array(count);
     for (let i = 0; i < count; i++) {
-        const p = list[i];
+        const p = list[i]!;
         result[i] = {
             symbol: sym.toUnified(p.symbol),
             side: p.side === 'Buy' ? 'long' : 'short',

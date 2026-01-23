@@ -4,7 +4,7 @@ import { EXCHANGE_ORDER, type ExchangeId } from '../../../types/exchange.types';
 import type {
     TradeFilterType,
     TradeListItem,
-    TradeTradeSymbolWithExchange,
+    TradeSymbolWithExchange,
     TradeExchangeSymbols,
     SymbolRowItemProps,
     SymbolSelectorProps,

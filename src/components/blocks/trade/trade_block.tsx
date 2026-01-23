@@ -12,7 +12,11 @@ import { OrderSummary } from './order_summary';
 import { OrderButtons } from './order_buttons';
 import type { ExchangeSymbols } from './symbol_selector';
 
-export function TradeBlock() {
+interface TradeBlockProps {
+    on_remove?: () => void;
+}
+
+export function TradeBlock(_props: TradeBlockProps) {
     const order_type = selected_order_type.value;
     const current_markets = markets.value;
     const connection_status = exchange_connection_status.value;

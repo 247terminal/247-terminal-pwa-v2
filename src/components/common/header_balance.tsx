@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useEffect, useCallback } from 'preact/hooks'
 import { Wallet } from 'lucide-preact';
 import { exchange_connection_status, has_connected_exchange } from '@/stores/credentials_store';
 import { balances, total_balance, total_available, privacy_mode } from '@/stores/account_store';
-import { EXCHANGE_ORDER, EXCHANGE_DISPLAY_NAMES, type ExchangeId } from '@/types/exchange.types';
+import { EXCHANGE_ORDER, EXCHANGE_DISPLAY_NAMES } from '@/types/exchange.types';
 import { get_exchange_icon } from './exchanges';
 import { mask_value, format_usd_full } from '@/utils/account_format';
 

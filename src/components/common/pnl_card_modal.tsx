@@ -14,7 +14,7 @@ import { PNL_CARD_CONSTANTS } from '@/config/pnl_card.constants';
 import type { MarketData } from '@/types/chart.types';
 import type { PnlCardRenderData } from '@/types/pnl_card.types';
 
-function get_clean_symbol(market: MarketData | undefined, symbol: string): string {
+function get_clean_symbol(market: MarketData | null | undefined, symbol: string): string {
     if (market?.base && market?.quote) {
         return `${market.base}${market.quote}`.toUpperCase();
     }

@@ -9,7 +9,11 @@ import type {
 import { HYPERLIQUID_CACHE_TTL, EXCHANGE_CONFIG } from '@/config';
 import { hyperliquid as sym } from '../symbol_utils';
 
-export type HyperliquidExchange = InstanceType<typeof hyperliquid>;
+type BaseHyperliquidExchange = InstanceType<typeof hyperliquid>;
+
+export interface HyperliquidExchange extends BaseHyperliquidExchange {
+    publicPostInfo(params: Record<string, unknown>): Promise<unknown>;
+}
 
 interface ClearinghouseState {
     marginSummary?: { accountValue?: string; totalMarginUsed?: string };

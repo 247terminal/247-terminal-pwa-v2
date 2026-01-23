@@ -309,16 +309,20 @@ export function HistoryTab() {
                     flex
                 />
             </div>
-            <VList class="flex-1" role="rowgroup">
-                {sorted_trades.map((trade) => (
-                    <HistoryRow
-                        key={trade.id}
-                        trade={trade}
-                        is_private={is_private}
-                        fetched_leverage={leverages.value[trade.exchange]?.[trade.symbol] ?? null}
-                    />
-                ))}
-            </VList>
+            <div class="flex-1" role="rowgroup">
+                <VList style={{ height: '100%' }}>
+                    {sorted_trades.map((trade) => (
+                        <HistoryRow
+                            key={trade.id}
+                            trade={trade}
+                            is_private={is_private}
+                            fetched_leverage={
+                                leverages.value[trade.exchange]?.[trade.symbol] ?? null
+                            }
+                        />
+                    ))}
+                </VList>
+            </div>
         </div>
     );
 }

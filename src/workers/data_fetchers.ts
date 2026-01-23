@@ -137,11 +137,11 @@ export async function loadMarkets(exchangeId: ExchangeId): Promise<Record<string
         return markets;
     };
 
-    if (marketCache[exchangeId]) {
+    if (exchangeId in marketCache) {
         return assignToCurrentExchange(marketCache[exchangeId]);
     }
 
-    if (marketLoadPromises[exchangeId]) {
+    if (exchangeId in marketLoadPromises) {
         return marketLoadPromises[exchangeId].then(assignToCurrentExchange);
     }
 
@@ -195,13 +195,13 @@ export async function fetchBinanceMaxLeverage(): Promise<Record<string, number>>
     }
 
     const exchange = exchanges.binance;
-    if (!exchange || !exchangeCredentials.binance) {
+    if (!exchange || !exchangeCredentials.binance || !exchange.fapiPrivateGetLeverageBracket) {
         return binanceMaxLeverageCache;
     }
 
     binanceLeveragePromise = (async () => {
         try {
-            const response = await exchange.fapiPrivateGetLeverageBracket();
+            const response = await exchange.fapiPrivateGetLeverageBracket!();
             if (!Array.isArray(response)) return;
 
             for (const item of response as BinanceLeverageBracket[]) {

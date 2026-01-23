@@ -1,19 +1,12 @@
 import { useCallback } from 'preact/hooks';
 import type { SizeUnit } from '../../../types/trade.types';
-import {
-    trade_state,
-    update_limit_form,
-    fill_last_price,
-    current_market,
-} from '../../../stores/trade_store';
+import { trade_state, update_limit_form, fill_last_price } from '../../../stores/trade_store';
 import { PriceInput, QuantityInput, ToggleInput } from './trade_inputs';
 import { parse_symbol } from '../../chart/symbol_row';
 
 export function LimitForm() {
     const form = trade_state.value.limit;
     const symbol = trade_state.value.symbol;
-    const market = current_market.value;
-    const tick_size = market?.tick_size ?? 0.01;
     const { base } = parse_symbol(symbol);
 
     const handle_price_change = useCallback((value: string) => {

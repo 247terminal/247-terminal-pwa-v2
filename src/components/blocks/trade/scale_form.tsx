@@ -1,11 +1,6 @@
 import { useCallback } from 'preact/hooks';
 import type { PriceDistribution, SizeDistribution } from '../../../types/trade.types';
-import {
-    trade_state,
-    update_scale_form,
-    fill_last_price,
-    current_market,
-} from '../../../stores/trade_store';
+import { trade_state, update_scale_form, fill_last_price } from '../../../stores/trade_store';
 import {
     PriceInput,
     SliderInput,
@@ -18,8 +13,6 @@ import {
 
 export function ScaleForm() {
     const form = trade_state.value.scale;
-    const market = current_market.value;
-    const tick_size = market?.tick_size ?? 0.01;
 
     const handle_price_from_change = useCallback((value: string) => {
         update_scale_form({ price_from: value });
