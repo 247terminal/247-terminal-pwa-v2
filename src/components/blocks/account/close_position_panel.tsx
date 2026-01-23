@@ -1,5 +1,6 @@
 import { memo } from 'preact/compat';
 import { useState, useCallback, useRef, useEffect } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import type { Position } from '../../../types/account.types';
 import { close_position } from '../../../stores/account_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
@@ -13,11 +14,13 @@ const DECIMAL_REGEX = /^\d*\.?\d*$/;
 
 interface ClosePositionPanelProps {
     position: Position;
+    anchor_rect: DOMRect;
     on_close: () => void;
 }
 
 export const ClosePositionPanel = memo(function ClosePositionPanel({
     position,
+    anchor_rect,
     on_close,
 }: ClosePositionPanelProps) {
     const [order_type, set_order_type] = useState<CloseOrderType>('market');
@@ -84,10 +87,19 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
     const close_size = position.size * (percentage / 100);
     const close_value = close_size * current_price;
 
-    return (
+    const panel_width = 208;
+    const panel_style = {
+        position: 'fixed' as const,
+        top: `${anchor_rect.bottom + 4}px`,
+        left: `${Math.max(8, anchor_rect.right - panel_width)}px`,
+        zIndex: 9999,
+    };
+
+    return createPortal(
         <div
             ref={panel_ref}
-            class="absolute right-0 top-full mt-1 z-50 w-52 bg-base-200 border border-base-300 rounded-lg shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-150"
+            class="w-52 bg-base-200 border border-base-300 rounded-lg shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-150"
+            style={panel_style}
             role="dialog"
             aria-label="Close position options"
         >
@@ -170,6 +182,7 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
                     )}
                 </button>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 });

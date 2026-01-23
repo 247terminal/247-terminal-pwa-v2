@@ -1,5 +1,5 @@
 import { memo } from 'preact/compat';
-import { useState, useMemo, useCallback } from 'preact/hooks';
+import { useState, useMemo, useCallback, useRef } from 'preact/hooks';
 import { VList } from 'virtua';
 import type {
     Position,
@@ -26,7 +26,8 @@ import { SortHeader } from './sort_header';
 import { ClosePositionPanel } from './close_position_panel';
 
 const PositionRow = memo(function PositionRow({ position, is_private }: PositionRowProps) {
-    const [show_close_panel, set_show_close_panel] = useState(false);
+    const [close_panel_rect, set_close_panel_rect] = useState<DOMRect | null>(null);
+    const close_button_ref = useRef<HTMLButtonElement>(null);
     const is_long = position.side === 'long';
     const market = get_market(position.exchange, position.symbol);
     const tick_size = market?.tick_size ?? 0.01;
@@ -45,11 +46,15 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
     const pnl_color = pnl >= 0 ? 'text-success' : 'text-error';
 
     const handle_toggle_close_panel = useCallback(() => {
-        set_show_close_panel((prev) => !prev);
-    }, []);
+        if (close_panel_rect) {
+            set_close_panel_rect(null);
+        } else if (close_button_ref.current) {
+            set_close_panel_rect(close_button_ref.current.getBoundingClientRect());
+        }
+    }, [close_panel_rect]);
 
     const handle_close_panel_dismiss = useCallback(() => {
-        set_show_close_panel(false);
+        set_close_panel_rect(null);
     }, []);
 
     const handle_tpsl = useCallback(() => {
@@ -143,7 +148,7 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 </button>
             )}
 
-            <div class="flex-1 flex justify-end gap-1 relative" role="cell">
+            <div class="flex-1 flex justify-end gap-1" role="cell">
                 <button
                     type="button"
                     onClick={handle_tpsl}
@@ -153,20 +158,25 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                     TP/SL
                 </button>
                 <button
+                    ref={close_button_ref}
                     type="button"
                     onClick={handle_toggle_close_panel}
                     class={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
-                        show_close_panel
+                        close_panel_rect
                             ? 'bg-error text-error-content'
                             : 'bg-error/20 hover:bg-error/40 text-error'
                     }`}
                     aria-label={`Close ${format_symbol(position.symbol)} position`}
-                    aria-expanded={show_close_panel}
+                    aria-expanded={!!close_panel_rect}
                 >
                     Close
                 </button>
-                {show_close_panel && (
-                    <ClosePositionPanel position={position} on_close={handle_close_panel_dismiss} />
+                {close_panel_rect && (
+                    <ClosePositionPanel
+                        position={position}
+                        anchor_rect={close_panel_rect}
+                        on_close={handle_close_panel_dismiss}
+                    />
                 )}
             </div>
         </div>
