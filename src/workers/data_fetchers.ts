@@ -20,6 +20,9 @@ export function registerExchangeClass(name: string, cls: ExchangeClassType): voi
 
 const exchanges: Record<string, CcxtExchange> = {};
 const exchangeCredentials: Record<string, ExchangeAuthParams> = {};
+const marketCache: Record<string, Record<string, CcxtMarket>> = {};
+const marketsByIdCache: Record<string, Record<string, CcxtMarket>> = {};
+const marketLoadPromises: Record<string, Promise<Record<string, CcxtMarket>>> = {};
 
 function getProxyOptions(exchangeId: ExchangeId): {
     proxy?: string;
@@ -80,17 +83,11 @@ function hasMarkets(markets: Record<string, CcxtMarket> | undefined): boolean {
 function replaceExchangeInstance(exchangeId: ExchangeId, credentials?: ExchangeAuthParams): void {
     const oldExchange = exchanges[exchangeId];
 
-    if (oldExchange?.close) {
-        oldExchange.close().catch((err) => {
-            console.error('failed to close exchange:', exchangeId, (err as Error).message);
-        });
-    }
-
     const newExchange = createExchangeInstance(exchangeId, credentials);
 
-    if (hasMarkets(oldExchange?.markets)) {
-        newExchange.markets = oldExchange.markets;
-        newExchange.markets_by_id = oldExchange.markets_by_id || {};
+    if (marketCache[exchangeId]) {
+        newExchange.markets = marketCache[exchangeId];
+        newExchange.markets_by_id = marketsByIdCache[exchangeId] || {};
     }
 
     exchanges[exchangeId] = newExchange;
@@ -99,6 +96,12 @@ function replaceExchangeInstance(exchangeId: ExchangeId, credentials?: ExchangeA
         exchangeCredentials[exchangeId] = credentials;
     } else {
         delete exchangeCredentials[exchangeId];
+    }
+
+    if (oldExchange?.close) {
+        oldExchange.close().catch((err) => {
+            console.error('failed to close exchange:', exchangeId, (err as Error).message);
+        });
     }
 }
 
@@ -122,11 +125,37 @@ export function isExchangeAuthenticated(exchangeId: ExchangeId): boolean {
 }
 
 export async function loadMarkets(exchangeId: ExchangeId): Promise<Record<string, CcxtMarket>> {
-    const exchange = getExchange(exchangeId);
-    if (!hasMarkets(exchange.markets)) {
-        await exchange.loadMarkets();
+    const assignToCurrentExchange = (markets: Record<string, CcxtMarket>) => {
+        const exchange = exchanges[exchangeId];
+        if (exchange && !hasMarkets(exchange.markets)) {
+            exchange.markets = markets;
+            exchange.markets_by_id = marketsByIdCache[exchangeId] || {};
+        }
+        return markets;
+    };
+
+    if (marketCache[exchangeId]) {
+        return assignToCurrentExchange(marketCache[exchangeId]);
     }
-    return exchange.markets;
+
+    if (marketLoadPromises[exchangeId]) {
+        return marketLoadPromises[exchangeId].then(assignToCurrentExchange);
+    }
+
+    const exchange = getExchange(exchangeId);
+
+    marketLoadPromises[exchangeId] = exchange
+        .loadMarkets()
+        .then((markets) => {
+            marketCache[exchangeId] = markets;
+            marketsByIdCache[exchangeId] = exchange.markets_by_id || {};
+            return markets;
+        })
+        .finally(() => {
+            delete marketLoadPromises[exchangeId];
+        });
+
+    return marketLoadPromises[exchangeId].then(assignToCurrentExchange);
 }
 
 export function isLinearSwap(market: CcxtMarket): boolean {
