@@ -189,6 +189,10 @@ export function cancel_order(
     return sendRequest<boolean>('CANCEL_ORDER', { exchangeId, orderId, symbol, category });
 }
 
+export function cancel_all_orders_api(exchangeId: ExchangeId, symbol?: string): Promise<number> {
+    return sendRequest<number>('CANCEL_ALL_ORDERS', { exchangeId, symbol });
+}
+
 export function close_position_api(
     exchangeId: ExchangeId,
     params: Omit<ClosePositionParams, 'position_mode'>

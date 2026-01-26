@@ -105,6 +105,68 @@ interface BinanceSymbolConfig {
     maxNotionalValue: string;
 }
 
+interface CcxtOrder {
+    symbol: string;
+    type: 'market' | 'limit';
+    side: 'buy' | 'sell';
+    amount: number;
+    price?: number;
+    params: Record<string, unknown>;
+}
+
+async function execute_batch_orders(
+    exchange: BinanceExchange,
+    orders: CcxtOrder[],
+    log_prefix: string
+): Promise<{ success: number; failed: number }> {
+    if (orders.length === 0) {
+        return { success: 0, failed: 0 };
+    }
+
+    const batch_size = ORDER_BATCH_CONSTANTS.BINANCE_BATCH_SIZE;
+    const batches: CcxtOrder[][] = [];
+    for (let i = 0; i < orders.length; i += batch_size) {
+        batches.push(orders.slice(i, i + batch_size));
+    }
+
+    const batch_results = await Promise.all(
+        batches.map((batch) =>
+            exchange
+                .createOrders(batch)
+                .then((results) => {
+                    let success = 0;
+                    let failed = 0;
+                    if (Array.isArray(results)) {
+                        for (const r of results) {
+                            if (r && r.id && !('error' in r)) {
+                                success++;
+                            } else {
+                                failed++;
+                            }
+                        }
+                    } else {
+                        console.warn(`${log_prefix}: unexpected response format`);
+                        failed = batch.length;
+                    }
+                    return { success, failed };
+                })
+                .catch((err) => {
+                    console.error(`${log_prefix}:`, (err as Error).message);
+                    return { success: 0, failed: batch.length };
+                })
+        )
+    );
+
+    let success_count = 0;
+    let failed_count = 0;
+    for (const r of batch_results) {
+        success_count += r.success;
+        failed_count += r.failed;
+    }
+
+    return { success: success_count, failed: failed_count };
+}
+
 const is_balance_array = (data: unknown): data is BinanceBalance[] =>
     isArrayWithProperty(data, 'asset');
 
@@ -480,7 +542,6 @@ export async function close_position(
 ): Promise<boolean> {
     const binance_symbol = sym.fromUnified(params.symbol);
     const close_size = params.size * (params.percentage / 100);
-    const order_side = params.side === 'long' ? 'SELL' : 'BUY';
 
     if (!close_size || close_size <= 0 || !isFinite(close_size)) {
         throw new Error('invalid close size');
@@ -494,45 +555,46 @@ export async function close_position(
         throw new Error('no quantities to close');
     }
 
-    const orders = quantities.map((qty) => {
-        const order: Record<string, string> = {
+    const order_params: Record<string, unknown> = {
+        reduceOnly: true,
+    };
+
+    if (params.order_type === 'limit') {
+        order_params.timeInForce = 'GTC';
+    }
+
+    if (params.position_mode === 'hedge') {
+        order_params.positionSide = params.side === 'long' ? 'LONG' : 'SHORT';
+        delete order_params.reduceOnly;
+    }
+
+    const order_type = params.order_type === 'market' ? 'market' : 'limit';
+    const order_side = params.side === 'long' ? 'sell' : 'buy';
+
+    const ccxt_orders = quantities.map((qty) => {
+        const order: CcxtOrder = {
             symbol: binance_symbol,
+            type: order_type,
             side: order_side,
-            type: params.order_type === 'market' ? 'MARKET' : 'LIMIT',
-            quantity: round_quantity_string(qty, params.qty_step),
-            reduceOnly: 'true',
+            amount: round_quantity(qty, params.qty_step),
+            params: order_params,
         };
 
         if (params.order_type === 'limit' && params.limit_price) {
-            order.price = String(params.limit_price);
-            order.timeInForce = 'GTC';
-        }
-
-        if (params.position_mode === 'hedge') {
-            order.positionSide = params.side === 'long' ? 'LONG' : 'SHORT';
-            delete order.reduceOnly;
+            order.price = params.limit_price;
         }
 
         return order;
     });
 
-    const results = await Promise.all(
-        orders.map((order) =>
-            exchange
-                .fapiPrivatePostOrder(order)
-                .then(() => ({ success: true, error: null }))
-                .catch((err) => {
-                    console.error('binance order failed:', (err as Error).message);
-                    return { success: false, error: err as Error };
-                })
-        )
+    const { failed } = await execute_batch_orders(
+        exchange,
+        ccxt_orders,
+        'binance close order failed'
     );
 
-    const failed = results.filter((r) => !r.success);
-    if (failed.length > 0) {
-        const first_error = failed.find((r) => r.error)?.error;
-        if (first_error) throw first_error;
-        throw new Error(`${failed.length}/${orders.length} orders failed`);
+    if (failed > 0) {
+        throw new Error(`${failed}/${ccxt_orders.length} orders failed`);
     }
 
     return true;
@@ -543,7 +605,6 @@ export async function place_market_order(
     params: MarketOrderParams
 ): Promise<boolean> {
     const binance_symbol = sym.fromUnified(params.symbol);
-    const order_side = params.side === 'buy' ? 'BUY' : 'SELL';
 
     if (!params.size || params.size <= 0 || !isFinite(params.size)) {
         throw new Error('invalid order size');
@@ -566,51 +627,50 @@ export async function place_market_order(
         limit_price = params.current_price * slippage_multiplier;
     }
 
-    const orders = quantities.map((qty) => {
-        const order: Record<string, string> = {
+    const order_params: Record<string, unknown> = {};
+
+    if (is_limit_ioc) {
+        order_params.timeInForce = 'IOC';
+    }
+
+    if (params.reduce_only) {
+        order_params.reduceOnly = true;
+    }
+
+    if (params.position_mode === 'hedge') {
+        order_params.positionSide = params.side === 'buy' ? 'LONG' : 'SHORT';
+        if (params.reduce_only) {
+            order_params.positionSide = params.side === 'buy' ? 'SHORT' : 'LONG';
+        }
+        delete order_params.reduceOnly;
+    }
+
+    const order_type = is_limit_ioc ? 'limit' : 'market';
+
+    const ccxt_orders = quantities.map((qty) => {
+        const order: CcxtOrder = {
             symbol: binance_symbol,
-            side: order_side,
-            type: is_limit_ioc ? 'LIMIT' : 'MARKET',
-            quantity: round_quantity_string(qty, params.qty_step),
+            type: order_type,
+            side: params.side,
+            amount: round_quantity(qty, params.qty_step),
+            params: order_params,
         };
 
         if (is_limit_ioc && limit_price) {
-            order.price = String(limit_price);
-            order.timeInForce = 'IOC';
-        }
-
-        if (params.reduce_only) {
-            order.reduceOnly = 'true';
-        }
-
-        if (params.position_mode === 'hedge') {
-            order.positionSide = params.side === 'buy' ? 'LONG' : 'SHORT';
-            if (params.reduce_only) {
-                order.positionSide = params.side === 'buy' ? 'SHORT' : 'LONG';
-            }
-            delete order.reduceOnly;
+            order.price = limit_price;
         }
 
         return order;
     });
 
-    const results = await Promise.all(
-        orders.map((order) =>
-            exchange
-                .fapiPrivatePostOrder(order)
-                .then(() => ({ success: true, error: null }))
-                .catch((err) => {
-                    console.error('binance order failed:', (err as Error).message);
-                    return { success: false, error: err as Error };
-                })
-        )
+    const { failed } = await execute_batch_orders(
+        exchange,
+        ccxt_orders,
+        'binance market order failed'
     );
 
-    const failed = results.filter((r) => !r.success);
-    if (failed.length > 0) {
-        const first_error = failed.find((r) => r.error)?.error;
-        if (first_error) throw first_error;
-        throw new Error(`${failed.length}/${orders.length} orders failed`);
+    if (failed > 0) {
+        throw new Error(`${failed}/${ccxt_orders.length} orders failed`);
     }
 
     return true;

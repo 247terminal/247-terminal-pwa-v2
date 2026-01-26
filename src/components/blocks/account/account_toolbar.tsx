@@ -22,6 +22,8 @@ import {
     loading,
     refresh_all_accounts,
     cancel_all_orders,
+    close_all_positions,
+    nuke_all,
 } from '../../../stores/account_store';
 import { exchange_connection_status } from '../../../stores/credentials_store';
 
@@ -80,10 +82,36 @@ function NukeMenu() {
                 }
                 break;
             }
-            case 'all':
-            case 'longs':
-            case 'shorts':
+            case 'all': {
+                const result = await nuke_all();
+                const { positions_closed, orders_cancelled } = result;
+                if (positions_closed > 0 || orders_cancelled > 0) {
+                    toast.success(
+                        `Closed ${positions_closed} position${positions_closed !== 1 ? 's' : ''}, cancelled ${orders_cancelled} order${orders_cancelled !== 1 ? 's' : ''}`
+                    );
+                } else {
+                    toast.error('Nothing to close');
+                }
                 break;
+            }
+            case 'longs': {
+                const result = await close_all_positions('long');
+                if (result.closed > 0) {
+                    toast.success(`Closed ${result.closed} long${result.closed !== 1 ? 's' : ''}`);
+                } else {
+                    toast.error('No longs to close');
+                }
+                break;
+            }
+            case 'shorts': {
+                const result = await close_all_positions('short');
+                if (result.closed > 0) {
+                    toast.success(`Closed ${result.closed} short${result.closed !== 1 ? 's' : ''}`);
+                } else {
+                    toast.error('No shorts to close');
+                }
+                break;
+            }
         }
     }, []);
 

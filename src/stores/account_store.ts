@@ -8,6 +8,7 @@ import {
     fetch_orders as fetch_orders_api,
     fetch_closed_positions as fetch_closed_positions_api,
     cancel_order as cancel_order_api,
+    cancel_all_orders_api,
     close_position_api,
     place_market_order_api,
     place_limit_order_api,
@@ -383,33 +384,69 @@ export async function cancel_all_orders(exchange_ids?: ExchangeId[]): Promise<nu
         Array.from(new Set(Array.from(orders.value.values()).map((o) => o.exchange)));
     if (targets.length === 0) return 0;
 
-    const target_set = new Set(targets);
-    const orders_to_cancel = Array.from(orders.value.values()).filter((o) =>
-        target_set.has(o.exchange)
+    const results = await Promise.all(
+        targets.map((exchange_id) =>
+            cancel_all_orders_api(exchange_id).catch((err) => {
+                console.error(`failed to cancel orders on ${exchange_id}:`, (err as Error).message);
+                return 0;
+            })
+        )
     );
-    if (orders_to_cancel.length === 0) return 0;
 
-    const cancelled_ids: string[] = [];
-    await Promise.all(
-        orders_to_cancel.map((o) =>
-            cancel_order_api(o.exchange, o.id, o.symbol, o.category)
-                .then(() => {
-                    cancelled_ids.push(o.id);
-                })
+    const total_cancelled = results.reduce((sum, count) => sum + count, 0);
+
+    targets.forEach((exchange_id) =>
+        refresh_orders(exchange_id).catch((err) =>
+            console.error(`failed to refresh orders on ${exchange_id}:`, (err as Error).message)
+        )
+    );
+
+    return total_cancelled;
+}
+
+export async function close_all_positions(
+    side_filter?: 'long' | 'short'
+): Promise<{ closed: number; failed: number }> {
+    const all_positions = Array.from(positions.value.values());
+    const filtered = side_filter
+        ? all_positions.filter((p) => p.side === side_filter)
+        : all_positions;
+
+    if (filtered.length === 0) {
+        return { closed: 0, failed: 0 };
+    }
+
+    const results = await Promise.all(
+        filtered.map((p) =>
+            close_position(p.exchange, p.symbol, 100, 'market')
+                .then(() => ({ success: true, id: p.id }))
                 .catch((err) => {
-                    console.error('failed to cancel order:', (err as Error).message);
-                    return null;
+                    console.error(`failed to close ${p.symbol}:`, (err as Error).message);
+                    return { success: false, id: p.id };
                 })
         )
     );
 
-    if (cancelled_ids.length > 0) {
-        const map = new Map(orders.value);
-        for (const id of cancelled_ids) map.delete(id);
-        orders.value = map;
+    let closed = 0;
+    let failed = 0;
+    for (const r of results) {
+        if (r.success) closed++;
+        else failed++;
     }
 
-    return cancelled_ids.length;
+    return { closed, failed };
+}
+
+export async function nuke_all(): Promise<{ positions_closed: number; orders_cancelled: number }> {
+    const [position_result, orders_cancelled] = await Promise.all([
+        close_all_positions(),
+        cancel_all_orders(),
+    ]);
+
+    return {
+        positions_closed: position_result.closed,
+        orders_cancelled,
+    };
 }
 
 export async function close_position(

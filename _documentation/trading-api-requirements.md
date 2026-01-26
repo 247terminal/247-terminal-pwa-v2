@@ -910,4 +910,3 @@ Auth: EIP-712 signature (r, s, v) + nonce
 ### TODO:
 
 1. Connect slippage value from settings to market order placement.
-2. Batch order cancelling.
