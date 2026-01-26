@@ -1,5 +1,6 @@
 import bybit from 'ccxt/js/src/bybit.js';
 import type { ExchangeValidationResult } from './types';
+import { get_auth_error_message } from './index';
 
 interface BybitCredentials {
     api_key: string;
@@ -28,7 +29,7 @@ export async function validate_bybit(
 
         return { valid: true, error: null, balance: usdt_balance };
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'validation failed';
+        const message = get_auth_error_message(err, 'api_key_secret');
         return { valid: false, error: message };
     }
 }

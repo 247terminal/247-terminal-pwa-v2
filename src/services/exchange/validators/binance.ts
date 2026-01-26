@@ -1,6 +1,7 @@
 import binanceusdm from 'ccxt/js/src/binanceusdm.js';
 import { PROXY_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
+import { get_auth_error_message } from './index';
 
 interface BinanceCredentials {
     api_key: string;
@@ -29,7 +30,7 @@ export async function validate_binance(
 
         return { valid: true, error: null, balance: usdt_balance };
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'validation failed';
+        const message = get_auth_error_message(err, 'api_key_secret');
         return { valid: false, error: message };
     }
 }

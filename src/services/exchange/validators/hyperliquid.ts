@@ -1,5 +1,6 @@
 import hyperliquid from 'ccxt/js/src/hyperliquid.js';
 import type { ExchangeValidationResult } from './types';
+import { get_auth_error_message } from './index';
 
 interface HyperliquidCredentials {
     wallet_address: string;
@@ -39,7 +40,7 @@ export async function validate_hyperliquid(
 
         return { valid: true, error: null, balance: usdt_balance };
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'validation failed';
+        const message = get_auth_error_message(err, 'wallet_private_key');
         return { valid: false, error: message };
     }
 }

@@ -1,6 +1,7 @@
 import blofin from 'ccxt/js/src/blofin.js';
 import { PROXY_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
+import { get_auth_error_message } from './index';
 
 interface BlofinCredentials {
     api_key: string;
@@ -33,7 +34,7 @@ export async function validate_blofin(
 
         return { valid: true, error: null, balance: usdt_balance };
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'validation failed';
+        const message = get_auth_error_message(err, 'api_key_secret_passphrase');
         return { valid: false, error: message };
     }
 }
