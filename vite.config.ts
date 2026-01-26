@@ -26,24 +26,17 @@ export default defineConfig({
             'socks-proxy-agent': resolve(__dirname, './src/workers/stubs/empty.ts'),
             'https-proxy-agent': resolve(__dirname, './src/workers/stubs/empty.ts'),
             'http-proxy-agent': resolve(__dirname, './src/workers/stubs/empty.ts'),
-            // Direct CCXT Pro imports for tree-shaking
-            // If build fails after major CCXT update, revert to `import { pro } from 'ccxt'`
-            'ccxt/js/src/pro/binanceusdm.js': resolve(
-                __dirname,
-                './node_modules/ccxt/js/src/pro/binanceusdm.js'
-            ),
-            'ccxt/js/src/pro/blofin.js': resolve(
-                __dirname,
-                './node_modules/ccxt/js/src/pro/blofin.js'
-            ),
-            'ccxt/js/src/pro/bybit.js': resolve(
-                __dirname,
-                './node_modules/ccxt/js/src/pro/bybit.js'
-            ),
-            'ccxt/js/src/pro/hyperliquid.js': resolve(
-                __dirname,
-                './node_modules/ccxt/js/src/pro/hyperliquid.js'
-            ),
+            // Direct CCXT imports for tree-shaking (only bundle used exchanges)
+            // REST API versions (for validators)
+            'ccxt/js/src/binanceusdm.js': resolve(__dirname, './node_modules/ccxt/js/src/binanceusdm.js'),
+            'ccxt/js/src/blofin.js': resolve(__dirname, './node_modules/ccxt/js/src/blofin.js'),
+            'ccxt/js/src/bybit.js': resolve(__dirname, './node_modules/ccxt/js/src/bybit.js'),
+            'ccxt/js/src/hyperliquid.js': resolve(__dirname, './node_modules/ccxt/js/src/hyperliquid.js'),
+            // Pro/WebSocket versions (for worker)
+            'ccxt/js/src/pro/binanceusdm.js': resolve(__dirname, './node_modules/ccxt/js/src/pro/binanceusdm.js'),
+            'ccxt/js/src/pro/blofin.js': resolve(__dirname, './node_modules/ccxt/js/src/pro/blofin.js'),
+            'ccxt/js/src/pro/bybit.js': resolve(__dirname, './node_modules/ccxt/js/src/pro/bybit.js'),
+            'ccxt/js/src/pro/hyperliquid.js': resolve(__dirname, './node_modules/ccxt/js/src/pro/hyperliquid.js'),
         },
     },
     server: {
@@ -67,7 +60,6 @@ export default defineConfig({
         plugins: () => [nodePolyfills(nodePolyfillsConfig)],
     },
     optimizeDeps: {
-        include: ['ccxt'],
         esbuildOptions: {
             define: {
                 global: 'globalThis',

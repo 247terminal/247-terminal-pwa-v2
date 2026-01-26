@@ -1,10 +1,14 @@
-import * as ccxt from 'ccxt';
-import { privateKeyToAccount } from 'viem/accounts';
+import hyperliquid from 'ccxt/js/src/hyperliquid.js';
 import type { ExchangeValidationResult } from './types';
 
 interface HyperliquidCredentials {
     wallet_address: string;
     private_key: string;
+}
+
+function is_valid_private_key(key: string): boolean {
+    const hex = key.startsWith('0x') ? key.slice(2) : key;
+    return /^[a-fA-F0-9]{64}$/.test(hex);
 }
 
 export async function validate_hyperliquid(
@@ -17,9 +21,12 @@ export async function validate_hyperliquid(
 
     try {
         const formatted_key = private_key.startsWith('0x') ? private_key : `0x${private_key}`;
-        privateKeyToAccount(formatted_key as `0x${string}`);
 
-        const exchange = new ccxt.hyperliquid({
+        if (!is_valid_private_key(formatted_key)) {
+            return { valid: false, error: 'invalid private key format' };
+        }
+
+        const exchange = new hyperliquid({
             walletAddress: wallet_address,
             privateKey: formatted_key,
         });

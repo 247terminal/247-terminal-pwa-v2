@@ -1,4 +1,4 @@
-import * as ccxt from 'ccxt';
+import blofin from 'ccxt/js/src/blofin.js';
 import { PROXY_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
@@ -17,7 +17,7 @@ export async function validate_blofin(
         return { valid: false, error: 'api key, secret, and passphrase are required' };
 
     const proxy = PROXY_CONFIG.blofin;
-    const exchange = new ccxt.blofin({
+    const exchange = new blofin({
         apiKey: api_key,
         secret: api_secret,
         password: passphrase,

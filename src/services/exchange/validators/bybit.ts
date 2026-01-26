@@ -1,4 +1,4 @@
-import * as ccxt from 'ccxt';
+import bybit from 'ccxt/js/src/bybit.js';
 import type { ExchangeValidationResult } from './types';
 
 interface BybitCredentials {
@@ -13,7 +13,7 @@ export async function validate_bybit(
 
     if (!api_key || !api_secret) return { valid: false, error: 'api key and secret are required' };
 
-    const exchange = new ccxt.bybit({
+    const exchange = new bybit({
         apiKey: api_key,
         secret: api_secret,
     });

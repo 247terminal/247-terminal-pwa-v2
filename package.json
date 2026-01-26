@@ -25,7 +25,6 @@
         "react-grid-layout": "^2.2.2",
         "rxjs": "^7.8.2",
         "sonner": "^2.0.7",
-        "viem": "^2.44.4",
         "virtua": "^0.48.3"
     },
     "devDependencies": {

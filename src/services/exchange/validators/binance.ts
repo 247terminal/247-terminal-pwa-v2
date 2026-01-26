@@ -1,4 +1,4 @@
-import * as ccxt from 'ccxt';
+import binanceusdm from 'ccxt/js/src/binanceusdm.js';
 import { PROXY_CONFIG } from '@/config';
 import type { ExchangeValidationResult } from './types';
 
@@ -15,7 +15,7 @@ export async function validate_binance(
     if (!api_key || !api_secret) return { valid: false, error: 'api key and secret are required' };
 
     const proxy = PROXY_CONFIG.binance;
-    const exchange = new ccxt.binanceusdm({
+    const exchange = new binanceusdm({
         apiKey: api_key,
         secret: api_secret,
         proxy: proxy?.url,

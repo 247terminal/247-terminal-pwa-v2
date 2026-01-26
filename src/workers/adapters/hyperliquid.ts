@@ -365,7 +365,7 @@ export async function cancel_all_orders(
 
     await Promise.all(
         Object.entries(by_coin).map(([coin, ids]) =>
-            exchange.cancelOrders(ids, sym.toUnified(coin)).catch((err) => {
+            exchange.cancelOrders(ids, sym.toUnified(coin)).catch((err: unknown) => {
                 console.error('failed to cancel orders:', (err as Error).message);
                 return null;
             })
@@ -452,7 +452,7 @@ export async function place_market_order(
                     order_params
                 )
                 .then(() => ({ success: true, error: null }))
-                .catch((err) => {
+                .catch((err: unknown) => {
                     console.error('hyperliquid order failed:', (err as Error).message);
                     return { success: false, error: err as Error };
                 })
