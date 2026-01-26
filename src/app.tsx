@@ -63,6 +63,12 @@ export function App() {
             <Toaster
                 theme={current_theme.value === 'terminal-dark' ? 'dark' : 'light'}
                 closeButton
+                toastOptions={{
+                    style: {
+                        background: current_theme.value === 'terminal-dark' ? '#121215' : '#ffffff',
+                        border: '1px solid var(--color-base-300)',
+                    },
+                }}
             />
         </AuthGuard>
     );

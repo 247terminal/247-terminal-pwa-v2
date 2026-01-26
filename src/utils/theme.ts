@@ -1,5 +1,10 @@
 import type { ThemeColors } from '../types/chart.types';
 
+export const THEME_COLORS = {
+    GREEN: '#25B28E',
+    RED: '#CC3E50',
+} as const;
+
 let theme_colors_cache: ThemeColors | null = null;
 let theme_cache_key: string | null = null;
 
@@ -21,13 +26,13 @@ export function get_theme_colors(force_refresh = false): ThemeColors {
     const error = get_css_variable('--color-error');
 
     theme_colors_cache = {
-        background: is_dark ? '#000000' : '#ffffff',
+        background: is_dark ? '#121215' : '#ffffff',
         text: base_content || '#fafafa',
         grid: base_300
             ? `color-mix(in oklch, ${base_300}, transparent 50%)`
             : 'rgba(40, 41, 45, 0.5)',
-        up: success || 'rgb(0, 200, 114)',
-        down: error || 'rgb(255, 107, 59)',
+        up: success || THEME_COLORS.GREEN,
+        down: error || THEME_COLORS.RED,
     };
     theme_cache_key = current_theme;
 

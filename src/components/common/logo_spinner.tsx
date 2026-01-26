@@ -1,3 +1,5 @@
+import { THEME_COLORS } from '../../utils/theme';
+
 interface LogoSpinnerProps {
     size?: number;
     class?: string;
@@ -128,9 +130,9 @@ export function LogoSpinner({ size = 24, class: className }: LogoSpinnerProps) {
                     .ls_5_3{animation:ls_sz 1.2s linear infinite,ls_p5_3 1.2s linear infinite;animation-delay:.4s}
                     .ls_5_4{animation:ls_sz 1.2s linear infinite,ls_p5_4 1.2s linear infinite;animation-delay:.45s}
                     .ls_5_5{animation:ls_sz 1.2s linear infinite,ls_p5_5 1.2s linear infinite;animation-delay:.5s}
-                    .ls-primary{fill:#f43f5e}
+                    .ls-primary{fill:${THEME_COLORS.RED}}
                     .ls-text{fill:white}
-                    .ls-bg{fill:#f43f5e}
+                    .ls-bg{fill:${THEME_COLORS.RED}}
                 `}
             </style>
             <g mask="url(#ls-mask)">

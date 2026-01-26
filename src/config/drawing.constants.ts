@@ -1,3 +1,12 @@
+import { THEME_COLORS } from '../utils/theme';
+
+function hex_to_rgba(hex: string, alpha: number): string {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export const DRAWING_CONSTANTS = {
     DEFAULT_COLOR: '#2962ff',
     HIT_THRESHOLD: 8,
@@ -16,10 +25,10 @@ export const DRAWING_CONSTANTS = {
         RECTANGLE: '#2962ff',
         BRUSH: '#2962ff',
         MEASURE: '#9c27b0',
-        BULLISH: 'rgb(34, 197, 94)',
-        BEARISH: 'rgb(239, 68, 68)',
-        BULLISH_FILL: 'rgba(34, 197, 94, 0.18)',
-        BEARISH_FILL: 'rgba(239, 68, 68, 0.18)',
+        BULLISH: THEME_COLORS.GREEN,
+        BEARISH: THEME_COLORS.RED,
+        BULLISH_FILL: hex_to_rgba(THEME_COLORS.GREEN, 0.18),
+        BEARISH_FILL: hex_to_rgba(THEME_COLORS.RED, 0.18),
     },
     FILL_OPACITY: 0.3,
     DASH_PATTERN: [5, 5],
@@ -39,4 +48,4 @@ export const DRAWING_CONSTANTS = {
         FACTOR: 0.35,
         THRESHOLD: 0.5,
     },
-} as const;
+};

@@ -32,8 +32,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
     },
     chart: {
         default_timeframe: '5',
-        up_candle_color: '#00C853',
-        down_candle_color: '#FF1744',
+        up_candle_color: '#25B28E',
+        down_candle_color: '#CC3E50',
         chart_tickers: [],
         favorite_tickers: [],
     },

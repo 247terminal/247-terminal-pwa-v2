@@ -5,8 +5,8 @@ export const PNL_CARD_CONSTANTS = {
 } as const;
 
 export const PNL_CARD_COLORS = {
-    profit: '#22c55e',
-    loss: '#ef4444',
+    profit: '#25B28E',
+    loss: '#CC3E50',
     text: 'rgba(255, 255, 255, 1)',
     text_muted: 'rgba(255, 255, 255, 0.4)',
     text_dim: 'rgba(255, 255, 255, 0.2)',

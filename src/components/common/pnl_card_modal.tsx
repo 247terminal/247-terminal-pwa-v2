@@ -213,7 +213,7 @@ export function PnlCardModal() {
                     <button
                         type="button"
                         onClick={hide_pnl_card}
-                        class="h-9 px-4 flex items-center justify-center gap-2 rounded-lg bg-white/10 hover:bg-red-500/50 text-white/80 hover:text-white transition-all text-sm font-medium"
+                        class="h-9 px-4 flex items-center justify-center gap-2 rounded-lg bg-white/10 hover:bg-error/50 text-white/80 hover:text-white transition-all text-sm font-medium"
                         aria-label="Close"
                     >
                         <X class="w-4 h-4" />

@@ -22,19 +22,19 @@
     prefersdark: true;
     color-scheme: dark;
 
-    --color-base-100: #09090b;
+    --color-base-100: #121215;
     --color-base-200: #18181b;
     --color-base-300: #27272a;
     --color-base-content: #fafafa;
 
-    --color-primary: #ef4444;
+    --color-primary: #CC3E50;
     --color-primary-content: #ffffff;
 
     --color-secondary: #27272a;
     --color-secondary-content: #fafafa;
 
-    --color-accent: #f87171;
-    --color-accent-content: #000000;
+    --color-accent: #CC3E50;
+    --color-accent-content: #ffffff;
 
     --color-neutral: #18181b;
     --color-neutral-content: #a1a1aa;
@@ -42,13 +42,13 @@
     --color-info: #3b82f6;
     --color-info-content: #ffffff;
 
-    --color-success: #22c55e;
-    --color-success-content: #000000;
+    --color-success: #25B28E;
+    --color-success-content: #ffffff;
 
     --color-warning: #f59e0b;
     --color-warning-content: #000000;
 
-    --color-error: #ef4444;
+    --color-error: #CC3E50;
     --color-error-content: #ffffff;
 
     --radius-selector: 0.5rem;
@@ -70,28 +70,28 @@
     --color-base-300: #e4e4e7;
     --color-base-content: #09090b;
 
-    --color-primary: #dc2626;
+    --color-primary: #CC3E50;
     --color-primary-content: #ffffff;
 
     --color-secondary: #e4e4e7;
     --color-secondary-content: #09090b;
 
-    --color-accent: #ef4444;
+    --color-accent: #CC3E50;
     --color-accent-content: #ffffff;
 
     --color-neutral: #f4f4f5;
     --color-neutral-content: #71717a;
 
-    --color-info: #2563eb;
+    --color-info: #3b82f6;
     --color-info-content: #ffffff;
 
-    --color-success: #16a34a;
+    --color-success: #25B28E;
     --color-success-content: #ffffff;
 
-    --color-warning: #ca8a04;
-    --color-warning-content: #ffffff;
+    --color-warning: #f59e0b;
+    --color-warning-content: #000000;
 
-    --color-error: #dc2626;
+    --color-error: #CC3E50;
     --color-error-content: #ffffff;
 
     --radius-selector: 0.5rem;
@@ -137,7 +137,7 @@
 }
 
 [data-theme='terminal-dark'] .bg-theme-header {
-    background-color: oklch(0% 0 0);
+    background-color: #121215;
 }
 
 [data-theme='terminal-light'] .bg-theme-header {
