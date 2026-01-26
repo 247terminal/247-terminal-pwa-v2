@@ -9,6 +9,7 @@ import type {
 import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
 import type { ClosePositionParams } from '@/types/trading.types';
 import { bybit as sym } from '../symbol_utils';
+import { split_quantity } from '../../utils/format';
 
 type BaseBybitExchange = InstanceType<typeof bybit>;
 
@@ -21,6 +22,7 @@ export interface BybitExchange extends BaseBybitExchange {
     privatePostV5OrderCancel(params: Record<string, unknown>): Promise<unknown>;
     privatePostV5OrderCancelAll(params: Record<string, unknown>): Promise<unknown>;
     privatePostV5OrderCreate(params: Record<string, unknown>): Promise<unknown>;
+    privatePostV5OrderCreateBatch(params: Record<string, unknown>): Promise<unknown>;
 }
 
 interface BybitPositionResponse {
@@ -401,28 +403,70 @@ export async function close_position(
     const close_size = params.size * (params.percentage / 100);
     const order_side = params.side === 'long' ? 'Sell' : 'Buy';
 
-    const order_params: Record<string, string | number | boolean> = {
-        category: 'linear',
-        symbol: bybit_symbol,
-        side: order_side,
-        orderType: params.order_type === 'market' ? 'Market' : 'Limit',
-        qty: String(close_size),
-        reduceOnly: true,
-        timeInForce: params.order_type === 'market' ? 'IOC' : 'GTC',
-    };
-
-    if (params.order_type === 'limit' && params.limit_price) {
-        order_params.price = String(params.limit_price);
+    if (!close_size || close_size <= 0 || !isFinite(close_size)) {
+        throw new Error('invalid close size');
     }
 
-    if (params.position_mode === 'hedge') {
-        order_params.positionIdx = params.side === 'long' ? 1 : 2;
-        delete order_params.reduceOnly;
+    const max_qty =
+        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : close_size;
+    const quantities = split_quantity(close_size, max_qty);
+
+    if (quantities.length === 0) {
+        throw new Error('no quantities to close');
+    }
+
+    const orders = quantities.map((qty) => {
+        const order: Record<string, string | number | boolean> = {
+            symbol: bybit_symbol,
+            side: order_side,
+            orderType: params.order_type === 'market' ? 'Market' : 'Limit',
+            qty: String(qty),
+            reduceOnly: true,
+            timeInForce: params.order_type === 'market' ? 'IOC' : 'GTC',
+        };
+
+        if (params.order_type === 'limit' && params.limit_price) {
+            order.price = String(params.limit_price);
+        }
+
+        if (params.position_mode === 'hedge') {
+            order.positionIdx = params.side === 'long' ? 1 : 2;
+            delete order.reduceOnly;
+        } else {
+            order.positionIdx = 0;
+        }
+
+        return order;
+    });
+
+    let failed = 0;
+
+    if (orders.length === 1) {
+        try {
+            await exchange.privatePostV5OrderCreate({ category: 'linear', ...orders[0] });
+        } catch (err) {
+            console.error('bybit order failed:', (err as Error).message);
+            failed = 1;
+        }
     } else {
-        order_params.positionIdx = 0;
+        const batch_size = 10;
+        for (let i = 0; i < orders.length; i += batch_size) {
+            const batch = orders.slice(i, i + batch_size);
+            try {
+                await exchange.privatePostV5OrderCreateBatch({
+                    category: 'linear',
+                    request: batch,
+                });
+            } catch (err) {
+                console.error('bybit batch order failed:', (err as Error).message);
+                failed += batch.length;
+            }
+        }
     }
 
-    await exchange.privatePostV5OrderCreate(order_params);
+    if (failed > 0) {
+        throw new Error(`${failed}/${orders.length} orders failed`);
+    }
 
     return true;
 }

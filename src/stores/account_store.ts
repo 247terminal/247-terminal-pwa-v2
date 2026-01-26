@@ -12,6 +12,7 @@ import {
     has_exchange,
 } from '../services/exchange/account_bridge';
 import { get_market, has_markets, get_ticker } from './exchange_store';
+import { get_symbol_settings } from './trading_store';
 import { STORAGE_CONSTANTS, ACCOUNT_CONSTANTS } from '../config/chart.constants';
 
 function load_privacy_mode(): boolean {
@@ -423,6 +424,7 @@ export async function close_position(
 
     try {
         const ticker = get_ticker(exchange_id, symbol);
+        const symbol_settings = get_symbol_settings(exchange_id, symbol);
         const success = await close_position_api(exchange_id, {
             symbol,
             side: position.side,
@@ -432,6 +434,7 @@ export async function close_position(
             margin_mode: position.margin_mode,
             limit_price,
             mark_price: ticker?.last_price,
+            max_market_qty: symbol_settings?.max_market_qty,
         });
 
         if (success && percentage === 100 && order_type === 'market') {

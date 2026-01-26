@@ -49,4 +49,5 @@ export interface ClosePositionParams {
     position_mode: PositionMode;
     limit_price?: number;
     mark_price?: number;
+    max_market_qty?: number;
 }

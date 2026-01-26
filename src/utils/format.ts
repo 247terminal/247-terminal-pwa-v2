@@ -28,3 +28,26 @@ export function format_market_cap(value: number | null): string {
     if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
     return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
+
+export function split_quantity(total: number, max_per_order: number): number[] {
+    if (!isFinite(total) || !isFinite(max_per_order) || max_per_order <= 0) {
+        return [total];
+    }
+
+    if (total <= max_per_order) return [total];
+
+    const precision = 1e10;
+    const total_int = Math.round(total * precision);
+    const max_int = Math.round(max_per_order * precision);
+
+    const quantities: number[] = [];
+    let remaining = total_int;
+
+    while (remaining > 0) {
+        const qty = Math.min(remaining, max_int);
+        quantities.push(qty / precision);
+        remaining -= qty;
+    }
+
+    return quantities;
+}

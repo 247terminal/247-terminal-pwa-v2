@@ -10,6 +10,7 @@ import { POSITION_CONSTANTS } from '@/config/chart.constants';
 import { BROKER_CONFIG } from '@/config';
 import type { ClosePositionParams } from '@/types/trading.types';
 import { blofin as sym } from '../symbol_utils';
+import { split_quantity } from '../../utils/format';
 
 type BaseBlofinExchange = InstanceType<typeof blofin>;
 
@@ -26,6 +27,7 @@ export interface BlofinExchange extends BaseBlofinExchange {
     privatePostTradeCancelAlgo(params: unknown): Promise<unknown>;
     privatePostTradeCancelBatchOrders(params: unknown): Promise<unknown>;
     privatePostTradeOrder(params: Record<string, unknown>): Promise<unknown>;
+    privatePostTradeBatchOrders(params: unknown): Promise<unknown>;
 }
 
 interface BlofinPositionResponse {
@@ -552,28 +554,68 @@ export async function close_position(
     const close_size = params.size * (params.percentage / 100);
     const order_side = params.side === 'long' ? 'sell' : 'buy';
 
-    const order_params: Record<string, string | number> = {
-        instId: blofin_inst_id,
-        marginMode: params.margin_mode,
-        side: order_side,
-        orderType: params.order_type,
-        size: String(close_size),
-        reduceOnly: 'true',
-        brokerId: BROKER_CONFIG.blofin.brokerId,
-    };
-
-    if (params.order_type === 'limit' && params.limit_price) {
-        order_params.price = String(params.limit_price);
+    if (!close_size || close_size <= 0 || !isFinite(close_size)) {
+        throw new Error('invalid close size');
     }
 
-    if (params.position_mode === 'hedge') {
-        order_params.positionSide = params.side;
-        delete order_params.reduceOnly;
+    const max_qty =
+        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : close_size;
+    const quantities = split_quantity(close_size, max_qty);
+
+    if (quantities.length === 0) {
+        throw new Error('no quantities to close');
+    }
+
+    const orders = quantities.map((qty) => {
+        const order: Record<string, string | number> = {
+            instId: blofin_inst_id,
+            marginMode: params.margin_mode,
+            side: order_side,
+            orderType: params.order_type,
+            size: String(qty),
+            reduceOnly: 'true',
+            brokerId: BROKER_CONFIG.blofin.brokerId,
+        };
+
+        if (params.order_type === 'limit' && params.limit_price) {
+            order.price = String(params.limit_price);
+        }
+
+        if (params.position_mode === 'hedge') {
+            order.positionSide = params.side;
+            delete order.reduceOnly;
+        } else {
+            order.positionSide = 'net';
+        }
+
+        return order;
+    });
+
+    let failed = 0;
+
+    if (orders.length === 1) {
+        try {
+            await exchange.privatePostTradeOrder(orders[0]);
+        } catch (err) {
+            console.error('blofin order failed:', (err as Error).message);
+            failed = 1;
+        }
     } else {
-        order_params.positionSide = 'net';
+        const batch_size = 20;
+        for (let i = 0; i < orders.length; i += batch_size) {
+            const batch = orders.slice(i, i + batch_size);
+            try {
+                await exchange.privatePostTradeBatchOrders(batch);
+            } catch (err) {
+                console.error('blofin batch order failed:', (err as Error).message);
+                failed += batch.length;
+            }
+        }
     }
 
-    await exchange.privatePostTradeOrder(order_params);
+    if (failed > 0) {
+        throw new Error(`${failed}/${orders.length} orders failed`);
+    }
 
     return true;
 }

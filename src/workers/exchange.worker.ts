@@ -418,6 +418,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                     margin_mode: payload?.margin_mode as 'cross' | 'isolated',
                     limit_price: payload?.limit_price as number | undefined,
                     mark_price: payload?.mark_price as number | undefined,
+                    max_market_qty: payload?.max_market_qty as number | undefined,
                 });
                 break;
             default:

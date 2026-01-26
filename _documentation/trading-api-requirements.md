@@ -905,12 +905,6 @@ Auth: EIP-712 signature (r, s, v) + nonce
 2. Implement debounced fetches
 3. Update store on fetch complete
 
-### Phase 3.2 - Position Close
-
-1. Implement `close_position(exchange, symbol, side?, percent?)`
-2. Support partial close with percentage
-3. Handle order splitting for large closes
-
 ### Phase 4.0 - Scale Orders
 
 1. Calculate price levels from range

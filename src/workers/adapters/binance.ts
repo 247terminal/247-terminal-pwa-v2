@@ -8,6 +8,7 @@ import type {
 } from '@/types/worker.types';
 import type { ClosePositionParams } from '@/types/trading.types';
 import { binance as sym } from '../symbol_utils';
+import { split_quantity } from '../../utils/format';
 
 type BaseBinanceExchange = InstanceType<typeof binanceusdm>;
 
@@ -24,6 +25,7 @@ export interface BinanceExchange extends BaseBinanceExchange {
     fapiPrivateDeleteAllOpenOrders(params: Record<string, unknown>): Promise<unknown>;
     fapiPrivateDeleteAlgoOpenOrders(params: Record<string, unknown>): Promise<unknown>;
     fapiPrivatePostOrder(params: Record<string, unknown>): Promise<unknown>;
+    fapiPrivatePostBatchOrders(params: Record<string, unknown>): Promise<unknown>;
 }
 
 interface BinanceBalance {
@@ -472,25 +474,56 @@ export async function close_position(
     const close_size = params.size * (params.percentage / 100);
     const order_side = params.side === 'long' ? 'SELL' : 'BUY';
 
-    const order_params: Record<string, string | number | boolean> = {
-        symbol: binance_symbol,
-        side: order_side,
-        type: params.order_type === 'market' ? 'MARKET' : 'LIMIT',
-        quantity: close_size,
-        reduceOnly: 'true',
-    };
-
-    if (params.order_type === 'limit' && params.limit_price) {
-        order_params.price = params.limit_price;
-        order_params.timeInForce = 'GTC';
+    if (!close_size || close_size <= 0 || !isFinite(close_size)) {
+        throw new Error('invalid close size');
     }
 
-    if (params.position_mode === 'hedge') {
-        order_params.positionSide = params.side === 'long' ? 'LONG' : 'SHORT';
-        delete order_params.reduceOnly;
+    const max_qty =
+        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : close_size;
+    const quantities = split_quantity(close_size, max_qty);
+
+    if (quantities.length === 0) {
+        throw new Error('no quantities to close');
     }
 
-    await exchange.fapiPrivatePostOrder(order_params);
+    const orders = quantities.map((qty) => {
+        const order: Record<string, string> = {
+            symbol: binance_symbol,
+            side: order_side,
+            type: params.order_type === 'market' ? 'MARKET' : 'LIMIT',
+            quantity: String(qty),
+            reduceOnly: 'true',
+        };
+
+        if (params.order_type === 'limit' && params.limit_price) {
+            order.price = String(params.limit_price);
+            order.timeInForce = 'GTC';
+        }
+
+        if (params.position_mode === 'hedge') {
+            order.positionSide = params.side === 'long' ? 'LONG' : 'SHORT';
+            delete order.reduceOnly;
+        }
+
+        return order;
+    });
+
+    const results = await Promise.all(
+        orders.map((order) =>
+            exchange
+                .fapiPrivatePostOrder(order)
+                .then(() => ({ success: true }))
+                .catch((err) => {
+                    console.error('binance order failed:', (err as Error).message);
+                    return { success: false };
+                })
+        )
+    );
+
+    const failed = results.filter((r) => !r.success);
+    if (failed.length > 0) {
+        throw new Error(`${failed.length}/${orders.length} orders failed`);
+    }
 
     return true;
 }
