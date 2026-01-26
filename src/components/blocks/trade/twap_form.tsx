@@ -4,7 +4,7 @@ import {
     update_twap_form,
     calculate_twap_max_orders,
 } from '../../../stores/trade_store';
-import { SliderInput, ToggleInput, TotalInput } from './trade_inputs';
+import { SliderInput, TotalInput } from './trade_inputs';
 
 function format_duration(minutes: number): string {
     const hours = Math.floor(minutes / 60);
@@ -39,14 +39,6 @@ export function TwapForm() {
         update_twap_form({ total_size_usd: value });
     }, []);
 
-    const handle_post_only = useCallback((checked: boolean) => {
-        update_twap_form({ post_only: checked });
-    }, []);
-
-    const handle_reduce_only = useCallback((checked: boolean) => {
-        update_twap_form({ reduce_only: checked });
-    }, []);
-
     return (
         <div class="flex flex-col gap-2">
             <SliderInput
@@ -72,19 +64,6 @@ export function TwapForm() {
                 value={form.total_size_usd}
                 on_change={handle_total_size_change}
             />
-
-            <div class="flex items-center gap-4 pt-1 border-t border-base-300/50">
-                <ToggleInput
-                    label="Post-only"
-                    checked={form.post_only}
-                    on_change={handle_post_only}
-                />
-                <ToggleInput
-                    label="Reduce-only"
-                    checked={form.reduce_only}
-                    on_change={handle_reduce_only}
-                />
-            </div>
         </div>
     );
 }
