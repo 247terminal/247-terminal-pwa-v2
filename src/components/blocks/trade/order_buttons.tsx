@@ -8,7 +8,7 @@ import {
     current_market,
 } from '../../../stores/trade_store';
 import { get_ticker } from '../../../stores/exchange_store';
-import { place_market_order } from '../../../stores/account_store';
+import { place_market_order, place_limit_order } from '../../../stores/account_store';
 import { has_exchange } from '../../../services/exchange/account_bridge';
 import { parse_symbol } from '../../chart/symbol_row';
 import { format_price, extract_error_message } from '../../../utils/format';
@@ -19,44 +19,49 @@ export const OrderButtons = memo(function OrderButtons() {
     const symbol = selected_symbol.value;
     const market = current_market.value;
     const ticker = get_ticker(exchange, symbol);
-    const { base } = parse_symbol(symbol);
+    const base = useMemo(() => parse_symbol(symbol).base, [symbol]);
     const tick_size = market?.tick_size ?? 0.01;
     const [submitting, setSubmitting] = useState(false);
 
+    const order_type = state.order_type;
+    const limit_form = state.limit;
+    const market_form = state.market;
+    const scale_form = state.scale;
+    const twap_form = state.twap;
+
     const { quantity_display, price_display } = useMemo(() => {
-        const order_type = state.order_type;
         let qty = '';
         let price = '';
 
         if (order_type === 'limit') {
-            const qty_val = parseFloat(state.limit.quantity) || 0;
-            const price_val = parseFloat(state.limit.price) || 0;
-            if (state.limit.size_unit === 'usd' && ticker?.last_price) {
+            const qty_val = parseFloat(limit_form.quantity) || 0;
+            const price_val = parseFloat(limit_form.price) || 0;
+            if (limit_form.size_unit === 'usd' && ticker?.last_price) {
                 qty = (qty_val / ticker.last_price).toFixed(4);
             } else {
                 qty = qty_val.toFixed(4);
             }
             price = price_val ? format_price(price_val, tick_size) : '';
         } else if (order_type === 'market') {
-            const qty_val = parseFloat(state.market.quantity) || 0;
-            if (state.market.size_unit === 'usd' && ticker?.last_price) {
+            const qty_val = parseFloat(market_form.quantity) || 0;
+            if (market_form.size_unit === 'usd' && ticker?.last_price) {
                 qty = (qty_val / ticker.last_price).toFixed(4);
             } else {
                 qty = qty_val.toFixed(4);
             }
             price = 'MKT';
         } else if (order_type === 'scale') {
-            const total = parseFloat(state.scale.total_size_usd) || 0;
+            const total = parseFloat(scale_form.total_size_usd) || 0;
             if (ticker?.last_price) {
                 qty = (total / ticker.last_price).toFixed(4);
             }
-            const from_price = parseFloat(state.scale.price_from) || 0;
-            const to_price = parseFloat(state.scale.price_to) || 0;
+            const from_price = parseFloat(scale_form.price_from) || 0;
+            const to_price = parseFloat(scale_form.price_to) || 0;
             if (from_price && to_price) {
                 price = `${format_price(from_price, tick_size)}→${format_price(to_price, tick_size)}`;
             }
         } else if (order_type === 'twap') {
-            const total = parseFloat(state.twap.total_size_usd) || 0;
+            const total = parseFloat(twap_form.total_size_usd) || 0;
             if (ticker?.last_price) {
                 qty = (total / ticker.last_price).toFixed(4);
             }
@@ -67,16 +72,102 @@ export const OrderButtons = memo(function OrderButtons() {
             quantity_display: qty ? `${qty} ${base}` : `— ${base}`,
             price_display: price || '—',
         };
-    }, [state, ticker, base, tick_size]);
+    }, [order_type, limit_form, market_form, scale_form, twap_form, ticker, base, tick_size]);
 
-    const order_type = state.order_type;
-    const market_quantity = state.market.quantity;
-    const market_size_unit = state.market.size_unit;
-    const market_reduce_only = state.market.reduce_only;
+    const market_quantity = market_form.quantity;
+    const market_size_unit = market_form.size_unit;
+    const market_reduce_only = market_form.reduce_only;
+    const limit_quantity = limit_form.quantity;
+    const limit_size_unit = limit_form.size_unit;
+    const limit_price = limit_form.price;
+    const limit_post_only = limit_form.post_only;
+    const limit_reduce_only = limit_form.reduce_only;
+    const last_price = ticker?.last_price;
+
+    const execute_market_order = useCallback(
+        async (side: 'buy' | 'sell'): Promise<boolean> => {
+            const qty_input = parseFloat(market_quantity) || 0;
+            if (qty_input <= 0) {
+                toast.error('Invalid quantity');
+                return false;
+            }
+
+            let final_size = qty_input;
+            if (market_size_unit === 'usd' && last_price) {
+                final_size = qty_input / last_price;
+            }
+
+            if (final_size <= 0) {
+                toast.error('Unable to calculate order size');
+                return false;
+            }
+
+            return place_market_order(exchange, symbol, side, final_size, market_reduce_only);
+        },
+        [market_quantity, market_size_unit, market_reduce_only, exchange, symbol, last_price]
+    );
+
+    const execute_limit_order = useCallback(
+        async (side: 'buy' | 'sell'): Promise<boolean> => {
+            const qty_input = parseFloat(limit_quantity) || 0;
+            const price_input = parseFloat(limit_price) || 0;
+
+            if (qty_input <= 0) {
+                toast.error('Invalid quantity');
+                return false;
+            }
+
+            if (price_input <= 0) {
+                toast.error('Invalid price');
+                return false;
+            }
+
+            if (last_price) {
+                if (side === 'buy' && price_input >= last_price) {
+                    toast.error('Limit buy price must be below market price');
+                    return false;
+                }
+                if (side === 'sell' && price_input <= last_price) {
+                    toast.error('Limit sell price must be above market price');
+                    return false;
+                }
+            }
+
+            let final_size = qty_input;
+            if (limit_size_unit === 'usd') {
+                final_size = qty_input / price_input;
+            }
+
+            if (final_size <= 0) {
+                toast.error('Unable to calculate order size');
+                return false;
+            }
+
+            return place_limit_order(
+                exchange,
+                symbol,
+                side,
+                final_size,
+                price_input,
+                limit_post_only,
+                limit_reduce_only
+            );
+        },
+        [
+            limit_quantity,
+            limit_price,
+            limit_size_unit,
+            limit_post_only,
+            limit_reduce_only,
+            exchange,
+            symbol,
+            last_price,
+        ]
+    );
 
     const submit_order = useCallback(
         async (side: 'buy' | 'sell') => {
-            if (order_type !== 'market') {
+            if (order_type !== 'market' && order_type !== 'limit') {
                 toast.error(`${order_type} orders not yet implemented`);
                 return;
             }
@@ -86,33 +177,14 @@ export const OrderButtons = memo(function OrderButtons() {
                 return;
             }
 
-            const qty_input = parseFloat(market_quantity) || 0;
-            if (qty_input <= 0) {
-                toast.error('Invalid quantity');
-                return;
-            }
-
-            let final_size = qty_input;
-            if (market_size_unit === 'usd' && ticker?.last_price) {
-                final_size = qty_input / ticker.last_price;
-            }
-
-            if (final_size <= 0) {
-                toast.error('Unable to calculate order size');
-                return;
-            }
-
             setSubmitting(true);
             const side_label = side === 'buy' ? 'BUY' : 'SELL';
 
             try {
-                const success = await place_market_order(
-                    exchange,
-                    symbol,
-                    side,
-                    final_size,
-                    market_reduce_only
-                );
+                const success =
+                    order_type === 'market'
+                        ? await execute_market_order(side)
+                        : await execute_limit_order(side);
 
                 if (success) {
                     toast.success(`${side_label} ${base} order placed`);
@@ -126,16 +198,7 @@ export const OrderButtons = memo(function OrderButtons() {
                 setSubmitting(false);
             }
         },
-        [
-            order_type,
-            market_quantity,
-            market_size_unit,
-            market_reduce_only,
-            exchange,
-            symbol,
-            ticker,
-            base,
-        ]
+        [order_type, exchange, base, execute_market_order, execute_limit_order]
     );
 
     const handle_buy = useCallback(() => submit_order('buy'), [submit_order]);

@@ -6,7 +6,7 @@ import type { Position } from '../../../types/account.types';
 import { close_position } from '../../../stores/account_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
 import { format_price, format_size, extract_error_message } from '../../../utils/format';
-import { format_symbol, parse_symbol } from '../../chart/symbol_row';
+import { parse_symbol } from '../../chart/symbol_row';
 
 type CloseOrderType = 'market' | 'limit';
 

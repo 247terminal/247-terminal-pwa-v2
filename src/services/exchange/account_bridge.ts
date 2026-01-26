@@ -6,6 +6,7 @@ import type {
     Balance,
     ClosePositionParams,
     MarketOrderParams,
+    LimitOrderParams,
 } from '@/types/trading.types';
 import type { Position, Order, TradeHistory } from '@/types/account.types';
 import type { RawFill, OrderCategory } from '@/types/worker.types';
@@ -225,4 +226,11 @@ export function place_market_order_api(
     params: Omit<MarketOrderParams, 'position_mode'>
 ): Promise<boolean> {
     return sendRequest<boolean>('PLACE_MARKET_ORDER', { exchangeId, ...params });
+}
+
+export function place_limit_order_api(
+    exchangeId: ExchangeId,
+    params: Omit<LimitOrderParams, 'position_mode'>
+): Promise<boolean> {
+    return sendRequest<boolean>('PLACE_LIMIT_ORDER', { exchangeId, ...params });
 }

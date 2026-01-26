@@ -42,16 +42,12 @@ function create_initial_state(): TradeFormState {
             price: '',
             quantity: '',
             size_unit: 'usd',
-            tp_sl_enabled: false,
-            tp_price: '',
-            sl_price: '',
             post_only: false,
             reduce_only: false,
         },
         market: {
             quantity: '',
             size_unit: 'usd',
-            post_only: false,
             reduce_only: false,
         },
         scale: {
@@ -61,15 +57,11 @@ function create_initial_state(): TradeFormState {
             price_distribution: 'linear',
             size_distribution: 'equal',
             total_size_usd: '',
-            post_only: false,
-            reduce_only: false,
         },
         twap: {
             duration_minutes: 60,
             orders_count: 50,
             total_size_usd: '',
-            post_only: false,
-            reduce_only: false,
         },
     };
 }
@@ -113,7 +105,9 @@ function apply_symbol_leverage(exchange: ExchangeId, symbol: string): void {
                 trade_state.value = { ...trade_state.value, leverage: clamped };
             }
         })
-        .catch(() => {});
+        .catch((err) => {
+            console.error('failed to fetch leverage settings:', (err as Error).message);
+        });
 }
 
 export function set_exchange(exchange: ExchangeId): void {
@@ -193,9 +187,7 @@ export function calculate_twap_max_orders(duration_minutes: number): number {
     return Math.min(1000, 500 + Math.floor((duration_minutes - 240) * 0.4));
 }
 
-export function fill_last_price(
-    field: 'price' | 'tp_price' | 'sl_price' | 'price_from' | 'price_to'
-): void {
+export function fill_last_price(field: 'price' | 'price_from' | 'price_to'): void {
     const { exchange, symbol, order_type } = trade_state.value;
     const ticker = get_ticker(exchange, symbol);
     if (!ticker) return;

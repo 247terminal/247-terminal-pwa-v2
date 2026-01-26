@@ -2,9 +2,13 @@ import type bybit from 'ccxt/js/src/pro/bybit.js';
 import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
 import { ORDER_BATCH_CONSTANTS } from '@/config/trading.constants';
-import type { ClosePositionParams, MarketOrderParams } from '@/types/trading.types';
+import type {
+    ClosePositionParams,
+    MarketOrderParams,
+    LimitOrderParams,
+} from '@/types/trading.types';
 import { bybit as sym } from '../symbol_utils';
-import { split_quantity, round_quantity_string } from '../../utils/format';
+import { split_quantity, round_quantity_string, round_price_string } from '../../utils/format';
 import { hasResultProperty } from './type_guards';
 
 type BaseBybitExchange = InstanceType<typeof bybit>;
@@ -549,5 +553,47 @@ export async function place_market_order(
         throw first_error;
     }
 
+    return true;
+}
+
+export async function place_limit_order(
+    exchange: BybitExchange,
+    params: LimitOrderParams
+): Promise<boolean> {
+    const bybit_symbol = sym.fromUnified(params.symbol);
+    const order_side = params.side === 'buy' ? 'Buy' : 'Sell';
+
+    if (!params.size || params.size <= 0 || !isFinite(params.size)) {
+        throw new Error('invalid order size');
+    }
+
+    if (!params.price || params.price <= 0 || !isFinite(params.price)) {
+        throw new Error('invalid order price');
+    }
+
+    const order: Record<string, string | number | boolean> = {
+        symbol: bybit_symbol,
+        side: order_side,
+        orderType: 'Limit',
+        qty: round_quantity_string(params.size, params.qty_step),
+        price: round_price_string(params.price, params.tick_size),
+        timeInForce: params.post_only ? 'PostOnly' : 'GTC',
+    };
+
+    if (params.reduce_only) {
+        order.reduceOnly = true;
+    }
+
+    if (params.position_mode === 'hedge') {
+        order.positionIdx = params.side === 'buy' ? 1 : 2;
+        if (params.reduce_only) {
+            order.positionIdx = params.side === 'buy' ? 2 : 1;
+        }
+        delete order.reduceOnly;
+    } else {
+        order.positionIdx = 0;
+    }
+
+    await exchange.privatePostV5OrderCreate({ category: 'linear', ...order });
     return true;
 }

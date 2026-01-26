@@ -6,10 +6,14 @@ import type {
     RawFill,
     OrderCategory,
 } from '@/types/worker.types';
-import type { ClosePositionParams, MarketOrderParams } from '@/types/trading.types';
+import type {
+    ClosePositionParams,
+    MarketOrderParams,
+    LimitOrderParams,
+} from '@/types/trading.types';
 import { ORDER_BATCH_CONSTANTS } from '@/config/trading.constants';
 import { binance as sym } from '../symbol_utils';
-import { split_quantity, round_quantity_string } from '../../utils/format';
+import { split_quantity, round_quantity_string, round_price_string } from '../../utils/format';
 import { isArrayWithProperty } from './type_guards';
 
 type BaseBinanceExchange = InstanceType<typeof binanceusdm>;
@@ -602,5 +606,45 @@ export async function place_market_order(
         throw new Error(`${failed.length}/${orders.length} orders failed`);
     }
 
+    return true;
+}
+
+export async function place_limit_order(
+    exchange: BinanceExchange,
+    params: LimitOrderParams
+): Promise<boolean> {
+    const binance_symbol = sym.fromUnified(params.symbol);
+    const order_side = params.side === 'buy' ? 'BUY' : 'SELL';
+
+    if (!params.size || params.size <= 0 || !isFinite(params.size)) {
+        throw new Error('invalid order size');
+    }
+
+    if (!params.price || params.price <= 0 || !isFinite(params.price)) {
+        throw new Error('invalid order price');
+    }
+
+    const order: Record<string, string> = {
+        symbol: binance_symbol,
+        side: order_side,
+        type: 'LIMIT',
+        quantity: round_quantity_string(params.size, params.qty_step),
+        price: round_price_string(params.price, params.tick_size),
+        timeInForce: params.post_only ? 'GTX' : 'GTC',
+    };
+
+    if (params.reduce_only) {
+        order.reduceOnly = 'true';
+    }
+
+    if (params.position_mode === 'hedge') {
+        order.positionSide = params.side === 'buy' ? 'LONG' : 'SHORT';
+        if (params.reduce_only) {
+            order.positionSide = params.side === 'buy' ? 'SHORT' : 'LONG';
+        }
+        delete order.reduceOnly;
+    }
+
+    await exchange.fapiPrivatePostOrder(order);
     return true;
 }

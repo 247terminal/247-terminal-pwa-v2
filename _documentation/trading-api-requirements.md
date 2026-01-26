@@ -880,12 +880,6 @@ Auth: EIP-712 signature (r, s, v) + nonce
 
 ## 9. Implementation Phases (Detailed)
 
-### Phase 2.2 - Limit Order Placement
-
-1. Implement `place_limit_order(exchange, symbol, side, amount, price)`
-2. Support `postOnly`, `reduceOnly` params
-3. Handle hedge mode position side
-
 ### Phase 3.0 - WebSocket Setup
 
 1. Create WS connection manager per exchange

@@ -52,6 +52,13 @@ export function split_quantity(total: number, max_per_order: number): number[] {
     return quantities;
 }
 
+export function round_quantity(qty: number, qty_step?: number): number {
+    if (!qty_step || qty_step <= 0) return qty;
+    const precision = tick_size_to_precision(qty_step);
+    const multiplier = Math.pow(10, precision);
+    return Math.floor(qty * multiplier) / multiplier;
+}
+
 export function validate_order_size(
     size: number,
     min_qty: number,
@@ -65,9 +72,7 @@ export function validate_order_size(
         return { valid: false, adjusted_size: 0, error: `size below minimum: ${min_qty}` };
     }
 
-    const precision = tick_size_to_precision(qty_step);
-    const multiplier = Math.pow(10, precision);
-    const adjusted_size = Math.floor(size * multiplier) / multiplier;
+    const adjusted_size = round_quantity(size, qty_step);
 
     if (adjusted_size < min_qty) {
         return { valid: false, adjusted_size: 0, error: `adjusted size below minimum: ${min_qty}` };
@@ -76,15 +81,21 @@ export function validate_order_size(
     return { valid: true, adjusted_size };
 }
 
-export function round_quantity(qty: number, qty_step?: number): number {
-    if (!qty_step || qty_step <= 0) return qty;
-    const precision = tick_size_to_precision(qty_step);
-    const multiplier = Math.pow(10, precision);
-    return Math.floor(qty * multiplier) / multiplier;
-}
-
 export function round_quantity_string(qty: number, qty_step?: number): string {
     return String(round_quantity(qty, qty_step));
+}
+
+export function round_price(price: number, tick_size?: number): number {
+    if (!tick_size || tick_size <= 0) return price;
+    const precision = tick_size_to_precision(tick_size);
+    const multiplier = Math.pow(10, precision);
+    return Math.round(price * multiplier) / multiplier;
+}
+
+export function round_price_string(price: number, tick_size?: number): string {
+    if (!tick_size || tick_size <= 0) return String(price);
+    const precision = tick_size_to_precision(tick_size);
+    return round_price(price, tick_size).toFixed(precision);
 }
 
 const ERROR_PATTERNS = {

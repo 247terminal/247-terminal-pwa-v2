@@ -51,6 +51,7 @@ export interface ClosePositionParams {
     mark_price?: number;
     max_market_qty?: number;
     qty_step?: number;
+    contract_size?: number;
 }
 
 export interface MarketOrderParams {
@@ -65,4 +66,20 @@ export interface MarketOrderParams {
     current_price?: number;
     max_market_qty?: number;
     qty_step?: number;
+    contract_size?: number;
+}
+
+export interface LimitOrderParams {
+    symbol: string;
+    side: 'buy' | 'sell';
+    size: number;
+    price: number;
+    margin_mode: MarginMode;
+    position_mode: PositionMode;
+    leverage: number;
+    post_only?: boolean;
+    reduce_only?: boolean;
+    qty_step?: number;
+    tick_size?: number;
+    contract_size?: number;
 }

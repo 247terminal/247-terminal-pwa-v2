@@ -9,9 +9,13 @@ import type {
 import { POSITION_CONSTANTS } from '@/config/chart.constants';
 import { ORDER_BATCH_CONSTANTS } from '@/config/trading.constants';
 import { BROKER_CONFIG } from '@/config';
-import type { ClosePositionParams, MarketOrderParams } from '@/types/trading.types';
+import type {
+    ClosePositionParams,
+    MarketOrderParams,
+    LimitOrderParams,
+} from '@/types/trading.types';
 import { blofin as sym } from '../symbol_utils';
-import { split_quantity, round_quantity_string } from '../../utils/format';
+import { split_quantity, round_quantity_string, round_price_string } from '../../utils/format';
 import { hasDataProperty } from './type_guards';
 
 type BaseBlofinExchange = InstanceType<typeof blofin>;
@@ -545,7 +549,10 @@ export async function close_position(
     params: ClosePositionParams
 ): Promise<boolean> {
     const blofin_inst_id = to_blofin_inst_id(params.symbol);
-    const close_size = params.size * (params.percentage / 100);
+    const contract_size =
+        params.contract_size && params.contract_size > 0 ? params.contract_size : 1;
+    const close_size_base = params.size * (params.percentage / 100);
+    const close_size = close_size_base / contract_size;
     const order_side = params.side === 'long' ? 'sell' : 'buy';
 
     if (!close_size || close_size <= 0 || !isFinite(close_size)) {
@@ -553,7 +560,9 @@ export async function close_position(
     }
 
     const max_qty =
-        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : close_size;
+        params.max_market_qty && params.max_market_qty > 0
+            ? params.max_market_qty / contract_size
+            : close_size;
     const quantities = split_quantity(close_size, max_qty);
 
     if (quantities.length === 0) {
@@ -624,14 +633,19 @@ export async function place_market_order(
 ): Promise<boolean> {
     const blofin_inst_id = to_blofin_inst_id(params.symbol);
     const order_side = params.side;
+    const contract_size =
+        params.contract_size && params.contract_size > 0 ? params.contract_size : 1;
+    const size_in_contracts = params.size / contract_size;
 
-    if (!params.size || params.size <= 0 || !isFinite(params.size)) {
+    if (!size_in_contracts || size_in_contracts <= 0 || !isFinite(size_in_contracts)) {
         throw new Error('invalid order size');
     }
 
     const max_qty =
-        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : params.size;
-    const quantities = split_quantity(params.size, max_qty);
+        params.max_market_qty && params.max_market_qty > 0
+            ? params.max_market_qty / contract_size
+            : size_in_contracts;
+    const quantities = split_quantity(size_in_contracts, max_qty);
 
     if (quantities.length === 0) {
         throw new Error('no quantities to place');
@@ -707,5 +721,51 @@ export async function place_market_order(
         throw first_error;
     }
 
+    return true;
+}
+
+export async function place_limit_order(
+    exchange: BlofinExchange,
+    params: LimitOrderParams
+): Promise<boolean> {
+    const blofin_inst_id = to_blofin_inst_id(params.symbol);
+    const order_side = params.side;
+    const contract_size =
+        params.contract_size && params.contract_size > 0 ? params.contract_size : 1;
+    const size_in_contracts = params.size / contract_size;
+
+    if (!size_in_contracts || size_in_contracts <= 0 || !isFinite(size_in_contracts)) {
+        throw new Error('invalid order size');
+    }
+
+    if (!params.price || params.price <= 0 || !isFinite(params.price)) {
+        throw new Error('invalid order price');
+    }
+
+    const order: Record<string, string | number> = {
+        instId: blofin_inst_id,
+        marginMode: params.margin_mode,
+        side: order_side,
+        orderType: params.post_only ? 'post_only' : 'limit',
+        size: round_quantity_string(size_in_contracts, params.qty_step),
+        price: round_price_string(params.price, params.tick_size),
+        brokerId: BROKER_CONFIG.blofin.brokerId,
+    };
+
+    if (params.reduce_only) {
+        order.reduceOnly = 'true';
+    }
+
+    if (params.position_mode === 'hedge') {
+        order.positionSide = params.side === 'buy' ? 'long' : 'short';
+        if (params.reduce_only) {
+            order.positionSide = params.side === 'buy' ? 'short' : 'long';
+        }
+        delete order.reduceOnly;
+    } else {
+        order.positionSide = 'net';
+    }
+
+    await exchange.privatePostTradeOrder(order);
     return true;
 }

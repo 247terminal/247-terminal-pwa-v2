@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useCallback } from 'preact/hooks';
 import { settings, set_setting, update_settings } from '@/stores/settings_store';
 import type {
     ShortcutBinding,
@@ -20,8 +20,6 @@ function Toggle({ label, checked, on_change }: ToggleProps) {
         </label>
     );
 }
-
-const MODIFIER_OPTIONS = ['NONE', 'CTRL', 'SHIFT'] as const;
 
 function ShortcutEditor({ label, binding, on_change }: ShortcutEditorProps) {
     const [is_recording, set_is_recording] = useState(false);
@@ -104,14 +102,15 @@ const SHORTCUT_LABELS: Record<string, string> = {
 export function ShortcutsSection() {
     const shortcuts = settings.value.shortcuts;
 
-    function handle_binding_change(key: string, binding: ShortcutBinding): void {
-        const new_bindings = { ...shortcuts.bindings, [key]: binding };
+    const handle_binding_change = useCallback((key: string, binding: ShortcutBinding): void => {
+        const current = settings.value.shortcuts;
+        const new_bindings = { ...current.bindings, [key]: binding };
         update_settings('shortcuts', { bindings: new_bindings });
-    }
+    }, []);
 
-    function handle_nuke_change(binding: ShortcutBinding): void {
+    const handle_nuke_change = useCallback((binding: ShortcutBinding): void => {
         update_settings('shortcuts', { nuke_all: binding });
-    }
+    }, []);
 
     return (
         <div class="space-y-4">

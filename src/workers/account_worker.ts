@@ -20,6 +20,7 @@ import {
     type HyperliquidExchange,
     type ClosePositionParams,
     type MarketOrderParams,
+    type LimitOrderParams,
 } from './adapters';
 import type { ExchangeId, CcxtExchange, OrderCategory } from '@/types/worker.types';
 import { mapPosition, mapOrder, mapClosedPosition } from './position_mappers';
@@ -553,6 +554,47 @@ export async function placeMarketOrder(
         }
     } catch (err) {
         console.error(`failed to place ${exchangeId} market order:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function placeLimitOrder(
+    exchangeId: ExchangeId,
+    params: LimitOrderParams
+): Promise<boolean> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+    const fullParams: LimitOrderParams = {
+        ...params,
+        position_mode: getPositionMode(exchangeId),
+    };
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.place_limit_order(
+                    exchange as unknown as BinanceExchange,
+                    fullParams
+                );
+            case 'bybit':
+                return await bybitAdapter.place_limit_order(
+                    exchange as unknown as BybitExchange,
+                    fullParams
+                );
+            case 'blofin':
+                return await blofinAdapter.place_limit_order(
+                    exchange as unknown as BlofinExchange,
+                    fullParams
+                );
+            case 'hyperliquid':
+                return await hyperliquidAdapter.place_limit_order(
+                    exchange as unknown as HyperliquidExchange,
+                    fullParams
+                );
+            default:
+                return false;
+        }
+    } catch (err) {
+        console.error(`failed to place ${exchangeId} limit order:`, (err as Error).message);
         throw err;
     }
 }

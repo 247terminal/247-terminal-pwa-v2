@@ -10,9 +10,6 @@ export interface LimitOrderForm {
     price: string;
     quantity: string;
     size_unit: SizeUnit;
-    tp_sl_enabled: boolean;
-    tp_price: string;
-    sl_price: string;
     post_only: boolean;
     reduce_only: boolean;
 }
@@ -20,7 +17,6 @@ export interface LimitOrderForm {
 export interface MarketOrderForm {
     quantity: string;
     size_unit: SizeUnit;
-    post_only: boolean;
     reduce_only: boolean;
 }
 
@@ -31,16 +27,12 @@ export interface ScaleOrderForm {
     price_distribution: PriceDistribution;
     size_distribution: SizeDistribution;
     total_size_usd: string;
-    post_only: boolean;
-    reduce_only: boolean;
 }
 
 export interface TwapOrderForm {
     duration_minutes: number;
     orders_count: number;
     total_size_usd: string;
-    post_only: boolean;
-    reduce_only: boolean;
 }
 
 export interface TradeFormState {

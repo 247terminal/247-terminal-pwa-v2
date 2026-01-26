@@ -10,6 +10,7 @@ import {
     cancel_order as cancel_order_api,
     close_position_api,
     place_market_order_api,
+    place_limit_order_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
 import { get_market, has_markets, get_ticker } from './exchange_store';
@@ -439,6 +440,7 @@ export async function close_position(
             mark_price: ticker?.last_price,
             max_market_qty: symbol_settings?.max_market_qty,
             qty_step: symbol_settings?.qty_step ?? market?.qty_step,
+            contract_size: market?.contract_size,
         });
 
         if (success && percentage === 100 && order_type === 'market') {
@@ -495,11 +497,63 @@ export async function place_market_order(
             current_price: ticker?.last_price,
             max_market_qty: symbol_settings?.max_market_qty,
             qty_step: qty_step,
+            contract_size: market?.contract_size,
         });
 
         return success;
     } catch (err) {
         console.error(`failed to place market order ${symbol}:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function place_limit_order(
+    exchange_id: ExchangeId,
+    symbol: string,
+    side: 'buy' | 'sell',
+    size: number,
+    price: number,
+    post_only: boolean = false,
+    reduce_only: boolean = false
+): Promise<boolean> {
+    if (!has_exchange(exchange_id)) {
+        throw new Error('Exchange not connected');
+    }
+
+    try {
+        const symbol_settings = get_symbol_settings(exchange_id, symbol);
+        const market = get_market(exchange_id, symbol);
+
+        let final_size = size;
+        const min_qty = symbol_settings?.min_qty ?? market?.min_qty;
+        const qty_step = symbol_settings?.qty_step ?? market?.qty_step;
+
+        if (min_qty && qty_step) {
+            const validation = validate_order_size(size, min_qty, qty_step);
+
+            if (!validation.valid) {
+                throw new Error(validation.error);
+            }
+            final_size = validation.adjusted_size;
+        }
+
+        const success = await place_limit_order_api(exchange_id, {
+            symbol,
+            side,
+            size: final_size,
+            price,
+            margin_mode: symbol_settings?.margin_mode ?? 'cross',
+            leverage: symbol_settings?.leverage ?? 10,
+            post_only,
+            reduce_only,
+            qty_step,
+            tick_size: market?.tick_size,
+            contract_size: market?.contract_size,
+        });
+
+        return success;
+    } catch (err) {
+        console.error(`failed to place limit order ${symbol}:`, (err as Error).message);
         throw err;
     }
 }

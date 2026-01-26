@@ -1,8 +1,12 @@
 import type hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
 import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 import { HYPERLIQUID_CACHE_TTL, EXCHANGE_CONFIG } from '@/config';
-import type { ClosePositionParams, MarketOrderParams } from '@/types/trading.types';
-import { split_quantity, round_quantity } from '../../utils/format';
+import type {
+    ClosePositionParams,
+    MarketOrderParams,
+    LimitOrderParams,
+} from '@/types/trading.types';
+import { split_quantity, round_quantity, round_price } from '../../utils/format';
 import { hyperliquid as sym } from '../symbol_utils';
 
 type BaseHyperliquidExchange = InstanceType<typeof hyperliquid>;
@@ -461,6 +465,38 @@ export async function place_market_order(
         if (first_error) throw first_error;
         throw new Error(`${failed.length}/${quantities.length} orders failed`);
     }
+
+    return true;
+}
+
+export async function place_limit_order(
+    exchange: HyperliquidExchange,
+    params: LimitOrderParams
+): Promise<boolean> {
+    if (!params.size || params.size <= 0 || !isFinite(params.size)) {
+        throw new Error('invalid order size');
+    }
+
+    if (!params.price || params.price <= 0 || !isFinite(params.price)) {
+        throw new Error('invalid order price');
+    }
+
+    const order_params: Record<string, unknown> = {
+        postOnly: params.post_only ?? false,
+    };
+
+    if (params.reduce_only) {
+        order_params.reduceOnly = true;
+    }
+
+    await exchange.createOrder(
+        params.symbol,
+        'limit',
+        params.side,
+        round_quantity(params.size, params.qty_step),
+        round_price(params.price, params.tick_size),
+        order_params
+    );
 
     return true;
 }
