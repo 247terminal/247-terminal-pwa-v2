@@ -95,8 +95,7 @@ export const TickerInfo = memo(function TickerInfo({ exchange, symbol }: TickerI
     const tick_size = market?.tick_size ?? 0.01;
     const price = format_price(ticker?.last_price ?? null, tick_size, true);
     const change = format_change(ticker?.last_price ?? null, ticker?.price_24h ?? null);
-    const volume =
-        ticker?.volume_24h?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? '-';
+    const volume = format_market_cap(ticker?.volume_24h ?? null);
     const funding = format_funding_rate(ticker?.funding_rate ?? null);
     const market_cap_value =
         circulating_supply && ticker?.last_price ? circulating_supply * ticker.last_price : null;
