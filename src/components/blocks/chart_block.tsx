@@ -217,6 +217,13 @@ export function ChartBlock({ id, on_remove }: ChartBlockProps) {
         return market?.tick_size ?? 0.01;
     });
 
+    useEffect(() => {
+        const market_data = current_markets[exchange]?.[symbol];
+        if (market_data?.tick_size) {
+            set_chart_tick_size(market_data.tick_size);
+        }
+    }, [current_markets, exchange, symbol]);
+
     const current_key = `${exchange}:${symbol}:${timeframe}`;
 
     useEffect(() => {
