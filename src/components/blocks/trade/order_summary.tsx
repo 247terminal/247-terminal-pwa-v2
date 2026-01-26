@@ -6,16 +6,12 @@ import {
     selected_symbol,
 } from '../../../stores/trade_store';
 import { get_ticker } from '../../../stores/exchange_store';
+import { balances, privacy_mode } from '../../../stores/account_store';
+import { mask_value, format_usd_full } from '../../../utils/account_format';
 
-function format_usd(value: number | null): string {
+function format_usd_or_empty(value: number | null): string {
     if (value === null || isNaN(value)) return '$—';
-    return (
-        '$' +
-        value.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        })
-    );
+    return format_usd_full(value);
 }
 
 export function OrderSummary() {
@@ -25,7 +21,10 @@ export function OrderSummary() {
     const symbol = selected_symbol.value;
     const ticker = get_ticker(exchange, symbol);
 
-    const { value, cost, balance } = useMemo(() => {
+    const account_balance = balances.value.get(exchange);
+    const is_private = privacy_mode.value;
+
+    const { value, cost } = useMemo(() => {
         const order_type = state.order_type;
         let size_usd = 0;
 
@@ -48,7 +47,6 @@ export function OrderSummary() {
         return {
             value: size_usd || null,
             cost: computed_cost || null,
-            balance: null,
         };
     }, [state, leverage, ticker]);
 
@@ -57,19 +55,22 @@ export function OrderSummary() {
             <div class="text-center">
                 <div class="text-[10px] text-base-content/50 uppercase">Value</div>
                 <div class="text-xs font-medium text-base-content tabular-nums">
-                    {format_usd(value)}
+                    {format_usd_or_empty(value)}
                 </div>
             </div>
             <div class="text-center">
                 <div class="text-[10px] text-base-content/50 uppercase">Margin</div>
                 <div class="text-xs font-medium text-base-content tabular-nums">
-                    {format_usd(cost)}
+                    {format_usd_or_empty(cost)}
                 </div>
             </div>
             <div class="text-center">
                 <div class="text-[10px] text-base-content/50 uppercase">Balance</div>
                 <div class="text-xs font-medium text-base-content tabular-nums">
-                    {format_usd(balance)}
+                    {mask_value(
+                        format_usd_or_empty(account_balance?.available ?? null),
+                        is_private
+                    )}
                 </div>
             </div>
         </div>
