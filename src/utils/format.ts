@@ -51,3 +51,79 @@ export function split_quantity(total: number, max_per_order: number): number[] {
 
     return quantities;
 }
+
+export function validate_order_size(
+    size: number,
+    min_qty: number,
+    qty_step: number
+): { valid: boolean; adjusted_size: number; error?: string } {
+    if (!isFinite(size) || size <= 0) {
+        return { valid: false, adjusted_size: 0, error: 'invalid size' };
+    }
+
+    if (size < min_qty) {
+        return { valid: false, adjusted_size: 0, error: `size below minimum: ${min_qty}` };
+    }
+
+    const precision = tick_size_to_precision(qty_step);
+    const multiplier = Math.pow(10, precision);
+    const adjusted_size = Math.floor(size * multiplier) / multiplier;
+
+    if (adjusted_size < min_qty) {
+        return { valid: false, adjusted_size: 0, error: `adjusted size below minimum: ${min_qty}` };
+    }
+
+    return { valid: true, adjusted_size };
+}
+
+export function round_quantity(qty: number, qty_step?: number): number {
+    if (!qty_step || qty_step <= 0) return qty;
+    const precision = tick_size_to_precision(qty_step);
+    const multiplier = Math.pow(10, precision);
+    return Math.floor(qty * multiplier) / multiplier;
+}
+
+export function round_quantity_string(qty: number, qty_step?: number): string {
+    return String(round_quantity(qty, qty_step));
+}
+
+const ERROR_PATTERNS = {
+    hyperliquid: /"statuses"\s*:\s*\[\s*\{\s*"error"\s*:\s*"([^"]+)"/,
+    msg: /\{[^}]*"msg"\s*:\s*"([^"]+)"[^}]*\}/,
+    bybit: /"retMsg"\s*:\s*"([^"]+)"/,
+    exchange_prefix: /(?:binance|blofin|bybit|hyperliquid)[^:]*:\s*(\{.+\})$/i,
+} as const;
+
+export function extract_error_message(err: unknown): string {
+    if (!err) return 'Unknown error';
+
+    const message = (err as Error).message || String(err);
+
+    const hl_match = message.match(ERROR_PATTERNS.hyperliquid);
+    if (hl_match?.[1]) {
+        return hl_match[1];
+    }
+
+    const json_match = message.match(ERROR_PATTERNS.msg);
+    if (json_match?.[1]) {
+        return json_match[1];
+    }
+
+    const bybit_match = message.match(ERROR_PATTERNS.bybit);
+    if (bybit_match?.[1]) {
+        return bybit_match[1];
+    }
+
+    const exchange_json_match = message.match(ERROR_PATTERNS.exchange_prefix);
+    if (exchange_json_match?.[1]) {
+        try {
+            const parsed = JSON.parse(exchange_json_match[1]);
+            if (parsed.msg) return parsed.msg;
+            if (parsed.message) return parsed.message;
+        } catch (err) {
+            console.error('failed to parse exchange error json:', (err as Error).message);
+        }
+    }
+
+    return message;
+}

@@ -880,13 +880,6 @@ Auth: EIP-712 signature (r, s, v) + nonce
 
 ## 9. Implementation Phases (Detailed)
 
-### Phase 2.1 - Market Order Placement
-
-1. Implement order params builder (handles hedge mode, margin mode)
-2. Add order size validation against limits
-3. Implement `place_market_order(exchange, symbol, side, amount)`
-4. Add order splitting for large orders
-
 ### Phase 2.2 - Limit Order Placement
 
 1. Implement `place_limit_order(exchange, symbol, side, amount, price)`
@@ -926,3 +919,7 @@ Auth: EIP-712 signature (r, s, v) + nonce
 3. Support modification of existing TP/SL
 
 ---
+
+### TODO:
+
+1. Connect slippage value from settings to market order placement.
