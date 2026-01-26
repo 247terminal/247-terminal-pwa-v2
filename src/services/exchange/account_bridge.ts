@@ -1,46 +1,21 @@
 import { signal } from '@preact/signals';
 import type { ExchangeId } from '@/types/exchange.types';
 import type {
-    PositionMode,
-    MarginMode,
+    ExchangeConfig,
     Balance,
     ClosePositionParams,
     MarketOrderParams,
     LimitOrderParams,
+    ScaleOrderParams,
+    MarketInfo,
+    AccountData,
+    CachedMarketMap,
 } from '@/types/trading.types';
 import type { Position, Order, TradeHistory } from '@/types/account.types';
-import type { RawFill, OrderCategory } from '@/types/worker.types';
+import type { RawFill, OrderCategory, ExchangeAuthParams } from '@/types/worker.types';
 import { getWorker, sendRequest, fetch_markets } from './chart_data';
 import { get_exchange_markets, has_markets, set_markets } from '@/stores/exchange_store';
 import { MARKET_MAP_CACHE_TTL } from '@/config';
-
-interface AccountConfig {
-    position_mode: PositionMode;
-    default_margin_mode: MarginMode;
-}
-
-interface AccountData {
-    balance: Balance | null;
-    positions: Position[];
-    orders: Order[];
-}
-
-interface ExchangeAuthParams {
-    api_key?: string;
-    api_secret?: string;
-    passphrase?: string;
-    wallet_address?: string;
-    private_key?: string;
-}
-
-interface MarketInfo {
-    contract_size?: number;
-}
-
-interface CachedMarketMap {
-    data: Record<string, MarketInfo>;
-    timestamp: number;
-}
 
 const initializedExchanges = new Set<ExchangeId>();
 const marketMapCache = new Map<ExchangeId, CachedMarketMap>();
@@ -122,9 +97,9 @@ export function has_exchange(exchangeId: ExchangeId): boolean {
     return initializedExchanges.has(exchangeId);
 }
 
-export function fetch_account_config(exchangeId: ExchangeId): Promise<AccountConfig> {
+export function fetch_account_config(exchangeId: ExchangeId): Promise<ExchangeConfig> {
     return dedupeRequest(`config:${exchangeId}`, () =>
-        sendRequest<AccountConfig>('FETCH_ACCOUNT_CONFIG', { exchangeId })
+        sendRequest<ExchangeConfig>('FETCH_ACCOUNT_CONFIG', { exchangeId })
     );
 }
 
@@ -233,4 +208,14 @@ export function place_limit_order_api(
     params: Omit<LimitOrderParams, 'position_mode'>
 ): Promise<boolean> {
     return sendRequest<boolean>('PLACE_LIMIT_ORDER', { exchangeId, ...params });
+}
+
+export function place_scale_orders_api(
+    exchangeId: ExchangeId,
+    params: Omit<ScaleOrderParams, 'position_mode'>
+): Promise<{ success: number; failed: number; total: number }> {
+    return sendRequest<{ success: number; failed: number; total: number }>('PLACE_SCALE_ORDERS', {
+        exchangeId,
+        ...params,
+    });
 }

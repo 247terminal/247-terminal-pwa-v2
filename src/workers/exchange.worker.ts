@@ -32,6 +32,7 @@ import {
     closePosition,
     placeMarketOrder,
     placeLimitOrder,
+    placeScaleOrders,
     hyperliquidAdapter,
     type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
@@ -57,7 +58,7 @@ import type {
     CcxtTickerData,
     OrderCategory,
 } from '@/types/worker.types';
-import type { MarketOrderParams, LimitOrderParams } from '@/types/trading.types';
+import type { MarketOrderParams, LimitOrderParams, ScaleOrderParams } from '@/types/trading.types';
 
 registerExchangeClass(
     'binanceusdm',
@@ -435,6 +436,12 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 result = await placeLimitOrder(
                     payload?.exchangeId as ExchangeId,
                     payload as unknown as LimitOrderParams
+                );
+                break;
+            case 'PLACE_SCALE_ORDERS':
+                result = await placeScaleOrders(
+                    payload?.exchangeId as ExchangeId,
+                    payload as unknown as ScaleOrderParams
                 );
                 break;
             default:

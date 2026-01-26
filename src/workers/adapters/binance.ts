@@ -10,10 +10,17 @@ import type {
     ClosePositionParams,
     MarketOrderParams,
     LimitOrderParams,
+    BatchLimitOrderParams,
 } from '@/types/trading.types';
 import { ORDER_BATCH_CONSTANTS } from '@/config/trading.constants';
 import { binance as sym } from '../symbol_utils';
-import { split_quantity, round_quantity_string, round_price_string } from '../../utils/format';
+import {
+    split_quantity,
+    round_quantity,
+    round_quantity_string,
+    round_price,
+    round_price_string,
+} from '../../utils/format';
 import { isArrayWithProperty } from './type_guards';
 
 type BaseBinanceExchange = InstanceType<typeof binanceusdm>;
@@ -609,13 +616,50 @@ export async function place_market_order(
     return true;
 }
 
+interface BuildLimitOrderOptions {
+    symbol: string;
+    side: 'buy' | 'sell';
+    size: number;
+    price: number;
+    position_mode: 'one_way' | 'hedge';
+    qty_step?: number;
+    tick_size?: number;
+    post_only?: boolean;
+    reduce_only?: boolean;
+}
+
+function build_limit_order(options: BuildLimitOrderOptions): Record<string, string> {
+    const binance_symbol = sym.fromUnified(options.symbol);
+    const order_side = options.side === 'buy' ? 'BUY' : 'SELL';
+
+    const order: Record<string, string> = {
+        symbol: binance_symbol,
+        side: order_side,
+        type: 'LIMIT',
+        quantity: round_quantity_string(options.size, options.qty_step),
+        price: round_price_string(options.price, options.tick_size),
+        timeInForce: options.post_only ? 'GTX' : 'GTC',
+    };
+
+    if (options.reduce_only) {
+        order.reduceOnly = 'true';
+    }
+
+    if (options.position_mode === 'hedge') {
+        order.positionSide = options.side === 'buy' ? 'LONG' : 'SHORT';
+        if (options.reduce_only) {
+            order.positionSide = options.side === 'buy' ? 'SHORT' : 'LONG';
+        }
+        delete order.reduceOnly;
+    }
+
+    return order;
+}
+
 export async function place_limit_order(
     exchange: BinanceExchange,
     params: LimitOrderParams
 ): Promise<boolean> {
-    const binance_symbol = sym.fromUnified(params.symbol);
-    const order_side = params.side === 'buy' ? 'BUY' : 'SELL';
-
     if (!params.size || params.size <= 0 || !isFinite(params.size)) {
         throw new Error('invalid order size');
     }
@@ -624,27 +668,75 @@ export async function place_limit_order(
         throw new Error('invalid order price');
     }
 
-    const order: Record<string, string> = {
-        symbol: binance_symbol,
-        side: order_side,
-        type: 'LIMIT',
-        quantity: round_quantity_string(params.size, params.qty_step),
-        price: round_price_string(params.price, params.tick_size),
-        timeInForce: params.post_only ? 'GTX' : 'GTC',
-    };
-
-    if (params.reduce_only) {
-        order.reduceOnly = 'true';
-    }
-
-    if (params.position_mode === 'hedge') {
-        order.positionSide = params.side === 'buy' ? 'LONG' : 'SHORT';
-        if (params.reduce_only) {
-            order.positionSide = params.side === 'buy' ? 'SHORT' : 'LONG';
-        }
-        delete order.reduceOnly;
-    }
+    const order = build_limit_order({
+        symbol: params.symbol,
+        side: params.side,
+        size: params.size,
+        price: params.price,
+        position_mode: params.position_mode,
+        qty_step: params.qty_step,
+        tick_size: params.tick_size,
+        post_only: params.post_only,
+        reduce_only: params.reduce_only,
+    });
 
     await exchange.fapiPrivatePostOrder(order);
     return true;
+}
+
+export async function place_batch_limit_orders(
+    exchange: BinanceExchange,
+    params: BatchLimitOrderParams
+): Promise<{ success: number; failed: number }> {
+    if (!params.orders || params.orders.length === 0) {
+        return { success: 0, failed: 0 };
+    }
+
+    const ccxt_symbol = sym.fromUnified(params.symbol);
+    const order_params: Record<string, unknown> = {};
+
+    if (params.position_mode === 'hedge') {
+        order_params.positionSide = params.side === 'buy' ? 'LONG' : 'SHORT';
+    }
+
+    const ccxt_orders = params.orders.map((o) => ({
+        symbol: ccxt_symbol,
+        type: 'limit' as const,
+        side: params.side,
+        amount: round_quantity(o.size, params.qty_step),
+        price: round_price(o.price, params.tick_size),
+        params: order_params,
+    }));
+
+    const batch_size = ORDER_BATCH_CONSTANTS.BINANCE_BATCH_SIZE;
+    const batches: (typeof ccxt_orders)[] = [];
+    for (let i = 0; i < ccxt_orders.length; i += batch_size) {
+        batches.push(ccxt_orders.slice(i, i + batch_size));
+    }
+
+    let success_count = 0;
+    let failed_count = 0;
+
+    for (const batch of batches) {
+        try {
+            const results = await exchange.createOrders(batch);
+            if (Array.isArray(results)) {
+                for (const r of results) {
+                    if (r && r.id && !('error' in r)) {
+                        success_count++;
+                    } else {
+                        failed_count++;
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('binance batch order failed:', (err as Error).message);
+            failed_count += batch.length;
+            if (success_count === 0) {
+                throw err;
+            }
+        }
+    }
+
+    return { success: success_count, failed: failed_count };
 }

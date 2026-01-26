@@ -892,13 +892,6 @@ Auth: EIP-712 signature (r, s, v) + nonce
 2. Implement debounced fetches
 3. Update store on fetch complete
 
-### Phase 4.0 - Scale Orders
-
-1. Calculate price levels from range
-2. Calculate size per level based on distribution
-3. Use native batch APIs where available
-4. Fall back to sequential for exchanges with low batch limits
-
 ### Phase 4.1 - TWAP Orders
 
 1. Create TWAP scheduler service
@@ -917,3 +910,4 @@ Auth: EIP-712 signature (r, s, v) + nonce
 ### TODO:
 
 1. Connect slippage value from settings to market order placement.
+2. Batch order cancelling.

@@ -21,15 +21,14 @@ import {
     type ClosePositionParams,
     type MarketOrderParams,
     type LimitOrderParams,
+    type ScaleOrderParams,
 } from './adapters';
+import { generate_scale_orders } from '../utils/scale_orders';
 import type { ExchangeId, CcxtExchange, OrderCategory } from '@/types/worker.types';
+import type { MarketInfo } from '@/types/trading.types';
 import { mapPosition, mapOrder, mapClosedPosition } from './position_mappers';
 
-export type { ExchangeAuthParams };
-
-export interface MarketInfo {
-    contract_size?: number;
-}
+export type { ExchangeAuthParams, MarketInfo };
 
 const positionModeCache = new Map<ExchangeId, 'one_way' | 'hedge'>();
 
@@ -595,6 +594,79 @@ export async function placeLimitOrder(
         }
     } catch (err) {
         console.error(`failed to place ${exchangeId} limit order:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function placeScaleOrders(
+    exchangeId: ExchangeId,
+    params: ScaleOrderParams
+): Promise<{ success: number; failed: number; total: number }> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+    const position_mode = getPositionMode(exchangeId);
+
+    const orders = generate_scale_orders(
+        params.price_from,
+        params.price_to,
+        params.total_size,
+        params.orders_count,
+        params.price_distribution,
+        params.size_distribution,
+        params.tick_size,
+        params.qty_step,
+        params.min_qty
+    );
+
+    if (orders.length === 0) {
+        throw new Error('no valid orders generated');
+    }
+
+    const batch_params = {
+        symbol: params.symbol,
+        side: params.side,
+        orders,
+        margin_mode: params.margin_mode,
+        position_mode,
+        qty_step: params.qty_step,
+        tick_size: params.tick_size,
+        contract_size: params.contract_size,
+    };
+
+    try {
+        let result: { success: number; failed: number };
+
+        switch (exchangeId) {
+            case 'binance':
+                result = await binanceAdapter.place_batch_limit_orders(
+                    exchange as unknown as BinanceExchange,
+                    batch_params
+                );
+                break;
+            case 'bybit':
+                result = await bybitAdapter.place_batch_limit_orders(
+                    exchange as unknown as BybitExchange,
+                    batch_params
+                );
+                break;
+            case 'blofin':
+                result = await blofinAdapter.place_batch_limit_orders(
+                    exchange as unknown as BlofinExchange,
+                    batch_params
+                );
+                break;
+            case 'hyperliquid':
+                result = await hyperliquidAdapter.place_batch_limit_orders(
+                    exchange as unknown as HyperliquidExchange,
+                    batch_params
+                );
+                break;
+            default:
+                throw new Error(`exchange ${exchangeId} not supported for scale orders`);
+        }
+
+        return { ...result, total: orders.length };
+    } catch (err) {
+        console.error(`failed to place ${exchangeId} scale orders:`, (err as Error).message);
         throw err;
     }
 }

@@ -83,3 +83,54 @@ export interface LimitOrderParams {
     tick_size?: number;
     contract_size?: number;
 }
+
+export type { PriceDistribution, SizeDistribution } from './trade.types';
+
+export interface ScaleOrderParams {
+    symbol: string;
+    side: 'buy' | 'sell';
+    price_from: number;
+    price_to: number;
+    orders_count: number;
+    total_size: number;
+    price_distribution: PriceDistribution;
+    size_distribution: SizeDistribution;
+    margin_mode: MarginMode;
+    position_mode: PositionMode;
+    leverage: number;
+    qty_step?: number;
+    tick_size?: number;
+    min_qty?: number;
+    contract_size?: number;
+}
+
+export interface ScaleOrderEntry {
+    price: number;
+    size: number;
+}
+
+export interface BatchLimitOrderParams {
+    symbol: string;
+    side: 'buy' | 'sell';
+    orders: ScaleOrderEntry[];
+    margin_mode: MarginMode;
+    position_mode: PositionMode;
+    qty_step?: number;
+    tick_size?: number;
+    contract_size?: number;
+}
+
+export interface MarketInfo {
+    contract_size?: number;
+}
+
+export interface AccountData {
+    balance: Balance | null;
+    positions: Position[];
+    orders: Order[];
+}
+
+export interface CachedMarketMap {
+    data: Record<string, MarketInfo>;
+    timestamp: number;
+}

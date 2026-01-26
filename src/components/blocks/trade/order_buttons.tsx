@@ -8,7 +8,11 @@ import {
     current_market,
 } from '../../../stores/trade_store';
 import { get_ticker } from '../../../stores/exchange_store';
-import { place_market_order, place_limit_order } from '../../../stores/account_store';
+import {
+    place_market_order,
+    place_limit_order,
+    place_scale_orders,
+} from '../../../stores/account_store';
 import { has_exchange } from '../../../services/exchange/account_bridge';
 import { parse_symbol } from '../../chart/symbol_row';
 import { format_price, extract_error_message } from '../../../utils/format';
@@ -165,9 +169,88 @@ export const OrderButtons = memo(function OrderButtons() {
         ]
     );
 
+    const scale_price_from = scale_form.price_from;
+    const scale_price_to = scale_form.price_to;
+    const scale_orders_count = scale_form.orders_count;
+    const scale_total_size_usd = scale_form.total_size_usd;
+    const scale_price_distribution = scale_form.price_distribution;
+    const scale_size_distribution = scale_form.size_distribution;
+
+    const execute_scale_order = useCallback(
+        async (
+            side: 'buy' | 'sell'
+        ): Promise<{ success: number; failed: number; total: number }> => {
+            const price_from = parseFloat(scale_price_from) || 0;
+            const price_to = parseFloat(scale_price_to) || 0;
+            const total_usd = parseFloat(scale_total_size_usd) || 0;
+
+            if (price_from <= 0 || price_to <= 0) {
+                toast.error('Invalid price range');
+                return { success: 0, failed: 0, total: 0 };
+            }
+
+            if (total_usd <= 0) {
+                toast.error('Invalid total size');
+                return { success: 0, failed: 0, total: 0 };
+            }
+
+            if (scale_orders_count < 2) {
+                toast.error('Need at least 2 orders');
+                return { success: 0, failed: 0, total: 0 };
+            }
+
+            if (last_price) {
+                if (side === 'buy') {
+                    const max_price = Math.max(price_from, price_to);
+                    if (max_price >= last_price) {
+                        toast.error('Scale buy prices must be below market price');
+                        return { success: 0, failed: 0, total: 0 };
+                    }
+                } else {
+                    const min_price = Math.min(price_from, price_to);
+                    if (min_price <= last_price) {
+                        toast.error('Scale sell prices must be above market price');
+                        return { success: 0, failed: 0, total: 0 };
+                    }
+                }
+            }
+
+            const avg_price = (price_from + price_to) / 2;
+            const total_size = total_usd / avg_price;
+
+            if (total_size <= 0) {
+                toast.error('Unable to calculate order size');
+                return { success: 0, failed: 0, total: 0 };
+            }
+
+            return place_scale_orders(
+                exchange,
+                symbol,
+                side,
+                price_from,
+                price_to,
+                scale_orders_count,
+                total_size,
+                scale_price_distribution,
+                scale_size_distribution
+            );
+        },
+        [
+            scale_price_from,
+            scale_price_to,
+            scale_orders_count,
+            scale_total_size_usd,
+            scale_price_distribution,
+            scale_size_distribution,
+            exchange,
+            symbol,
+            last_price,
+        ]
+    );
+
     const submit_order = useCallback(
         async (side: 'buy' | 'sell') => {
-            if (order_type !== 'market' && order_type !== 'limit') {
+            if (order_type !== 'market' && order_type !== 'limit' && order_type !== 'scale') {
                 toast.error(`${order_type} orders not yet implemented`);
                 return;
             }
@@ -181,15 +264,28 @@ export const OrderButtons = memo(function OrderButtons() {
             const side_label = side === 'buy' ? 'BUY' : 'SELL';
 
             try {
-                const success =
-                    order_type === 'market'
-                        ? await execute_market_order(side)
-                        : await execute_limit_order(side);
-
-                if (success) {
-                    toast.success(`${side_label} ${base} order placed`);
+                if (order_type === 'scale') {
+                    const result = await execute_scale_order(side);
+                    if (result.success > 0) {
+                        toast.success(`${result.success}/${result.total} scale orders placed`);
+                    }
+                    if (result.failed > 0) {
+                        toast.error(`${result.failed}/${result.total} orders failed`);
+                    }
+                    if (result.success === 0 && result.failed === 0) {
+                        toast.error('Failed to place scale orders');
+                    }
                 } else {
-                    toast.error(`Failed to place ${side_label} order`);
+                    const success =
+                        order_type === 'market'
+                            ? await execute_market_order(side)
+                            : await execute_limit_order(side);
+
+                    if (success) {
+                        toast.success(`${side_label} ${base} order placed`);
+                    } else {
+                        toast.error(`Failed to place ${side_label} order`);
+                    }
                 }
             } catch (err) {
                 const error_msg = extract_error_message(err);
@@ -198,7 +294,7 @@ export const OrderButtons = memo(function OrderButtons() {
                 setSubmitting(false);
             }
         },
-        [order_type, exchange, base, execute_market_order, execute_limit_order]
+        [order_type, exchange, base, execute_market_order, execute_limit_order, execute_scale_order]
     );
 
     const handle_buy = useCallback(() => submit_order('buy'), [submit_order]);

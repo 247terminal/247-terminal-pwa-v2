@@ -9,6 +9,8 @@ export type {
     ClosePositionParams,
     MarketOrderParams,
     LimitOrderParams,
+    ScaleOrderParams,
+    BatchLimitOrderParams,
 } from '@/types/trading.types';
 export type { BybitExchange } from './bybit';
 export type { BlofinExchange } from './blofin';

@@ -6,6 +6,7 @@ import type {
     ClosePositionParams,
     MarketOrderParams,
     LimitOrderParams,
+    BatchLimitOrderParams,
 } from '@/types/trading.types';
 import { bybit as sym } from '../symbol_utils';
 import { split_quantity, round_quantity_string, round_price_string } from '../../utils/format';
@@ -556,13 +557,54 @@ export async function place_market_order(
     return true;
 }
 
+interface BuildLimitOrderOptions {
+    symbol: string;
+    side: 'buy' | 'sell';
+    size: number;
+    price: number;
+    position_mode: 'one_way' | 'hedge';
+    qty_step?: number;
+    tick_size?: number;
+    post_only?: boolean;
+    reduce_only?: boolean;
+}
+
+function build_limit_order(
+    options: BuildLimitOrderOptions
+): Record<string, string | number | boolean> {
+    const bybit_symbol = sym.fromUnified(options.symbol);
+    const order_side = options.side === 'buy' ? 'Buy' : 'Sell';
+
+    const order: Record<string, string | number | boolean> = {
+        symbol: bybit_symbol,
+        side: order_side,
+        orderType: 'Limit',
+        qty: round_quantity_string(options.size, options.qty_step),
+        price: round_price_string(options.price, options.tick_size),
+        timeInForce: options.post_only ? 'PostOnly' : 'GTC',
+    };
+
+    if (options.reduce_only) {
+        order.reduceOnly = true;
+    }
+
+    if (options.position_mode === 'hedge') {
+        order.positionIdx = options.side === 'buy' ? 1 : 2;
+        if (options.reduce_only) {
+            order.positionIdx = options.side === 'buy' ? 2 : 1;
+        }
+        delete order.reduceOnly;
+    } else {
+        order.positionIdx = 0;
+    }
+
+    return order;
+}
+
 export async function place_limit_order(
     exchange: BybitExchange,
     params: LimitOrderParams
 ): Promise<boolean> {
-    const bybit_symbol = sym.fromUnified(params.symbol);
-    const order_side = params.side === 'buy' ? 'Buy' : 'Sell';
-
     if (!params.size || params.size <= 0 || !isFinite(params.size)) {
         throw new Error('invalid order size');
     }
@@ -571,29 +613,92 @@ export async function place_limit_order(
         throw new Error('invalid order price');
     }
 
-    const order: Record<string, string | number | boolean> = {
-        symbol: bybit_symbol,
-        side: order_side,
-        orderType: 'Limit',
-        qty: round_quantity_string(params.size, params.qty_step),
-        price: round_price_string(params.price, params.tick_size),
-        timeInForce: params.post_only ? 'PostOnly' : 'GTC',
-    };
-
-    if (params.reduce_only) {
-        order.reduceOnly = true;
-    }
-
-    if (params.position_mode === 'hedge') {
-        order.positionIdx = params.side === 'buy' ? 1 : 2;
-        if (params.reduce_only) {
-            order.positionIdx = params.side === 'buy' ? 2 : 1;
-        }
-        delete order.reduceOnly;
-    } else {
-        order.positionIdx = 0;
-    }
+    const order = build_limit_order({
+        symbol: params.symbol,
+        side: params.side,
+        size: params.size,
+        price: params.price,
+        position_mode: params.position_mode,
+        qty_step: params.qty_step,
+        tick_size: params.tick_size,
+        post_only: params.post_only,
+        reduce_only: params.reduce_only,
+    });
 
     await exchange.privatePostV5OrderCreate({ category: 'linear', ...order });
     return true;
+}
+
+export async function place_batch_limit_orders(
+    exchange: BybitExchange,
+    params: BatchLimitOrderParams
+): Promise<{ success: number; failed: number }> {
+    if (!params.orders || params.orders.length === 0) {
+        return { success: 0, failed: 0 };
+    }
+
+    const orders = params.orders.map((o) =>
+        build_limit_order({
+            symbol: params.symbol,
+            side: params.side,
+            size: o.size,
+            price: o.price,
+            position_mode: params.position_mode,
+            qty_step: params.qty_step,
+            tick_size: params.tick_size,
+        })
+    );
+
+    const batch_size = ORDER_BATCH_CONSTANTS.BYBIT_BATCH_SIZE;
+    const batches: (typeof orders)[] = [];
+    for (let i = 0; i < orders.length; i += batch_size) {
+        batches.push(orders.slice(i, i + batch_size));
+    }
+
+    const results = await Promise.all(
+        batches.map((batch) =>
+            exchange
+                .privatePostV5OrderCreateBatch({ category: 'linear', request: batch })
+                .then((response) => {
+                    const res = response as { result?: { list?: Array<{ orderId?: string }> } };
+                    const list = res?.result?.list;
+                    let batch_success = 0;
+                    let batch_failed = 0;
+                    if (Array.isArray(list)) {
+                        for (const r of list) {
+                            if (r.orderId) {
+                                batch_success++;
+                            } else {
+                                batch_failed++;
+                            }
+                        }
+                    } else {
+                        batch_success = batch.length;
+                    }
+                    return { success: batch_success, failed: batch_failed };
+                })
+                .catch((err) => {
+                    console.error('bybit batch order failed:', (err as Error).message);
+                    return { success: 0, failed: batch.length, error: err as Error };
+                })
+        )
+    );
+
+    let success_count = 0;
+    let failed_count = 0;
+    let first_error: Error | undefined;
+
+    for (const r of results) {
+        success_count += r.success;
+        failed_count += r.failed;
+        if ('error' in r && !first_error) {
+            first_error = r.error;
+        }
+    }
+
+    if (first_error && success_count === 0) {
+        throw first_error;
+    }
+
+    return { success: success_count, failed: failed_count };
 }

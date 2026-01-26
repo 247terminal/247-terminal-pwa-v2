@@ -13,6 +13,7 @@ import type {
     ClosePositionParams,
     MarketOrderParams,
     LimitOrderParams,
+    BatchLimitOrderParams,
 } from '@/types/trading.types';
 import { blofin as sym } from '../symbol_utils';
 import { split_quantity, round_quantity_string, round_price_string } from '../../utils/format';
@@ -724,12 +725,57 @@ export async function place_market_order(
     return true;
 }
 
+interface BuildLimitOrderOptions {
+    symbol: string;
+    side: 'buy' | 'sell';
+    size: number;
+    price: number;
+    margin_mode: 'cross' | 'isolated';
+    position_mode: 'one_way' | 'hedge';
+    qty_step?: number;
+    tick_size?: number;
+    contract_size?: number;
+    post_only?: boolean;
+    reduce_only?: boolean;
+}
+
+function build_limit_order(options: BuildLimitOrderOptions): Record<string, string | number> {
+    const blofin_inst_id = to_blofin_inst_id(options.symbol);
+    const contract_size =
+        options.contract_size && options.contract_size > 0 ? options.contract_size : 1;
+    const size_in_contracts = options.size / contract_size;
+
+    const order: Record<string, string | number> = {
+        instId: blofin_inst_id,
+        marginMode: options.margin_mode,
+        side: options.side,
+        orderType: options.post_only ? 'post_only' : 'limit',
+        size: round_quantity_string(size_in_contracts, options.qty_step),
+        price: round_price_string(options.price, options.tick_size),
+        brokerId: BROKER_CONFIG.blofin.brokerId,
+    };
+
+    if (options.reduce_only) {
+        order.reduceOnly = 'true';
+    }
+
+    if (options.position_mode === 'hedge') {
+        order.positionSide = options.side === 'buy' ? 'long' : 'short';
+        if (options.reduce_only) {
+            order.positionSide = options.side === 'buy' ? 'short' : 'long';
+        }
+        delete order.reduceOnly;
+    } else {
+        order.positionSide = 'net';
+    }
+
+    return order;
+}
+
 export async function place_limit_order(
     exchange: BlofinExchange,
     params: LimitOrderParams
 ): Promise<boolean> {
-    const blofin_inst_id = to_blofin_inst_id(params.symbol);
-    const order_side = params.side;
     const contract_size =
         params.contract_size && params.contract_size > 0 ? params.contract_size : 1;
     const size_in_contracts = params.size / contract_size;
@@ -742,30 +788,95 @@ export async function place_limit_order(
         throw new Error('invalid order price');
     }
 
-    const order: Record<string, string | number> = {
-        instId: blofin_inst_id,
-        marginMode: params.margin_mode,
-        side: order_side,
-        orderType: params.post_only ? 'post_only' : 'limit',
-        size: round_quantity_string(size_in_contracts, params.qty_step),
-        price: round_price_string(params.price, params.tick_size),
-        brokerId: BROKER_CONFIG.blofin.brokerId,
-    };
-
-    if (params.reduce_only) {
-        order.reduceOnly = 'true';
-    }
-
-    if (params.position_mode === 'hedge') {
-        order.positionSide = params.side === 'buy' ? 'long' : 'short';
-        if (params.reduce_only) {
-            order.positionSide = params.side === 'buy' ? 'short' : 'long';
-        }
-        delete order.reduceOnly;
-    } else {
-        order.positionSide = 'net';
-    }
+    const order = build_limit_order({
+        symbol: params.symbol,
+        side: params.side,
+        size: params.size,
+        price: params.price,
+        margin_mode: params.margin_mode,
+        position_mode: params.position_mode,
+        qty_step: params.qty_step,
+        tick_size: params.tick_size,
+        contract_size: params.contract_size,
+        post_only: params.post_only,
+        reduce_only: params.reduce_only,
+    });
 
     await exchange.privatePostTradeOrder(order);
     return true;
+}
+
+export async function place_batch_limit_orders(
+    exchange: BlofinExchange,
+    params: BatchLimitOrderParams
+): Promise<{ success: number; failed: number }> {
+    if (!params.orders || params.orders.length === 0) {
+        return { success: 0, failed: 0 };
+    }
+
+    const orders = params.orders.map((o) =>
+        build_limit_order({
+            symbol: params.symbol,
+            side: params.side,
+            size: o.size,
+            price: o.price,
+            margin_mode: params.margin_mode,
+            position_mode: params.position_mode,
+            qty_step: params.qty_step,
+            tick_size: params.tick_size,
+            contract_size: params.contract_size,
+        })
+    );
+
+    const batch_size = ORDER_BATCH_CONSTANTS.BLOFIN_BATCH_SIZE;
+    const batches: (typeof orders)[] = [];
+    for (let i = 0; i < orders.length; i += batch_size) {
+        batches.push(orders.slice(i, i + batch_size));
+    }
+
+    const results = await Promise.all(
+        batches.map((batch) =>
+            exchange
+                .privatePostTradeBatchOrders(batch)
+                .then((response) => {
+                    const res = response as { data?: Array<{ orderId?: string; code?: string }> };
+                    let batch_success = 0;
+                    let batch_failed = 0;
+                    if (Array.isArray(res?.data)) {
+                        for (const r of res.data) {
+                            if (r.orderId && r.code === '0') {
+                                batch_success++;
+                            } else {
+                                batch_failed++;
+                            }
+                        }
+                    } else {
+                        batch_success = batch.length;
+                    }
+                    return { success: batch_success, failed: batch_failed };
+                })
+                .catch((err) => {
+                    console.error('blofin batch order failed:', (err as Error).message);
+                    return { success: 0, failed: batch.length, error: err as Error };
+                })
+        )
+    );
+
+    let success_count = 0;
+    let failed_count = 0;
+    let first_error: Error | undefined;
+
+    for (const r of results) {
+        success_count += r.success;
+        failed_count += r.failed;
+        if ('error' in r && !first_error) {
+            first_error = r.error;
+        }
+    }
+
+    if (first_error && success_count === 0) {
+        throw first_error;
+    }
+
+    return { success: success_count, failed: failed_count };
 }

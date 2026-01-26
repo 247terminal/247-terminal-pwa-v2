@@ -11,8 +11,10 @@ import {
     close_position_api,
     place_market_order_api,
     place_limit_order_api,
+    place_scale_orders_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
+import type { PriceDistribution, SizeDistribution } from '../types/trading.types';
 import { get_market, has_markets, get_ticker } from './exchange_store';
 import { get_symbol_settings } from './trading_store';
 import { settings } from './settings_store';
@@ -554,6 +556,49 @@ export async function place_limit_order(
         return success;
     } catch (err) {
         console.error(`failed to place limit order ${symbol}:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function place_scale_orders(
+    exchange_id: ExchangeId,
+    symbol: string,
+    side: 'buy' | 'sell',
+    price_from: number,
+    price_to: number,
+    orders_count: number,
+    total_size: number,
+    price_distribution: PriceDistribution,
+    size_distribution: SizeDistribution
+): Promise<{ success: number; failed: number; total: number }> {
+    if (!has_exchange(exchange_id)) {
+        throw new Error('Exchange not connected');
+    }
+
+    try {
+        const symbol_settings = get_symbol_settings(exchange_id, symbol);
+        const market = get_market(exchange_id, symbol);
+
+        const result = await place_scale_orders_api(exchange_id, {
+            symbol,
+            side,
+            price_from,
+            price_to,
+            orders_count,
+            total_size,
+            price_distribution,
+            size_distribution,
+            margin_mode: symbol_settings?.margin_mode ?? 'cross',
+            leverage: symbol_settings?.leverage ?? 10,
+            qty_step: symbol_settings?.qty_step ?? market?.qty_step,
+            tick_size: market?.tick_size,
+            min_qty: symbol_settings?.min_qty ?? market?.min_qty,
+            contract_size: market?.contract_size,
+        });
+
+        return result;
+    } catch (err) {
+        console.error(`failed to place scale orders ${symbol}:`, (err as Error).message);
         throw err;
     }
 }

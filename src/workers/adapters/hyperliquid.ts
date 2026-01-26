@@ -5,6 +5,7 @@ import type {
     ClosePositionParams,
     MarketOrderParams,
     LimitOrderParams,
+    BatchLimitOrderParams,
 } from '@/types/trading.types';
 import { split_quantity, round_quantity, round_price } from '../../utils/format';
 import { hyperliquid as sym } from '../symbol_utils';
@@ -469,6 +470,39 @@ export async function place_market_order(
     return true;
 }
 
+interface CreateLimitOrderOptions {
+    symbol: string;
+    side: 'buy' | 'sell';
+    size: number;
+    price: number;
+    qty_step?: number;
+    tick_size?: number;
+    post_only?: boolean;
+    reduce_only?: boolean;
+}
+
+function create_limit_order(
+    exchange: HyperliquidExchange,
+    options: CreateLimitOrderOptions
+): Promise<unknown> {
+    const order_params: Record<string, unknown> = {
+        postOnly: options.post_only ?? false,
+    };
+
+    if (options.reduce_only) {
+        order_params.reduceOnly = true;
+    }
+
+    return exchange.createOrder(
+        options.symbol,
+        'limit',
+        options.side,
+        round_quantity(options.size, options.qty_step),
+        round_price(options.price, options.tick_size),
+        order_params
+    );
+}
+
 export async function place_limit_order(
     exchange: HyperliquidExchange,
     params: LimitOrderParams
@@ -481,22 +515,64 @@ export async function place_limit_order(
         throw new Error('invalid order price');
     }
 
-    const order_params: Record<string, unknown> = {
-        postOnly: params.post_only ?? false,
-    };
-
-    if (params.reduce_only) {
-        order_params.reduceOnly = true;
-    }
-
-    await exchange.createOrder(
-        params.symbol,
-        'limit',
-        params.side,
-        round_quantity(params.size, params.qty_step),
-        round_price(params.price, params.tick_size),
-        order_params
-    );
+    await create_limit_order(exchange, {
+        symbol: params.symbol,
+        side: params.side,
+        size: params.size,
+        price: params.price,
+        qty_step: params.qty_step,
+        tick_size: params.tick_size,
+        post_only: params.post_only,
+        reduce_only: params.reduce_only,
+    });
 
     return true;
+}
+
+export async function place_batch_limit_orders(
+    exchange: HyperliquidExchange,
+    params: BatchLimitOrderParams
+): Promise<{ success: number; failed: number }> {
+    if (!params.orders || params.orders.length === 0) {
+        return { success: 0, failed: 0 };
+    }
+
+    const results = await Promise.all(
+        params.orders.map((o) =>
+            create_limit_order(exchange, {
+                symbol: params.symbol,
+                side: params.side,
+                size: o.size,
+                price: o.price,
+                qty_step: params.qty_step,
+                tick_size: params.tick_size,
+            })
+                .then(() => ({ success: true as const }))
+                .catch((err: unknown) => {
+                    console.error('hyperliquid order failed:', (err as Error).message);
+                    return { success: false as const, error: err as Error };
+                })
+        )
+    );
+
+    let success_count = 0;
+    let failed_count = 0;
+    let first_error: Error | undefined;
+
+    for (const r of results) {
+        if (r.success) {
+            success_count++;
+        } else {
+            failed_count++;
+            if (!first_error && 'error' in r) {
+                first_error = r.error;
+            }
+        }
+    }
+
+    if (first_error && success_count === 0) {
+        throw first_error;
+    }
+
+    return { success: success_count, failed: failed_count };
 }
