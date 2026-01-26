@@ -112,7 +112,7 @@ export const TickerInfo = memo(function TickerInfo({ exchange, symbol }: TickerI
     return (
         <div class="flex items-center gap-4 text-xs no-drag cursor-default">
             <span class={`font-semibold text-sm tabular-nums ${price_flash_class}`}>${price}</span>
-            <div class="flex flex-col leading-tight">
+            <div class="flex flex-col items-center leading-tight">
                 <span class="text-base-content/50">24h Change</span>
                 <span
                     class={`font-semibold tabular-nums ${change.positive ? 'text-success' : 'text-error'}`}
@@ -120,11 +120,11 @@ export const TickerInfo = memo(function TickerInfo({ exchange, symbol }: TickerI
                     {change.text}
                 </span>
             </div>
-            <div class="flex flex-col leading-tight">
+            <div class="flex flex-col items-center leading-tight">
                 <span class="text-base-content/50">24h Volume</span>
                 <span class="font-semibold tabular-nums text-base-content/70">{volume}</span>
             </div>
-            <div class="flex flex-col leading-tight">
+            <div class="flex flex-col items-center leading-tight">
                 <span class="text-base-content/50">Funding / Countdown</span>
                 <span class="font-semibold tabular-nums">
                     <span class={funding.positive ? 'text-success' : 'text-error'}>
@@ -134,7 +134,7 @@ export const TickerInfo = memo(function TickerInfo({ exchange, symbol }: TickerI
                     <span class="text-base-content/70">{countdown}</span>
                 </span>
             </div>
-            <div class="flex flex-col leading-tight">
+            <div class="flex flex-col items-center leading-tight">
                 <span class="text-base-content/50">Market Cap</span>
                 <span class="font-semibold tabular-nums text-base-content/70">{market_cap}</span>
             </div>
