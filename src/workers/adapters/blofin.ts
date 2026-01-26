@@ -7,10 +7,12 @@ import type {
     OrderCategory,
 } from '@/types/worker.types';
 import { POSITION_CONSTANTS } from '@/config/chart.constants';
+import { ORDER_BATCH_CONSTANTS } from '@/config/trading.constants';
 import { BROKER_CONFIG } from '@/config';
-import type { ClosePositionParams } from '@/types/trading.types';
+import type { ClosePositionParams, MarketOrderParams } from '@/types/trading.types';
 import { blofin as sym } from '../symbol_utils';
-import { split_quantity } from '../../utils/format';
+import { split_quantity, round_quantity_string } from '../../utils/format';
+import { hasDataProperty } from './type_guards';
 
 type BaseBlofinExchange = InstanceType<typeof blofin>;
 
@@ -93,14 +95,11 @@ interface BlofinLeverageResponse {
     }>;
 }
 
-function has_data(d: unknown): d is { data: unknown } {
-    return d !== null && typeof d === 'object' && 'data' in d;
-}
-const is_position_response = has_data as (d: unknown) => d is BlofinPositionResponse;
-const is_balance_response = has_data as (d: unknown) => d is BlofinBalanceResponse;
-const is_order_response = has_data as (d: unknown) => d is BlofinOrderResponse;
-const is_fill_response = has_data as (d: unknown) => d is BlofinFillResponse;
-const is_leverage_response = has_data as (d: unknown) => d is BlofinLeverageResponse;
+const is_position_response = hasDataProperty as (d: unknown) => d is BlofinPositionResponse;
+const is_balance_response = hasDataProperty as (d: unknown) => d is BlofinBalanceResponse;
+const is_order_response = hasDataProperty as (d: unknown) => d is BlofinOrderResponse;
+const is_fill_response = hasDataProperty as (d: unknown) => d is BlofinFillResponse;
+const is_leverage_response = hasDataProperty as (d: unknown) => d is BlofinLeverageResponse;
 
 export async function fetch_position_mode(exchange: BlofinExchange): Promise<'hedge' | 'one_way'> {
     try {
@@ -199,13 +198,8 @@ interface BlofinAlgoOrderResponse {
     }>;
 }
 
-function is_tpsl_order_response(data: unknown): data is BlofinTpslOrderResponse {
-    return data !== null && typeof data === 'object' && 'data' in data;
-}
-
-function is_algo_order_response(data: unknown): data is BlofinAlgoOrderResponse {
-    return data !== null && typeof data === 'object' && 'data' in data;
-}
+const is_tpsl_order_response = hasDataProperty as (d: unknown) => d is BlofinTpslOrderResponse;
+const is_algo_order_response = hasDataProperty as (d: unknown) => d is BlofinAlgoOrderResponse;
 
 export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]> {
     const [pending_result, tpsl_result, trigger_result] = await Promise.all([
@@ -410,7 +404,7 @@ export async function fetch_leverage_settings(
     if (symbols.length === 0) return {};
 
     const result: Record<string, number> = {};
-    const batch_size = 20;
+    const batch_size = ORDER_BATCH_CONSTANTS.BLOFIN_BATCH_SIZE;
 
     try {
         for (let i = 0; i < symbols.length; i += batch_size) {
@@ -572,7 +566,7 @@ export async function close_position(
             marginMode: params.margin_mode,
             side: order_side,
             orderType: params.order_type,
-            size: String(qty),
+            size: round_quantity_string(qty, params.qty_step),
             reduceOnly: 'true',
             brokerId: BROKER_CONFIG.blofin.brokerId,
         };
@@ -591,30 +585,126 @@ export async function close_position(
         return order;
     });
 
-    let failed = 0;
+    let first_error: Error | null = null;
 
     if (orders.length === 1) {
         try {
             await exchange.privatePostTradeOrder(orders[0]);
         } catch (err) {
             console.error('blofin order failed:', (err as Error).message);
-            failed = 1;
+            first_error = err as Error;
         }
     } else {
-        const batch_size = 20;
+        const batch_size = ORDER_BATCH_CONSTANTS.BLOFIN_BATCH_SIZE;
+        const batches: (typeof orders)[] = [];
         for (let i = 0; i < orders.length; i += batch_size) {
-            const batch = orders.slice(i, i + batch_size);
-            try {
-                await exchange.privatePostTradeBatchOrders(batch);
-            } catch (err) {
-                console.error('blofin batch order failed:', (err as Error).message);
-                failed += batch.length;
-            }
+            batches.push(orders.slice(i, i + batch_size));
         }
+        const results = await Promise.all(
+            batches.map((batch) =>
+                exchange.privatePostTradeBatchOrders(batch).catch((err) => {
+                    console.error('blofin batch order failed:', (err as Error).message);
+                    return err as Error;
+                })
+            )
+        );
+        first_error = results.find((r) => r instanceof Error) as Error | null;
     }
 
-    if (failed > 0) {
-        throw new Error(`${failed}/${orders.length} orders failed`);
+    if (first_error) {
+        throw first_error;
+    }
+
+    return true;
+}
+
+export async function place_market_order(
+    exchange: BlofinExchange,
+    params: MarketOrderParams
+): Promise<boolean> {
+    const blofin_inst_id = to_blofin_inst_id(params.symbol);
+    const order_side = params.side;
+
+    if (!params.size || params.size <= 0 || !isFinite(params.size)) {
+        throw new Error('invalid order size');
+    }
+
+    const max_qty =
+        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : params.size;
+    const quantities = split_quantity(params.size, max_qty);
+
+    if (quantities.length === 0) {
+        throw new Error('no quantities to place');
+    }
+
+    const is_limit_ioc = params.slippage !== 'MARKET' && params.slippage && params.current_price;
+
+    let limit_price: number | undefined;
+    if (is_limit_ioc && params.current_price && typeof params.slippage === 'number') {
+        const slippage_multiplier =
+            params.side === 'buy' ? 1 + params.slippage / 100 : 1 - params.slippage / 100;
+        limit_price = params.current_price * slippage_multiplier;
+    }
+
+    const orders = quantities.map((qty) => {
+        const order: Record<string, string | number> = {
+            instId: blofin_inst_id,
+            marginMode: params.margin_mode,
+            side: order_side,
+            orderType: is_limit_ioc ? 'limit' : 'market',
+            size: round_quantity_string(qty, params.qty_step),
+            brokerId: BROKER_CONFIG.blofin.brokerId,
+        };
+
+        if (is_limit_ioc && limit_price) {
+            order.price = String(limit_price);
+        }
+
+        if (params.reduce_only) {
+            order.reduceOnly = 'true';
+        }
+
+        if (params.position_mode === 'hedge') {
+            order.positionSide = params.side === 'buy' ? 'long' : 'short';
+            if (params.reduce_only) {
+                order.positionSide = params.side === 'buy' ? 'short' : 'long';
+            }
+            delete order.reduceOnly;
+        } else {
+            order.positionSide = 'net';
+        }
+
+        return order;
+    });
+
+    let first_error: Error | null = null;
+
+    if (orders.length === 1) {
+        try {
+            await exchange.privatePostTradeOrder(orders[0]);
+        } catch (err) {
+            console.error('blofin order failed:', (err as Error).message);
+            first_error = err as Error;
+        }
+    } else {
+        const batch_size = ORDER_BATCH_CONSTANTS.BLOFIN_BATCH_SIZE;
+        const batches: (typeof orders)[] = [];
+        for (let i = 0; i < orders.length; i += batch_size) {
+            batches.push(orders.slice(i, i + batch_size));
+        }
+        const results = await Promise.all(
+            batches.map((batch) =>
+                exchange.privatePostTradeBatchOrders(batch).catch((err) => {
+                    console.error('blofin batch order failed:', (err as Error).message);
+                    return err as Error;
+                })
+            )
+        );
+        first_error = results.find((r) => r instanceof Error) as Error | null;
+    }
+
+    if (first_error) {
+        throw first_error;
     }
 
     return true;

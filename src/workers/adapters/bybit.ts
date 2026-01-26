@@ -1,15 +1,11 @@
 import type bybit from 'ccxt/js/src/pro/bybit.js';
-import type {
-    RawPosition,
-    RawOrder,
-    RawClosedPosition,
-    RawFill,
-    OrderCategory,
-} from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 import { HISTORY_FETCH_CONSTANTS } from '@/config/chart.constants';
-import type { ClosePositionParams } from '@/types/trading.types';
+import { ORDER_BATCH_CONSTANTS } from '@/config/trading.constants';
+import type { ClosePositionParams, MarketOrderParams } from '@/types/trading.types';
 import { bybit as sym } from '../symbol_utils';
-import { split_quantity } from '../../utils/format';
+import { split_quantity, round_quantity_string } from '../../utils/format';
+import { hasResultProperty } from './type_guards';
 
 type BaseBybitExchange = InstanceType<typeof bybit>;
 
@@ -96,17 +92,9 @@ interface BybitClosedPnlResponse {
     };
 }
 
-function is_position_response(data: unknown): data is BybitPositionResponse {
-    return data !== null && typeof data === 'object' && 'result' in data;
-}
-
-function is_balance_response(data: unknown): data is BybitBalanceResponse {
-    return data !== null && typeof data === 'object' && 'result' in data;
-}
-
-function is_order_response(data: unknown): data is BybitOrderResponse {
-    return data !== null && typeof data === 'object' && 'result' in data;
-}
+const is_position_response = hasResultProperty as (d: unknown) => d is BybitPositionResponse;
+const is_balance_response = hasResultProperty as (d: unknown) => d is BybitBalanceResponse;
+const is_order_response = hasResultProperty as (d: unknown) => d is BybitOrderResponse;
 
 interface BybitExecutionResponse {
     result?: {
@@ -124,9 +112,7 @@ interface BybitExecutionResponse {
     };
 }
 
-function is_execution_response(data: unknown): data is BybitExecutionResponse {
-    return data !== null && typeof data === 'object' && 'result' in data;
-}
+const is_execution_response = hasResultProperty as (d: unknown) => d is BybitExecutionResponse;
 
 export async function fetch_position_mode(exchange: BybitExchange): Promise<'hedge' | 'one_way'> {
     try {
@@ -370,8 +356,7 @@ export async function fetch_leverage_settings(
 export async function cancel_order(
     exchange: BybitExchange,
     order_id: string,
-    symbol: string,
-    _category: OrderCategory
+    symbol: string
 ): Promise<boolean> {
     const bybit_symbol = sym.fromUnified(symbol);
     await exchange.privatePostV5OrderCancel({
@@ -420,7 +405,7 @@ export async function close_position(
             symbol: bybit_symbol,
             side: order_side,
             orderType: params.order_type === 'market' ? 'Market' : 'Limit',
-            qty: String(qty),
+            qty: round_quantity_string(qty, params.qty_step),
             reduceOnly: true,
             timeInForce: params.order_type === 'market' ? 'IOC' : 'GTC',
         };
@@ -439,33 +424,129 @@ export async function close_position(
         return order;
     });
 
-    let failed = 0;
+    let first_error: Error | null = null;
 
     if (orders.length === 1) {
         try {
             await exchange.privatePostV5OrderCreate({ category: 'linear', ...orders[0] });
         } catch (err) {
             console.error('bybit order failed:', (err as Error).message);
-            failed = 1;
+            first_error = err as Error;
         }
     } else {
-        const batch_size = 10;
+        const batch_size = ORDER_BATCH_CONSTANTS.BYBIT_BATCH_SIZE;
+        const batches: (typeof orders)[] = [];
         for (let i = 0; i < orders.length; i += batch_size) {
-            const batch = orders.slice(i, i + batch_size);
-            try {
-                await exchange.privatePostV5OrderCreateBatch({
-                    category: 'linear',
-                    request: batch,
-                });
-            } catch (err) {
-                console.error('bybit batch order failed:', (err as Error).message);
-                failed += batch.length;
-            }
+            batches.push(orders.slice(i, i + batch_size));
         }
+        const results = await Promise.all(
+            batches.map((batch) =>
+                exchange
+                    .privatePostV5OrderCreateBatch({ category: 'linear', request: batch })
+                    .catch((err) => {
+                        console.error('bybit batch order failed:', (err as Error).message);
+                        return err as Error;
+                    })
+            )
+        );
+        first_error = results.find((r) => r instanceof Error) as Error | null;
     }
 
-    if (failed > 0) {
-        throw new Error(`${failed}/${orders.length} orders failed`);
+    if (first_error) {
+        throw first_error;
+    }
+
+    return true;
+}
+
+export async function place_market_order(
+    exchange: BybitExchange,
+    params: MarketOrderParams
+): Promise<boolean> {
+    const bybit_symbol = sym.fromUnified(params.symbol);
+    const order_side = params.side === 'buy' ? 'Buy' : 'Sell';
+
+    if (!params.size || params.size <= 0 || !isFinite(params.size)) {
+        throw new Error('invalid order size');
+    }
+
+    const max_qty =
+        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : params.size;
+    const quantities = split_quantity(params.size, max_qty);
+
+    if (quantities.length === 0) {
+        throw new Error('no quantities to place');
+    }
+
+    const is_limit_ioc = params.slippage !== 'MARKET' && params.slippage && params.current_price;
+
+    let limit_price: number | undefined;
+    if (is_limit_ioc && params.current_price && typeof params.slippage === 'number') {
+        const slippage_multiplier =
+            params.side === 'buy' ? 1 + params.slippage / 100 : 1 - params.slippage / 100;
+        limit_price = params.current_price * slippage_multiplier;
+    }
+
+    const orders = quantities.map((qty) => {
+        const order: Record<string, string | number | boolean> = {
+            symbol: bybit_symbol,
+            side: order_side,
+            orderType: is_limit_ioc ? 'Limit' : 'Market',
+            qty: round_quantity_string(qty, params.qty_step),
+            timeInForce: 'IOC',
+        };
+
+        if (is_limit_ioc && limit_price) {
+            order.price = String(limit_price);
+        }
+
+        if (params.reduce_only) {
+            order.reduceOnly = true;
+        }
+
+        if (params.position_mode === 'hedge') {
+            order.positionIdx = params.side === 'buy' ? 1 : 2;
+            if (params.reduce_only) {
+                order.positionIdx = params.side === 'buy' ? 2 : 1;
+            }
+            delete order.reduceOnly;
+        } else {
+            order.positionIdx = 0;
+        }
+
+        return order;
+    });
+
+    let first_error: Error | null = null;
+
+    if (orders.length === 1) {
+        try {
+            await exchange.privatePostV5OrderCreate({ category: 'linear', ...orders[0] });
+        } catch (err) {
+            console.error('bybit order failed:', (err as Error).message);
+            first_error = err as Error;
+        }
+    } else {
+        const batch_size = ORDER_BATCH_CONSTANTS.BYBIT_BATCH_SIZE;
+        const batches: (typeof orders)[] = [];
+        for (let i = 0; i < orders.length; i += batch_size) {
+            batches.push(orders.slice(i, i + batch_size));
+        }
+        const results = await Promise.all(
+            batches.map((batch) =>
+                exchange
+                    .privatePostV5OrderCreateBatch({ category: 'linear', request: batch })
+                    .catch((err) => {
+                        console.error('bybit batch order failed:', (err as Error).message);
+                        return err as Error;
+                    })
+            )
+        );
+        first_error = results.find((r) => r instanceof Error) as Error | null;
+    }
+
+    if (first_error) {
+        throw first_error;
     }
 
     return true;

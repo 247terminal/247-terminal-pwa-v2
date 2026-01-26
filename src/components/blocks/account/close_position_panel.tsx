@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import type { Position } from '../../../types/account.types';
 import { close_position } from '../../../stores/account_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
-import { format_price, format_size } from '../../../utils/format';
+import { format_price, format_size, extract_error_message } from '../../../utils/format';
 import { format_symbol, parse_symbol } from '../../chart/symbol_row';
 
 type CloseOrderType = 'market' | 'limit';
@@ -67,7 +67,7 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
 
     const handle_submit = useCallback(async () => {
         set_is_submitting(true);
-        const symbol_label = format_symbol(position.symbol);
+        const symbol_label = parse_symbol(position.symbol).base;
         try {
             const price = order_type === 'limit' ? parseFloat(limit_price) : undefined;
             const success = await close_position(
@@ -78,14 +78,20 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
                 price
             );
             if (success) {
-                toast.success(`Closed ${symbol_label} position`);
+                if (order_type === 'limit') {
+                    toast.success(`${symbol_label} close order placed`);
+                } else if (percentage < 100) {
+                    toast.success(`${symbol_label} position partially closed`);
+                } else {
+                    toast.success(`${symbol_label} position closed`);
+                }
             } else {
                 toast.error(`Failed to close ${symbol_label}`);
             }
             on_close();
         } catch (err) {
-            toast.error(`Failed to close ${symbol_label}`);
-            console.error('failed to close position:', (err as Error).message);
+            const error_msg = extract_error_message(err);
+            toast.error(`Failed to close ${symbol_label}: ${error_msg}`);
         } finally {
             set_is_submitting(false);
         }
@@ -96,6 +102,13 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
         if (DECIMAL_REGEX.test(value)) {
             set_limit_price(value);
         }
+    }, []);
+
+    const handle_set_market = useCallback(() => set_order_type('market'), []);
+    const handle_set_limit = useCallback(() => set_order_type('limit'), []);
+    const handle_percentage_click = useCallback((e: MouseEvent) => {
+        const pct = Number((e.currentTarget as HTMLButtonElement).dataset.pct);
+        if (pct) set_percentage(pct);
     }, []);
 
     const close_size = position.size * (percentage / 100);
@@ -121,7 +134,7 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
                 <div class="flex gap-1 p-0.5 bg-base-300/50 rounded-md">
                     <button
                         type="button"
-                        onClick={() => set_order_type('market')}
+                        onClick={handle_set_market}
                         class={`flex-1 py-1.5 text-[11px] font-medium rounded transition-all duration-150 ${
                             order_type === 'market'
                                 ? 'bg-base-content/10 text-base-content shadow-sm'
@@ -132,7 +145,7 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
                     </button>
                     <button
                         type="button"
-                        onClick={() => set_order_type('limit')}
+                        onClick={handle_set_limit}
                         class={`flex-1 py-1.5 text-[11px] font-medium rounded transition-all duration-150 ${
                             order_type === 'limit'
                                 ? 'bg-base-content/10 text-base-content shadow-sm'
@@ -159,7 +172,8 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
                         <button
                             key={pct}
                             type="button"
-                            onClick={() => set_percentage(pct)}
+                            data-pct={pct}
+                            onClick={handle_percentage_click}
                             class={`flex-1 py-1.5 text-[11px] font-medium rounded transition-all duration-150 ${
                                 percentage === pct
                                     ? 'bg-error/20 text-error'

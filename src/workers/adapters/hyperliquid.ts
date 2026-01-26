@@ -1,13 +1,8 @@
 import type hyperliquid from 'ccxt/js/src/pro/hyperliquid.js';
-import type {
-    RawPosition,
-    RawOrder,
-    RawClosedPosition,
-    RawFill,
-    OrderCategory,
-} from '@/types/worker.types';
+import type { RawPosition, RawOrder, RawClosedPosition, RawFill } from '@/types/worker.types';
 import { HYPERLIQUID_CACHE_TTL, EXCHANGE_CONFIG } from '@/config';
-import type { ClosePositionParams } from '@/types/trading.types';
+import type { ClosePositionParams, MarketOrderParams } from '@/types/trading.types';
+import { split_quantity, round_quantity } from '../../utils/format';
 import { hyperliquid as sym } from '../symbol_utils';
 
 type BaseHyperliquidExchange = InstanceType<typeof hyperliquid>;
@@ -333,8 +328,7 @@ export async function fetch_symbol_fills(
 export async function cancel_order(
     exchange: HyperliquidExchange,
     order_id: string,
-    symbol: string,
-    _category: OrderCategory
+    symbol: string
 ): Promise<boolean> {
     await exchange.cancelOrder(order_id, symbol);
     return true;
@@ -381,8 +375,12 @@ export async function close_position(
     exchange: HyperliquidExchange,
     params: ClosePositionParams
 ): Promise<boolean> {
-    const close_size = params.size * (params.percentage / 100);
+    const close_size = round_quantity(params.size * (params.percentage / 100), params.qty_step);
     const order_side = params.side === 'long' ? 'sell' : 'buy';
+
+    if (!close_size || close_size <= 0 || !isFinite(close_size)) {
+        throw new Error('invalid close size');
+    }
 
     const order_params: Record<string, unknown> = {
         reduceOnly: true,
@@ -398,6 +396,71 @@ export async function close_position(
         price,
         order_params
     );
+
+    return true;
+}
+
+export async function place_market_order(
+    exchange: HyperliquidExchange,
+    params: MarketOrderParams
+): Promise<boolean> {
+    if (!params.size || params.size <= 0 || !isFinite(params.size)) {
+        throw new Error('invalid order size');
+    }
+
+    const max_qty =
+        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : params.size;
+    const quantities = split_quantity(params.size, max_qty);
+
+    if (quantities.length === 0) {
+        throw new Error('no quantities to place');
+    }
+
+    const is_limit_ioc = params.slippage !== 'MARKET' && params.slippage && params.current_price;
+
+    let limit_price: number | undefined;
+    if (is_limit_ioc && params.current_price && typeof params.slippage === 'number') {
+        const slippage_multiplier =
+            params.side === 'buy' ? 1 + params.slippage / 100 : 1 - params.slippage / 100;
+        limit_price = params.current_price * slippage_multiplier;
+    }
+
+    const order_type = is_limit_ioc ? 'limit' : 'market';
+    const price = is_limit_ioc ? limit_price : params.current_price;
+
+    const order_params: Record<string, unknown> = {};
+    if (params.reduce_only) {
+        order_params.reduceOnly = true;
+    }
+    if (is_limit_ioc) {
+        order_params.timeInForce = 'Ioc';
+    }
+
+    const results = await Promise.all(
+        quantities.map((qty) =>
+            exchange
+                .createOrder(
+                    params.symbol,
+                    order_type,
+                    params.side,
+                    round_quantity(qty, params.qty_step),
+                    price,
+                    order_params
+                )
+                .then(() => ({ success: true, error: null }))
+                .catch((err) => {
+                    console.error('hyperliquid order failed:', (err as Error).message);
+                    return { success: false, error: err as Error };
+                })
+        )
+    );
+
+    const failed = results.filter((r) => !r.success);
+    if (failed.length > 0) {
+        const first_error = failed.find((r) => r.error)?.error;
+        if (first_error) throw first_error;
+        throw new Error(`${failed.length}/${quantities.length} orders failed`);
+    }
 
     return true;
 }

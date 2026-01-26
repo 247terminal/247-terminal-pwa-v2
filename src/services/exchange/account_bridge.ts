@@ -1,6 +1,12 @@
 import { signal } from '@preact/signals';
 import type { ExchangeId } from '@/types/exchange.types';
-import type { PositionMode, MarginMode, Balance, ClosePositionParams } from '@/types/trading.types';
+import type {
+    PositionMode,
+    MarginMode,
+    Balance,
+    ClosePositionParams,
+    MarketOrderParams,
+} from '@/types/trading.types';
 import type { Position, Order, TradeHistory } from '@/types/account.types';
 import type { RawFill, OrderCategory } from '@/types/worker.types';
 import { getWorker, sendRequest, fetch_markets } from './chart_data';
@@ -212,4 +218,11 @@ export function close_position_api(
     params: Omit<ClosePositionParams, 'position_mode'>
 ): Promise<boolean> {
     return sendRequest<boolean>('CLOSE_POSITION', { exchangeId, ...params });
+}
+
+export function place_market_order_api(
+    exchangeId: ExchangeId,
+    params: Omit<MarketOrderParams, 'position_mode'>
+): Promise<boolean> {
+    return sendRequest<boolean>('PLACE_MARKET_ORDER', { exchangeId, ...params });
 }

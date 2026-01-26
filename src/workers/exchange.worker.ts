@@ -30,6 +30,7 @@ import {
     cancelOrder,
     cancelAllOrders,
     closePosition,
+    placeMarketOrder,
     hyperliquidAdapter,
     type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
@@ -55,6 +56,7 @@ import type {
     CcxtTickerData,
     OrderCategory,
 } from '@/types/worker.types';
+import type { MarketOrderParams } from '@/types/trading.types';
 
 registerExchangeClass(
     'binanceusdm',
@@ -419,7 +421,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                     limit_price: payload?.limit_price as number | undefined,
                     mark_price: payload?.mark_price as number | undefined,
                     max_market_qty: payload?.max_market_qty as number | undefined,
+                    qty_step: payload?.qty_step as number | undefined,
                 });
+                break;
+            case 'PLACE_MARKET_ORDER':
+                result = await placeMarketOrder(
+                    payload?.exchangeId as ExchangeId,
+                    payload as unknown as MarketOrderParams
+                );
                 break;
             default:
                 throw new Error(`unknown message type: ${type}`);

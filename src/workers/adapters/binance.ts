@@ -6,9 +6,11 @@ import type {
     RawFill,
     OrderCategory,
 } from '@/types/worker.types';
-import type { ClosePositionParams } from '@/types/trading.types';
+import type { ClosePositionParams, MarketOrderParams } from '@/types/trading.types';
+import { ORDER_BATCH_CONSTANTS } from '@/config/trading.constants';
 import { binance as sym } from '../symbol_utils';
-import { split_quantity } from '../../utils/format';
+import { split_quantity, round_quantity_string } from '../../utils/format';
+import { isArrayWithProperty } from './type_guards';
 
 type BaseBinanceExchange = InstanceType<typeof binanceusdm>;
 
@@ -92,25 +94,20 @@ interface BinanceSymbolConfig {
     maxNotionalValue: string;
 }
 
-function is_balance_array(data: unknown): data is BinanceBalance[] {
-    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.asset === 'string');
-}
+const is_balance_array = (data: unknown): data is BinanceBalance[] =>
+    isArrayWithProperty(data, 'asset');
 
-function is_position_array(data: unknown): data is BinancePosition[] {
-    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.symbol === 'string');
-}
+const is_position_array = (data: unknown): data is BinancePosition[] =>
+    isArrayWithProperty(data, 'symbol');
 
-function is_order_array(data: unknown): data is BinanceOrder[] {
-    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.orderId === 'string');
-}
+const is_order_array = (data: unknown): data is BinanceOrder[] =>
+    isArrayWithProperty(data, 'orderId');
 
-function is_trade_array(data: unknown): data is BinanceTrade[] {
-    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.orderId === 'string');
-}
+const is_trade_array = (data: unknown): data is BinanceTrade[] =>
+    isArrayWithProperty(data, 'orderId');
 
-function is_symbol_config_array(data: unknown): data is BinanceSymbolConfig[] {
-    return Array.isArray(data) && (data.length === 0 || typeof data[0]?.symbol === 'string');
-}
+const is_symbol_config_array = (data: unknown): data is BinanceSymbolConfig[] =>
+    isArrayWithProperty(data, 'symbol');
 
 export async function fetch_position_mode(exchange: BinanceExchange): Promise<'hedge' | 'one_way'> {
     try {
@@ -234,7 +231,7 @@ export async function fetch_closed_positions(
     limit: number
 ): Promise<RawClosedPosition[]> {
     const tradesRaw = await exchange.fapiPrivateGetUserTrades({
-        limit: Math.min(limit * 10, 1000),
+        limit: Math.min(limit * 10, ORDER_BATCH_CONSTANTS.BINANCE_TRADE_LIMIT),
     });
     if (!is_trade_array(tradesRaw)) return [];
 
@@ -362,7 +359,7 @@ export async function fetch_symbol_fills(
     const binance_symbol = sym.fromUnified(symbol);
     const tradesRaw = await exchange.fapiPrivateGetUserTrades({
         symbol: binance_symbol,
-        limit: Math.min(limit, 1000),
+        limit: Math.min(limit, ORDER_BATCH_CONSTANTS.BINANCE_TRADE_LIMIT),
     });
     if (!is_trade_array(tradesRaw)) return [];
 
@@ -491,7 +488,7 @@ export async function close_position(
             symbol: binance_symbol,
             side: order_side,
             type: params.order_type === 'market' ? 'MARKET' : 'LIMIT',
-            quantity: String(qty),
+            quantity: round_quantity_string(qty, params.qty_step),
             reduceOnly: 'true',
         };
 
@@ -512,16 +509,96 @@ export async function close_position(
         orders.map((order) =>
             exchange
                 .fapiPrivatePostOrder(order)
-                .then(() => ({ success: true }))
+                .then(() => ({ success: true, error: null }))
                 .catch((err) => {
                     console.error('binance order failed:', (err as Error).message);
-                    return { success: false };
+                    return { success: false, error: err as Error };
                 })
         )
     );
 
     const failed = results.filter((r) => !r.success);
     if (failed.length > 0) {
+        const first_error = failed.find((r) => r.error)?.error;
+        if (first_error) throw first_error;
+        throw new Error(`${failed.length}/${orders.length} orders failed`);
+    }
+
+    return true;
+}
+
+export async function place_market_order(
+    exchange: BinanceExchange,
+    params: MarketOrderParams
+): Promise<boolean> {
+    const binance_symbol = sym.fromUnified(params.symbol);
+    const order_side = params.side === 'buy' ? 'BUY' : 'SELL';
+
+    if (!params.size || params.size <= 0 || !isFinite(params.size)) {
+        throw new Error('invalid order size');
+    }
+
+    const max_qty =
+        params.max_market_qty && params.max_market_qty > 0 ? params.max_market_qty : params.size;
+    const quantities = split_quantity(params.size, max_qty);
+
+    if (quantities.length === 0) {
+        throw new Error('no quantities to place');
+    }
+
+    const is_limit_ioc = params.slippage !== 'MARKET' && params.slippage && params.current_price;
+
+    let limit_price: number | undefined;
+    if (is_limit_ioc && params.current_price && typeof params.slippage === 'number') {
+        const slippage_multiplier =
+            params.side === 'buy' ? 1 + params.slippage / 100 : 1 - params.slippage / 100;
+        limit_price = params.current_price * slippage_multiplier;
+    }
+
+    const orders = quantities.map((qty) => {
+        const order: Record<string, string> = {
+            symbol: binance_symbol,
+            side: order_side,
+            type: is_limit_ioc ? 'LIMIT' : 'MARKET',
+            quantity: round_quantity_string(qty, params.qty_step),
+        };
+
+        if (is_limit_ioc && limit_price) {
+            order.price = String(limit_price);
+            order.timeInForce = 'IOC';
+        }
+
+        if (params.reduce_only) {
+            order.reduceOnly = 'true';
+        }
+
+        if (params.position_mode === 'hedge') {
+            order.positionSide = params.side === 'buy' ? 'LONG' : 'SHORT';
+            if (params.reduce_only) {
+                order.positionSide = params.side === 'buy' ? 'SHORT' : 'LONG';
+            }
+            delete order.reduceOnly;
+        }
+
+        return order;
+    });
+
+    const results = await Promise.all(
+        orders.map((order) =>
+            exchange
+                .fapiPrivatePostOrder(order)
+                .then(() => ({ success: true, error: null }))
+                .catch((err) => {
+                    console.error('binance order failed:', (err as Error).message);
+                    return { success: false, error: err as Error };
+                })
+        )
+    );
+
+    const failed = results.filter((r) => !r.success);
+    if (failed.length > 0) {
+        const first_error = failed.find((r) => r.error)?.error;
+        if (first_error) throw first_error;
         throw new Error(`${failed.length}/${orders.length} orders failed`);
     }
 

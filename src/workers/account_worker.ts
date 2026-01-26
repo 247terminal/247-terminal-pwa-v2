@@ -19,6 +19,7 @@ import {
     type BlofinExchange,
     type HyperliquidExchange,
     type ClosePositionParams,
+    type MarketOrderParams,
 } from './adapters';
 import type { ExchangeId, CcxtExchange, OrderCategory } from '@/types/worker.types';
 import { mapPosition, mapOrder, mapClosedPosition } from './position_mappers';
@@ -416,8 +417,7 @@ export async function cancelOrder(
                 return await bybitAdapter.cancel_order(
                     exchange as unknown as BybitExchange,
                     orderId,
-                    symbol,
-                    category
+                    symbol
                 );
             case 'blofin':
                 return await blofinAdapter.cancel_order(
@@ -430,8 +430,7 @@ export async function cancelOrder(
                 return await hyperliquidAdapter.cancel_order(
                     exchange as unknown as HyperliquidExchange,
                     orderId,
-                    symbol,
-                    category
+                    symbol
                 );
             default:
                 return false;
@@ -513,6 +512,47 @@ export async function closePosition(
         }
     } catch (err) {
         console.error(`failed to close ${exchangeId} position:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function placeMarketOrder(
+    exchangeId: ExchangeId,
+    params: MarketOrderParams
+): Promise<boolean> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+    const fullParams: MarketOrderParams = {
+        ...params,
+        position_mode: getPositionMode(exchangeId),
+    };
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.place_market_order(
+                    exchange as unknown as BinanceExchange,
+                    fullParams
+                );
+            case 'bybit':
+                return await bybitAdapter.place_market_order(
+                    exchange as unknown as BybitExchange,
+                    fullParams
+                );
+            case 'blofin':
+                return await blofinAdapter.place_market_order(
+                    exchange as unknown as BlofinExchange,
+                    fullParams
+                );
+            case 'hyperliquid':
+                return await hyperliquidAdapter.place_market_order(
+                    exchange as unknown as HyperliquidExchange,
+                    fullParams
+                );
+            default:
+                return false;
+        }
+    } catch (err) {
+        console.error(`failed to place ${exchangeId} market order:`, (err as Error).message);
         throw err;
     }
 }

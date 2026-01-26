@@ -1,4 +1,6 @@
-import { useMemo, useCallback } from 'preact/hooks';
+import { memo } from 'preact/compat';
+import { useMemo, useCallback, useState } from 'preact/hooks';
+import { toast } from 'sonner';
 import {
     trade_state,
     selected_exchange,
@@ -6,10 +8,12 @@ import {
     current_market,
 } from '../../../stores/trade_store';
 import { get_ticker } from '../../../stores/exchange_store';
+import { place_market_order } from '../../../stores/account_store';
+import { has_exchange } from '../../../services/exchange/account_bridge';
 import { parse_symbol } from '../../chart/symbol_row';
-import { format_price } from '../../../utils/format';
+import { format_price, extract_error_message } from '../../../utils/format';
 
-export function OrderButtons() {
+export const OrderButtons = memo(function OrderButtons() {
     const state = trade_state.value;
     const exchange = selected_exchange.value;
     const symbol = selected_symbol.value;
@@ -17,6 +21,7 @@ export function OrderButtons() {
     const ticker = get_ticker(exchange, symbol);
     const { base } = parse_symbol(symbol);
     const tick_size = market?.tick_size ?? 0.01;
+    const [submitting, setSubmitting] = useState(false);
 
     const { quantity_display, price_display } = useMemo(() => {
         const order_type = state.order_type;
@@ -64,22 +69,89 @@ export function OrderButtons() {
         };
     }, [state, ticker, base, tick_size]);
 
-    const handle_buy = useCallback(() => {
-        console.error('buy order submission not implemented');
-    }, []);
+    const order_type = state.order_type;
+    const market_quantity = state.market.quantity;
+    const market_size_unit = state.market.size_unit;
+    const market_reduce_only = state.market.reduce_only;
 
-    const handle_sell = useCallback(() => {
-        console.error('sell order submission not implemented');
-    }, []);
+    const submit_order = useCallback(
+        async (side: 'buy' | 'sell') => {
+            if (order_type !== 'market') {
+                toast.error(`${order_type} orders not yet implemented`);
+                return;
+            }
+
+            if (!has_exchange(exchange)) {
+                toast.error('Exchange not connected');
+                return;
+            }
+
+            const qty_input = parseFloat(market_quantity) || 0;
+            if (qty_input <= 0) {
+                toast.error('Invalid quantity');
+                return;
+            }
+
+            let final_size = qty_input;
+            if (market_size_unit === 'usd' && ticker?.last_price) {
+                final_size = qty_input / ticker.last_price;
+            }
+
+            if (final_size <= 0) {
+                toast.error('Unable to calculate order size');
+                return;
+            }
+
+            setSubmitting(true);
+            const side_label = side === 'buy' ? 'BUY' : 'SELL';
+
+            try {
+                const success = await place_market_order(
+                    exchange,
+                    symbol,
+                    side,
+                    final_size,
+                    market_reduce_only
+                );
+
+                if (success) {
+                    toast.success(`${side_label} ${base} order placed`);
+                } else {
+                    toast.error(`Failed to place ${side_label} order`);
+                }
+            } catch (err) {
+                const error_msg = extract_error_message(err);
+                toast.error(`Failed to place ${base} order: ${error_msg}`);
+            } finally {
+                setSubmitting(false);
+            }
+        },
+        [
+            order_type,
+            market_quantity,
+            market_size_unit,
+            market_reduce_only,
+            exchange,
+            symbol,
+            ticker,
+            base,
+        ]
+    );
+
+    const handle_buy = useCallback(() => submit_order('buy'), [submit_order]);
+    const handle_sell = useCallback(() => submit_order('sell'), [submit_order]);
 
     return (
         <div class="grid grid-cols-2 gap-2 mt-2">
             <button
                 type="button"
                 onClick={handle_buy}
-                class="flex flex-col items-center py-2 rounded bg-success/20 text-success hover:bg-success/30 transition-colors"
+                disabled={submitting}
+                class="flex flex-col items-center py-2 rounded bg-success/20 text-success hover:bg-success/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                <span class="text-xs font-medium">BUY / LONG</span>
+                <span class="text-xs font-medium">
+                    {submitting ? 'SUBMITTING...' : 'BUY / LONG'}
+                </span>
                 <span class="text-[10px] opacity-70">
                     {quantity_display} @ {price_display}
                 </span>
@@ -87,13 +159,16 @@ export function OrderButtons() {
             <button
                 type="button"
                 onClick={handle_sell}
-                class="flex flex-col items-center py-2 rounded bg-error/20 text-error hover:bg-error/30 transition-colors"
+                disabled={submitting}
+                class="flex flex-col items-center py-2 rounded bg-error/20 text-error hover:bg-error/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                <span class="text-xs font-medium">SELL / SHORT</span>
+                <span class="text-xs font-medium">
+                    {submitting ? 'SUBMITTING...' : 'SELL / SHORT'}
+                </span>
                 <span class="text-[10px] opacity-70">
                     {quantity_display} @ {price_display}
                 </span>
             </button>
         </div>
     );
-}
+});

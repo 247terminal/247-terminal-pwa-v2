@@ -9,10 +9,13 @@ import {
     fetch_closed_positions as fetch_closed_positions_api,
     cancel_order as cancel_order_api,
     close_position_api,
+    place_market_order_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
 import { get_market, has_markets, get_ticker } from './exchange_store';
 import { get_symbol_settings } from './trading_store';
+import { settings } from './settings_store';
+import { validate_order_size } from '../utils/format';
 import { STORAGE_CONSTANTS, ACCOUNT_CONSTANTS } from '../config/chart.constants';
 
 function load_privacy_mode(): boolean {
@@ -418,12 +421,12 @@ export async function close_position(
     );
 
     if (!position) {
-        console.error(`position not found: ${symbol}`);
-        return false;
+        throw new Error('Position not found');
     }
 
     try {
         const ticker = get_ticker(exchange_id, symbol);
+        const market = get_market(exchange_id, symbol);
         const symbol_settings = get_symbol_settings(exchange_id, symbol);
         const success = await close_position_api(exchange_id, {
             symbol,
@@ -435,6 +438,7 @@ export async function close_position(
             limit_price,
             mark_price: ticker?.last_price,
             max_market_qty: symbol_settings?.max_market_qty,
+            qty_step: symbol_settings?.qty_step ?? market?.qty_step,
         });
 
         if (success && percentage === 100 && order_type === 'market') {
@@ -446,7 +450,57 @@ export async function close_position(
         return success;
     } catch (err) {
         console.error(`failed to close position ${symbol}:`, (err as Error).message);
-        return false;
+        throw err;
+    }
+}
+
+export async function place_market_order(
+    exchange_id: ExchangeId,
+    symbol: string,
+    side: 'buy' | 'sell',
+    size: number,
+    reduce_only: boolean = false
+): Promise<boolean> {
+    if (!has_exchange(exchange_id)) {
+        throw new Error('Exchange not connected');
+    }
+
+    try {
+        const symbol_settings = get_symbol_settings(exchange_id, symbol);
+        const market = get_market(exchange_id, symbol);
+        const ticker = get_ticker(exchange_id, symbol);
+        const slippage = settings.value.trading?.slippage ?? 'MARKET';
+
+        let final_size = size;
+        const min_qty = symbol_settings?.min_qty ?? market?.min_qty;
+        const qty_step = symbol_settings?.qty_step ?? market?.qty_step;
+
+        if (min_qty && qty_step) {
+            const validation = validate_order_size(size, min_qty, qty_step);
+
+            if (!validation.valid) {
+                throw new Error(validation.error);
+            }
+            final_size = validation.adjusted_size;
+        }
+
+        const success = await place_market_order_api(exchange_id, {
+            symbol,
+            side,
+            size: final_size,
+            margin_mode: symbol_settings?.margin_mode ?? 'cross',
+            leverage: symbol_settings?.leverage ?? 10,
+            reduce_only,
+            slippage,
+            current_price: ticker?.last_price,
+            max_market_qty: symbol_settings?.max_market_qty,
+            qty_step: qty_step,
+        });
+
+        return success;
+    } catch (err) {
+        console.error(`failed to place market order ${symbol}:`, (err as Error).message);
+        throw err;
     }
 }
 
@@ -457,7 +511,15 @@ export async function refresh_history(exchange_ids: ExchangeId[]): Promise<void>
     loading.value = { ...loading.value, history: true };
     try {
         const results = await Promise.all(
-            connected.map((id) => fetch_closed_positions_api(id).catch(() => []))
+            connected.map((id) =>
+                fetch_closed_positions_api(id).catch((err) => {
+                    console.error(
+                        `failed to fetch ${id} closed positions:`,
+                        (err as Error).message
+                    );
+                    return [];
+                })
+            )
         );
         const all_trades = results.flat();
         all_trades.sort((a, b) => b.closed_at - a.closed_at);

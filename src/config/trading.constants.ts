@@ -1,0 +1,5 @@
+export const ORDER_BATCH_CONSTANTS = {
+    BINANCE_TRADE_LIMIT: 1000,
+    BLOFIN_BATCH_SIZE: 20,
+    BYBIT_BATCH_SIZE: 10,
+} as const;
