@@ -228,7 +228,16 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
             ? trigger_result.data
             : [];
 
-    const totalLen = pending.length + tpsl.length + algo.length;
+    let tpsl_entries = 0;
+    for (let i = 0; i < tpsl.length; i++) {
+        const o = tpsl[i];
+        const has_tp = o.tpTriggerPrice && Number(o.tpTriggerPrice) > 0;
+        const has_sl = o.slTriggerPrice && Number(o.slTriggerPrice) > 0;
+        if (has_tp) tpsl_entries++;
+        if (has_sl) tpsl_entries++;
+    }
+
+    const totalLen = pending.length + tpsl_entries + algo.length;
     if (totalLen === 0) return [];
 
     const result: RawOrder[] = new Array(totalLen);
@@ -252,17 +261,35 @@ export async function fetch_orders(exchange: BlofinExchange): Promise<RawOrder[]
     for (let i = 0; i < tpsl.length; i++) {
         const o = tpsl[i];
         const has_tp = o.tpTriggerPrice && Number(o.tpTriggerPrice) > 0;
-        result[idx++] = {
-            symbol: sym.toUnified(o.instId),
-            id: o.tpslId,
-            side: o.side === 'buy' ? 'buy' : 'sell',
-            type: has_tp ? 'take_profit' : 'stop_loss',
-            amount: Number(o.size || 0),
-            price: has_tp ? Number(o.tpTriggerPrice) : Number(o.slTriggerPrice),
-            filled: 0,
-            timestamp: Number(o.createTime || Date.now()),
-            category: 'tpsl',
-        };
+        const has_sl = o.slTriggerPrice && Number(o.slTriggerPrice) > 0;
+        const is_combined = has_tp && has_sl;
+
+        if (has_tp) {
+            result[idx++] = {
+                symbol: sym.toUnified(o.instId),
+                id: is_combined ? `${o.tpslId}_tp` : o.tpslId,
+                side: o.side === 'buy' ? 'buy' : 'sell',
+                type: 'take_profit',
+                amount: Number(o.size || 0),
+                price: Number(o.tpTriggerPrice),
+                filled: 0,
+                timestamp: Number(o.createTime || Date.now()),
+                category: 'tpsl',
+            };
+        }
+        if (has_sl) {
+            result[idx++] = {
+                symbol: sym.toUnified(o.instId),
+                id: is_combined ? `${o.tpslId}_sl` : o.tpslId,
+                side: o.side === 'buy' ? 'buy' : 'sell',
+                type: 'stop_loss',
+                amount: Number(o.size || 0),
+                price: Number(o.slTriggerPrice),
+                filled: 0,
+                timestamp: Number(o.createTime || Date.now()),
+                category: 'tpsl',
+            };
+        }
     }
 
     for (let i = 0; i < algo.length; i++) {
@@ -487,9 +514,11 @@ export async function cancel_order(
 ): Promise<boolean> {
     const i = to_blofin_inst_id(symbol);
     switch (category) {
-        case 'tpsl':
-            await exchange.privatePostTradeCancelTpsl([{ instId: i, tpslId: order_id }]);
+        case 'tpsl': {
+            const tpsl_id = order_id.replace(/_tp$|_sl$/, '');
+            await exchange.privatePostTradeCancelTpsl([{ instId: i, tpslId: tpsl_id }]);
             break;
+        }
         case 'algo':
             await exchange.privatePostTradeCancelAlgo([{ instId: i, algoId: order_id }]);
             break;
@@ -891,37 +920,50 @@ export async function set_tpsl(exchange: BlofinExchange, params: TpSlParams): Pr
         params.contract_size && params.contract_size > 0 ? params.contract_size : 1;
     const size_in_contracts = params.size / contract_size;
     const is_tp_limit = params.tp_order_type === 'limit';
+    const size_str = round_quantity_string(size_in_contracts, params.qty_step);
+    const position_side = params.position_mode === 'hedge' ? params.side : 'net';
 
-    const order: Record<string, string> = {
-        instId: blofin_inst_id,
-        marginMode: params.margin_mode,
-        side: close_side,
-        size: round_quantity_string(size_in_contracts, params.qty_step),
-        brokerId: BROKER_CONFIG.blofin.brokerId,
-    };
+    const has_tp = params.tp_price && params.tp_price > 0;
+    const has_sl = params.sl_price && params.sl_price > 0;
 
-    if (params.position_mode === 'hedge') {
-        order.positionSide = params.side;
-    } else {
-        order.positionSide = 'net';
-    }
-
-    if (params.tp_price && params.tp_price > 0) {
-        order.tpTriggerPrice = round_price_string(params.tp_price, params.tick_size);
-        order.tpOrderPrice = is_tp_limit
-            ? round_price_string(params.tp_price, params.tick_size)
-            : '-1';
-    }
-
-    if (params.sl_price && params.sl_price > 0) {
-        order.slTriggerPrice = round_price_string(params.sl_price, params.tick_size);
-        order.slOrderPrice = '-1';
-    }
-
-    if (!order.tpTriggerPrice && !order.slTriggerPrice) {
+    if (!has_tp && !has_sl) {
         throw new Error('no tp or sl price provided');
     }
 
-    await exchange.privatePostTradeOrderTpsl(order);
+    const orders: Promise<unknown>[] = [];
+
+    if (has_tp) {
+        orders.push(
+            exchange.privatePostTradeOrderTpsl({
+                instId: blofin_inst_id,
+                marginMode: params.margin_mode,
+                side: close_side,
+                size: size_str,
+                positionSide: position_side,
+                tpTriggerPrice: round_price_string(params.tp_price!, params.tick_size),
+                tpOrderPrice: is_tp_limit
+                    ? round_price_string(params.tp_price!, params.tick_size)
+                    : '-1',
+                brokerId: BROKER_CONFIG.blofin.brokerId,
+            })
+        );
+    }
+
+    if (has_sl) {
+        orders.push(
+            exchange.privatePostTradeOrderTpsl({
+                instId: blofin_inst_id,
+                marginMode: params.margin_mode,
+                side: close_side,
+                size: size_str,
+                positionSide: position_side,
+                slTriggerPrice: round_price_string(params.sl_price!, params.tick_size),
+                slOrderPrice: '-1',
+                brokerId: BROKER_CONFIG.blofin.brokerId,
+            })
+        );
+    }
+
+    await Promise.all(orders);
     return true;
 }

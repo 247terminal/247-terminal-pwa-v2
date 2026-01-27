@@ -36,9 +36,10 @@ export const OrderButtons = memo(function OrderButtons() {
     const scale_form = state.scale;
     const twap_form = state.twap;
 
-    const { quantity_display, price_display } = useMemo(() => {
+    const { quantity_display, price_display, can_submit } = useMemo(() => {
         let qty = '';
         let price = '';
+        let valid = false;
 
         if (order_type === 'limit') {
             const qty_val = parseFloat(limit_form.quantity) || 0;
@@ -49,6 +50,7 @@ export const OrderButtons = memo(function OrderButtons() {
                 qty = qty_val.toFixed(4);
             }
             price = price_val ? format_price(price_val, tick_size) : '';
+            valid = qty_val > 0 && price_val > 0;
         } else if (order_type === 'market') {
             const qty_val = parseFloat(market_form.quantity) || 0;
             if (market_form.size_unit === 'usd' && ticker?.last_price) {
@@ -57,6 +59,7 @@ export const OrderButtons = memo(function OrderButtons() {
                 qty = qty_val.toFixed(4);
             }
             price = 'MKT';
+            valid = qty_val > 0;
         } else if (order_type === 'scale') {
             const total = parseFloat(scale_form.total_size_usd) || 0;
             if (ticker?.last_price) {
@@ -67,17 +70,20 @@ export const OrderButtons = memo(function OrderButtons() {
             if (from_price && to_price) {
                 price = `${format_price(from_price, tick_size)}→${format_price(to_price, tick_size)}`;
             }
+            valid = total > 0 && from_price > 0 && to_price > 0 && scale_form.orders_count >= 2;
         } else if (order_type === 'twap') {
             const total = parseFloat(twap_form.total_size_usd) || 0;
             if (ticker?.last_price) {
                 qty = (total / ticker.last_price).toFixed(4);
             }
             price = 'TWAP';
+            valid = total > 0 && twap_form.orders_count >= 2;
         }
 
         return {
             quantity_display: qty ? `${qty} ${base}` : `— ${base}`,
             price_display: price || '—',
+            can_submit: valid,
         };
     }, [order_type, limit_form, market_form, scale_form, twap_form, ticker, base, tick_size]);
 
@@ -367,12 +373,14 @@ export const OrderButtons = memo(function OrderButtons() {
     const handle_buy = useCallback(() => submit_order('buy'), [submit_order]);
     const handle_sell = useCallback(() => submit_order('sell'), [submit_order]);
 
+    const is_disabled = submitting || !can_submit;
+
     return (
         <div class="grid grid-cols-2 gap-2 mt-2">
             <button
                 type="button"
                 onClick={handle_buy}
-                disabled={submitting}
+                disabled={is_disabled}
                 class="flex flex-col items-center py-2 rounded bg-success/20 text-success hover:bg-success/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span class="text-xs font-medium">
@@ -385,7 +393,7 @@ export const OrderButtons = memo(function OrderButtons() {
             <button
                 type="button"
                 onClick={handle_sell}
-                disabled={submitting}
+                disabled={is_disabled}
                 class="flex flex-col items-center py-2 rounded bg-error/20 text-error hover:bg-error/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span class="text-xs font-medium">

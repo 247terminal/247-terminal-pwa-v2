@@ -225,13 +225,16 @@ export async function fetch_orders(exchange: BybitExchange): Promise<RawOrder[]>
             type = o.orderType.toLowerCase();
         }
 
+        const price_val = Number(o.price || 0);
+        const trigger_val = Number(o.triggerPrice || 0);
+
         return {
             symbol: sym.toUnified(o.symbol),
             id: o.orderId,
             side: is_buy ? 'buy' : 'sell',
             type,
             amount: Number(o.qty || 0),
-            price: Number(o.price || o.triggerPrice || 0),
+            price: price_val > 0 ? price_val : trigger_val,
             filled: Number(o.cumExecQty || 0),
             timestamp: Number(o.createdTime || Date.now()),
             category: 'regular',
