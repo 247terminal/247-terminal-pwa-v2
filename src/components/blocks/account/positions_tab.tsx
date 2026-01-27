@@ -7,12 +7,7 @@ import type {
     PositionRowProps,
     SortDirection,
 } from '../../../types/account.types';
-import {
-    positions_list,
-    privacy_mode,
-    loading,
-    open_tpsl_modal,
-} from '../../../stores/account_store';
+import { positions_list, privacy_mode, loading } from '../../../stores/account_store';
 import { LogoSpinner } from '../../common/logo_spinner';
 import { show_pnl_card } from '../../../stores/pnl_card_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
@@ -24,10 +19,15 @@ import { format_pnl, format_pct, format_usd, mask_value } from '../../../utils/a
 import { calculate_position_pnl } from '../../../utils/pnl';
 import { SortHeader } from './sort_header';
 import { ClosePositionPanel } from './close_position_panel';
+import { TpSlPanel } from './tpsl_panel';
+
+const VLIST_STYLE = { height: '100%' } as const;
 
 const PositionRow = memo(function PositionRow({ position, is_private }: PositionRowProps) {
     const [close_panel_rect, set_close_panel_rect] = useState<DOMRect | null>(null);
+    const [tpsl_panel_rect, set_tpsl_panel_rect] = useState<DOMRect | null>(null);
     const close_button_ref = useRef<HTMLButtonElement>(null);
+    const tpsl_button_ref = useRef<HTMLButtonElement>(null);
     const is_long = position.side === 'long';
     const market = get_market(position.exchange, position.symbol);
     const tick_size = market?.tick_size ?? 0.01;
@@ -35,31 +35,47 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
 
     const ticker = get_ticker_signal(position.exchange, position.symbol).value;
     const last_price = ticker?.last_price ?? position.last_price;
-    const { pnl, pnl_pct } = calculate_position_pnl(
+    const { pnl, pnl_pct, pnl_color } = useMemo(() => {
+        const result = calculate_position_pnl(
+            is_long,
+            position.entry_price,
+            last_price,
+            position.size,
+            position.margin,
+            position.leverage
+        );
+        return {
+            ...result,
+            pnl_color: result.pnl >= 0 ? 'text-success' : 'text-error',
+        };
+    }, [
         is_long,
         position.entry_price,
         last_price,
         position.size,
         position.margin,
-        position.leverage
-    );
-    const pnl_color = pnl >= 0 ? 'text-success' : 'text-error';
+        position.leverage,
+    ]);
 
     const handle_toggle_close_panel = useCallback(() => {
-        if (close_panel_rect) {
-            set_close_panel_rect(null);
-        } else if (close_button_ref.current) {
-            set_close_panel_rect(close_button_ref.current.getBoundingClientRect());
-        }
-    }, [close_panel_rect]);
+        set_close_panel_rect((prev) =>
+            prev ? null : (close_button_ref.current?.getBoundingClientRect() ?? null)
+        );
+    }, []);
 
     const handle_close_panel_dismiss = useCallback(() => {
         set_close_panel_rect(null);
     }, []);
 
-    const handle_tpsl = useCallback(() => {
-        open_tpsl_modal(position);
-    }, [position]);
+    const handle_toggle_tpsl_panel = useCallback(() => {
+        set_tpsl_panel_rect((prev) =>
+            prev ? null : (tpsl_button_ref.current?.getBoundingClientRect() ?? null)
+        );
+    }, []);
+
+    const handle_tpsl_panel_dismiss = useCallback(() => {
+        set_tpsl_panel_rect(null);
+    }, []);
 
     const handle_symbol_click = useCallback(() => {
         navigate_to_symbol(position.exchange, position.symbol);
@@ -150,10 +166,16 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
 
             <div class="flex-1 flex justify-end gap-1" role="cell">
                 <button
+                    ref={tpsl_button_ref}
                     type="button"
-                    onClick={handle_tpsl}
-                    class="px-1.5 py-0.5 text-[10px] rounded bg-base-300 hover:bg-base-content/20 text-base-content/70 hover:text-base-content transition-colors"
+                    onClick={handle_toggle_tpsl_panel}
+                    class={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                        tpsl_panel_rect
+                            ? 'bg-primary text-primary-content'
+                            : 'bg-base-300 hover:bg-base-content/20 text-base-content/70 hover:text-base-content'
+                    }`}
                     aria-label={`Set take profit and stop loss for ${format_symbol(position.symbol)}`}
+                    aria-expanded={!!tpsl_panel_rect}
                 >
                     TP/SL
                 </button>
@@ -171,6 +193,13 @@ const PositionRow = memo(function PositionRow({ position, is_private }: Position
                 >
                     Close
                 </button>
+                {tpsl_panel_rect && (
+                    <TpSlPanel
+                        position={position}
+                        anchor_rect={tpsl_panel_rect}
+                        on_close={handle_tpsl_panel_dismiss}
+                    />
+                )}
                 {close_panel_rect && (
                     <ClosePositionPanel
                         position={position}
@@ -304,7 +333,7 @@ export function PositionsTab() {
                 </div>
             </div>
             <div class="flex-1" role="rowgroup">
-                <VList style={{ height: '100%' }}>
+                <VList style={VLIST_STYLE}>
                     {sorted_positions.map((pos) => (
                         <PositionRow key={pos.id} position={pos} is_private={is_private} />
                     ))}

@@ -5,13 +5,18 @@ import { toast } from 'sonner';
 import type { Position } from '../../../types/account.types';
 import { close_position } from '../../../stores/account_store';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
-import { format_price, format_size, extract_error_message } from '../../../utils/format';
+import {
+    format_price,
+    format_size,
+    extract_error_message,
+    DECIMAL_REGEX,
+} from '../../../utils/format';
 import { parse_symbol } from '../../chart/symbol_row';
+import { use_click_outside, use_escape_key } from '../../../hooks';
 
 type CloseOrderType = 'market' | 'limit';
 
 const CLOSE_PERCENTAGES = [10, 25, 50, 75, 100] as const;
-const DECIMAL_REGEX = /^\d*\.?\d*$/;
 
 interface ClosePositionPanelProps {
     position: Position;
@@ -44,26 +49,8 @@ export const ClosePositionPanel = memo(function ClosePositionPanel({
         }
     }, [order_type, limit_price, current_price, tick_size, position.side]);
 
-    useEffect(() => {
-        function handle_click_outside(e: MouseEvent) {
-            if (panel_ref.current && !panel_ref.current.contains(e.target as Node)) {
-                on_close();
-            }
-        }
-
-        function handle_escape(e: KeyboardEvent) {
-            if (e.key === 'Escape') {
-                on_close();
-            }
-        }
-
-        document.addEventListener('mousedown', handle_click_outside);
-        document.addEventListener('keydown', handle_escape);
-        return () => {
-            document.removeEventListener('mousedown', handle_click_outside);
-            document.removeEventListener('keydown', handle_escape);
-        };
-    }, [on_close]);
+    use_click_outside(panel_ref, on_close);
+    use_escape_key(on_close);
 
     const handle_submit = useCallback(async () => {
         set_is_submitting(true);

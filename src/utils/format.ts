@@ -1,3 +1,5 @@
+export const DECIMAL_REGEX = /^\d*\.?\d*$/;
+
 export function tick_size_to_precision(tick_size: number): number {
     if (tick_size >= 1) return 0;
     return Math.max(0, Math.ceil(-Math.log10(tick_size)));
@@ -131,8 +133,8 @@ export function extract_error_message(err: unknown): string {
             const parsed = JSON.parse(exchange_json_match[1]);
             if (parsed.msg) return parsed.msg;
             if (parsed.message) return parsed.message;
-        } catch (err) {
-            console.error('failed to parse exchange error json:', (err as Error).message);
+        } catch (parse_err) {
+            console.error('failed to parse exchange error json:', (parse_err as Error).message);
         }
     }
 
