@@ -69,12 +69,7 @@ export const PositionContextMenu = memo(function PositionContextMenu({
         set_is_setting_sl(true);
         try {
             if (existing_sl) {
-                await cancel_order(
-                    existing_sl.exchange,
-                    existing_sl.id,
-                    existing_sl.symbol,
-                    existing_sl.category
-                );
+                await cancel_order(existing_sl.exchange, existing_sl.id);
             }
 
             await set_tpsl(

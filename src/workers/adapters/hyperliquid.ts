@@ -77,8 +77,60 @@ function is_user_fills_array(data: unknown): data is UserFill[] {
     return Array.isArray(data);
 }
 
+const HYPERLIQUID_INFO_URL = `${EXCHANGE_CONFIG.hyperliquid.restUrl}/info`;
+
 let cached_state: { wallet: string; data: ClearinghouseState; timestamp: number } | null = null;
 let pending_fetch: Promise<ClearinghouseState | null> | null = null;
+let cached_dex_names: { markets: object; names: string[] } | null = null;
+
+function get_dex_names(markets: Record<string, unknown> | null | undefined): string[] {
+    if (!markets) return [];
+    if (cached_dex_names?.markets === markets) return cached_dex_names.names;
+
+    const dexes = new Set<string>();
+    for (const key of Object.keys(markets)) {
+        const slashIdx = key.indexOf('/');
+        if (slashIdx <= 0) continue;
+        const dashIdx = key.indexOf('-');
+        if (dashIdx > 0 && dashIdx < slashIdx) {
+            dexes.add(key.slice(0, dashIdx).toLowerCase());
+        }
+    }
+    const names = Array.from(dexes);
+    cached_dex_names = { markets, names };
+    return names;
+}
+
+async function fetch_dex_api<T>(
+    wallet: string,
+    dex: string,
+    type: string,
+    validator: (data: unknown) => data is T,
+    fallback: T
+): Promise<T> {
+    try {
+        const response = await fetch(HYPERLIQUID_INFO_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, user: wallet, dex }),
+        });
+        if (!response.ok) return fallback;
+        const data = await response.json();
+        return validator(data) ? data : fallback;
+    } catch (err) {
+        console.error('dex api request failed:', (err as Error).message);
+        return fallback;
+    }
+}
+
+const fetch_dex_state = (wallet: string, dex: string) =>
+    fetch_dex_api(wallet, dex, 'clearinghouseState', is_clearinghouse_state, null);
+
+const fetch_dex_orders = (wallet: string, dex: string) =>
+    fetch_dex_api(wallet, dex, 'openOrders', is_open_orders_array, []);
+
+const fetch_dex_fills = (wallet: string, dex: string) =>
+    fetch_dex_api(wallet, dex, 'userFills', is_user_fills_array, []);
 
 async function get_clearinghouse_state(
     exchange: HyperliquidExchange
@@ -99,14 +151,24 @@ async function get_clearinghouse_state(
 
     pending_fetch = (async () => {
         try {
-            const response = await exchange.publicPostInfo({
-                type: 'clearinghouseState',
-                user: wallet,
-            });
+            const dex_names = get_dex_names(exchange.markets);
+            const [cexResponse, ...dexResponses] = await Promise.all([
+                exchange.publicPostInfo({ type: 'clearinghouseState', user: wallet }),
+                ...dex_names.map((dex) => fetch_dex_state(wallet, dex)),
+            ]);
 
-            if (!is_clearinghouse_state(response)) return null;
-            cached_state = { wallet, data: response, timestamp: Date.now() };
-            return response;
+            if (!is_clearinghouse_state(cexResponse)) return null;
+
+            const allPositions = [...(cexResponse.assetPositions || [])];
+            for (const dexState of dexResponses) {
+                if (dexState?.assetPositions?.length) {
+                    allPositions.push(...dexState.assetPositions);
+                }
+            }
+
+            const merged = { ...cexResponse, assetPositions: allPositions };
+            cached_state = { wallet, data: merged, timestamp: Date.now() };
+            return merged;
         } finally {
             pending_fetch = null;
         }
@@ -147,12 +209,13 @@ export async function fetch_balance(exchange: HyperliquidExchange): Promise<{
 export async function fetch_positions(exchange: HyperliquidExchange): Promise<RawPosition[]> {
     const state = await get_clearinghouse_state(exchange);
     if (!state?.assetPositions) return [];
+    const markets = exchange.markets;
     return state.assetPositions.map((item) => {
         const p = item.position;
         const szi = p.szi ?? 0;
         const lev = p.leverage;
         return {
-            symbol: sym.toUnified(p.coin),
+            symbol: sym.resolveCoin(p.coin, markets),
             contracts: Math.abs(szi),
             side: szi >= 0 ? 'long' : 'short',
             entry_price: p.entryPx,
@@ -169,12 +232,19 @@ export async function fetch_positions(exchange: HyperliquidExchange): Promise<Ra
 export async function fetch_orders(exchange: HyperliquidExchange): Promise<RawOrder[]> {
     const wallet = exchange.walletAddress;
     if (!wallet) return [];
-    const response = await exchange.publicPostInfo({
-        type: 'openOrders',
-        user: wallet,
-    });
-    if (!is_open_orders_array(response)) return [];
-    return response.map((o) => {
+
+    const dex_names = get_dex_names(exchange.markets);
+    const [cexOrders, ...dexOrdersArrays] = await Promise.all([
+        exchange
+            .publicPostInfo({ type: 'openOrders', user: wallet })
+            .then((r) => (is_open_orders_array(r) ? r : [])),
+        ...dex_names.map((dex) => fetch_dex_orders(wallet, dex)),
+    ]);
+
+    const allOrders = [...cexOrders, ...dexOrdersArrays.flat()];
+    const markets = exchange.markets;
+
+    return allOrders.map((o) => {
         const is_sell = o.side === 'A';
         const has_trigger = o.triggerPx && Number(o.triggerPx) > 0;
         const trigger_above = o.triggerCondition === 'gt';
@@ -193,7 +263,7 @@ export async function fetch_orders(exchange: HyperliquidExchange): Promise<RawOr
         }
 
         return {
-            symbol: sym.toUnified(o.coin),
+            symbol: sym.resolveCoin(o.coin, markets),
             id: String(o.oid),
             side: o.side === 'B' ? 'buy' : 'sell',
             type,
@@ -213,15 +283,19 @@ export async function fetch_closed_positions(
     const wallet = exchange.walletAddress;
     if (!wallet) return [];
 
-    const response = await exchange.publicPostInfo({
-        type: 'userFills',
-        user: wallet,
-    });
-    if (!is_user_fills_array(response)) return [];
+    const dex_names = get_dex_names(exchange.markets);
+    const [cexFills, ...dexFillsArrays] = await Promise.all([
+        exchange
+            .publicPostInfo({ type: 'userFills', user: wallet })
+            .then((r) => (is_user_fills_array(r) ? r : [])),
+        ...dex_names.map((dex) => fetch_dex_fills(wallet, dex)),
+    ]);
 
+    const allFills = [...cexFills, ...dexFillsArrays.flat()];
+    const markets = exchange.markets;
     const closed: RawClosedPosition[] = [];
 
-    for (const fill of response) {
+    for (const fill of allFills) {
         const dir = fill.dir || '';
 
         const is_close_long = dir === 'Close Long';
@@ -239,7 +313,7 @@ export async function fetch_closed_positions(
         const entry_price = position_side === 'long' ? price - pnl_per_unit : price + pnl_per_unit;
 
         closed.push({
-            symbol: sym.toUnified(fill.coin),
+            symbol: sym.resolveCoin(fill.coin, markets),
             side: position_side,
             size,
             entry_price: Math.max(0, entry_price),
@@ -252,8 +326,6 @@ export async function fetch_closed_positions(
 
     return closed.sort((a, b) => b.close_time - a.close_time).slice(0, limit);
 }
-
-const HYPERLIQUID_INFO_URL = `${EXCHANGE_CONFIG.hyperliquid.restUrl}/info`;
 
 export async function set_leverage(
     exchange: HyperliquidExchange,
@@ -304,14 +376,23 @@ export async function fetch_symbol_fills(
     const wallet = exchange.walletAddress;
     if (!wallet) return [];
 
-    const coin = sym.fromUnified(symbol);
-    const response = await exchange.publicPostInfo({
-        type: 'userFills',
-        user: wallet,
-    });
-    if (!is_user_fills_array(response)) return [];
+    const markets = exchange.markets;
+    const dexInfo = sym.toDexCoin(symbol);
 
-    const filtered = response.filter((f) => f.coin === coin).slice(0, limit);
+    let allFills: UserFill[];
+    if (dexInfo) {
+        allFills = await fetch_dex_fills(wallet, dexInfo.dex);
+    } else {
+        const response = await exchange.publicPostInfo({
+            type: 'userFills',
+            user: wallet,
+        });
+        allFills = is_user_fills_array(response) ? response : [];
+    }
+
+    const filtered = allFills
+        .filter((f) => sym.resolveCoin(f.coin, markets) === symbol)
+        .slice(0, limit);
 
     return filtered.map((f, idx) => {
         const is_buy = f.side === 'B';
@@ -320,7 +401,7 @@ export async function fetch_symbol_fills(
         return {
             id: `${f.time}-${idx}`,
             order_id: String(f.oid || `${f.time}-${idx}`),
-            symbol: sym.toUnified(f.coin),
+            symbol: sym.resolveCoin(f.coin, markets),
             side: is_buy ? 'buy' : 'sell',
             price: Number(f.px || 0),
             size: Number(f.sz || 0),
@@ -353,8 +434,9 @@ export async function cancel_all_orders(
     });
     if (!is_open_orders_array(response)) return 0;
 
+    const markets = exchange.markets;
     const orders_to_cancel = symbol
-        ? response.filter((o) => o.coin === sym.fromUnified(symbol))
+        ? response.filter((o) => sym.resolveCoin(o.coin, markets) === symbol)
         : response;
 
     if (orders_to_cancel.length === 0) return 0;
@@ -367,7 +449,7 @@ export async function cancel_all_orders(
 
     await Promise.all(
         Object.entries(by_coin).map(([coin, ids]) =>
-            exchange.cancelOrders(ids, sym.toUnified(coin)).catch((err: unknown) => {
+            exchange.cancelOrders(ids, sym.resolveCoin(coin, markets)).catch((err: unknown) => {
                 console.error('failed to cancel orders:', (err as Error).message);
                 return null;
             })
