@@ -321,7 +321,7 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
                                             return (
                                                 <div
                                                     key={`header-${item.exchange}`}
-                                                    class="flex items-center gap-1.5 px-2 text-xs bg-base-200 text-base-content/70"
+                                                    class="flex items-center gap-1.5 px-2 text-xs bg-base-300 text-base-content/70"
                                                     style={{ height: `${HEADER_HEIGHT}px` }}
                                                 >
                                                     {get_exchange_icon(item.exchange)}
