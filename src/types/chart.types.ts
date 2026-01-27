@@ -171,3 +171,11 @@ export interface TimeframeSelectorProps {
     timeframe: Timeframe;
     on_change: (tf: Timeframe) => void;
 }
+
+export interface PositionContextMenuProps {
+    position: Position;
+    orders: Order[];
+    x: number;
+    y: number;
+    on_close: () => void;
+}

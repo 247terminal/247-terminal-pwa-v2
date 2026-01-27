@@ -26,6 +26,7 @@ import {
     nuke_all,
 } from '../../../stores/account_store';
 import { exchange_connection_status } from '../../../stores/credentials_store';
+import { NUKE_MENU_CONSTANTS } from '../../../config/chart.constants';
 
 const NUKE_OPTIONS: NukeMenuOption[] = [
     { id: 'all', label: 'All', icon: <X class="w-3 h-3" />, description: 'Positions & orders' },
@@ -47,6 +48,7 @@ const NUKE_OPTIONS: NukeMenuOption[] = [
 function NukeMenu() {
     const [is_open, set_is_open] = useState(false);
     const container_ref = useRef<HTMLDivElement>(null);
+    const click_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (!is_open) return;
@@ -68,7 +70,11 @@ function NukeMenu() {
         };
     }, [is_open]);
 
-    const toggle_menu = useCallback(() => set_is_open((prev) => !prev), []);
+    useEffect(() => {
+        return () => {
+            if (click_timer_ref.current) clearTimeout(click_timer_ref.current);
+        };
+    }, []);
 
     const handle_option_click = useCallback(async (option: NukeOption) => {
         set_is_open(false);
@@ -115,17 +121,33 @@ function NukeMenu() {
         }
     }, []);
 
+    const handle_button_click = useCallback(() => {
+        if (click_timer_ref.current) {
+            clearTimeout(click_timer_ref.current);
+            click_timer_ref.current = null;
+            set_is_open(false);
+            handle_option_click('all');
+        } else if (is_open) {
+            set_is_open(false);
+        } else {
+            set_is_open(true);
+            click_timer_ref.current = setTimeout(() => {
+                click_timer_ref.current = null;
+            }, NUKE_MENU_CONSTANTS.DOUBLE_CLICK_DELAY_MS);
+        }
+    }, [handle_option_click, is_open]);
+
     return (
         <div ref={container_ref} class="relative">
             <button
                 type="button"
-                onClick={toggle_menu}
+                onClick={handle_button_click}
                 class={`p-1 rounded transition-colors ${
                     is_open
                         ? 'text-error bg-error/10'
                         : 'text-base-content/50 hover:text-error hover:bg-base-300'
                 }`}
-                title="Close positions"
+                title="Close positions (double-click for all)"
             >
                 <Radiation class="w-4 h-4" />
             </button>

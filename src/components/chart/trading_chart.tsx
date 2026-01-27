@@ -14,6 +14,7 @@ import {
     type LineWidth,
 } from 'lightweight-charts';
 import type { TradingChartProps, ToggleButtonProps } from '../../types/chart.types';
+import type { Position } from '../../types/account.types';
 import { tick_size_to_precision } from '../../utils/format';
 import { get_timeframe_seconds } from '../../services/chart/drawing_manager';
 import { use_chart_drawing } from '../../hooks/use_chart_drawing';
@@ -21,6 +22,7 @@ import { use_price_lines } from '../../hooks/use_price_lines';
 import { use_trade_markers } from '../../hooks/use_trade_markers';
 import { DrawingToolbar } from './drawing_toolbar';
 import { DrawingOverlay } from './drawing_overlay';
+import { PositionContextMenu } from './position_context_menu';
 import { ErrorBoundary } from '../common/error_boundary';
 import { LogoSpinner } from '../common/logo_spinner';
 import { Eye, EyeOff, Settings } from 'lucide-preact';
@@ -79,6 +81,11 @@ export function TradingChart({
     const [ema_settings_open, set_ema_settings_open] = useState(false);
     const [theme_version, set_theme_version] = useState(0);
     const ema_settings_ref = useRef<HTMLDivElement>(null);
+    const [context_menu, set_context_menu] = useState<{
+        position: Position;
+        x: number;
+        y: number;
+    } | null>(null);
 
     const first_candle_time = data.length > 0 ? data[0].time : null;
 
@@ -362,6 +369,21 @@ export function TradingChart({
         set_ema_settings_open((prev) => !prev);
     }, []);
 
+    const handle_context_menu = useCallback(
+        (e: MouseEvent) => {
+            e.preventDefault();
+
+            if (positions.length === 0) return;
+
+            set_context_menu({ position: positions[0], x: e.clientX, y: e.clientY });
+        },
+        [positions]
+    );
+
+    const close_context_menu = useCallback(() => {
+        set_context_menu(null);
+    }, []);
+
     const handle_ema_color_change = useCallback(
         (color: string) => {
             on_ema_settings_change?.({ color });
@@ -406,6 +428,7 @@ export function TradingChart({
                     onMouseUp={handle_mouse_up}
                     onTouchEnd={handle_mouse_up}
                     onWheel={handle_wheel}
+                    onContextMenu={handle_context_menu}
                 />
                 {show_overlay && (
                     <div
@@ -484,6 +507,15 @@ export function TradingChart({
                     <div class="absolute inset-0 flex items-center justify-center bg-base-100">
                         <LogoSpinner size={48} />
                     </div>
+                )}
+                {context_menu && (
+                    <PositionContextMenu
+                        position={context_menu.position}
+                        orders={orders}
+                        x={context_menu.x}
+                        y={context_menu.y}
+                        on_close={close_context_menu}
+                    />
                 )}
             </div>
         </ErrorBoundary>

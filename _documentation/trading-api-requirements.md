@@ -892,12 +892,6 @@ Auth: EIP-712 signature (r, s, v) + nonce
 2. Implement debounced fetches
 3. Update store on fetch complete
 
-### Phase 4.2 - TP/SL Management
-
-1. Implement position-level TP/SL setting
-2. Use native APIs per exchange
-3. Add simple TP/SL menu on chart of active position on right click
-
 ---
 
 ### TODO:

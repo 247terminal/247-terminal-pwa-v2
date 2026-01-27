@@ -73,3 +73,14 @@ export const HISTORY_FETCH_CONSTANTS = {
 export const POSITION_CONSTANTS = {
     SIZE_THRESHOLD: 0.00001,
 } as const;
+
+export const CONTEXT_MENU_CONSTANTS = {
+    WIDTH: 180,
+    HEIGHT: 140,
+    PADDING: 8,
+    Z_INDEX: 9999,
+} as const;
+
+export const NUKE_MENU_CONSTANTS = {
+    DOUBLE_CLICK_DELAY_MS: 250,
+} as const;
