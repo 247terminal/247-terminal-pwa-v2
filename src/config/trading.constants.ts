@@ -4,3 +4,7 @@ export const ORDER_BATCH_CONSTANTS = {
     BLOFIN_BATCH_SIZE: 20,
     BYBIT_BATCH_SIZE: 10,
 } as const;
+
+export const TWAP_CONSTANTS = {
+    COMPLETED_DISPLAY_MS: 3000,
+} as const;

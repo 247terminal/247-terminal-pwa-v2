@@ -1,3 +1,4 @@
+import { memo } from 'preact/compat';
 import { useMemo } from 'preact/hooks';
 import { EXCHANGE_ORDER } from '../../../types/exchange.types';
 import { markets } from '../../../stores/exchange_store';
@@ -10,13 +11,10 @@ import { ScaleForm } from './scale_form';
 import { TwapForm } from './twap_form';
 import { OrderSummary } from './order_summary';
 import { OrderButtons } from './order_buttons';
+import { ActiveTwaps } from './active_twaps';
 import type { ExchangeSymbols } from './symbol_selector';
 
-interface TradeBlockProps {
-    on_remove?: () => void;
-}
-
-export function TradeBlock(_props: TradeBlockProps) {
+export const TradeBlock = memo(function TradeBlock() {
     const order_type = selected_order_type.value;
     const current_markets = markets.value;
     const connection_status = exchange_connection_status.value;
@@ -46,7 +44,8 @@ export function TradeBlock(_props: TradeBlockProps) {
 
                 <OrderSummary />
                 <OrderButtons />
+                <ActiveTwaps />
             </div>
         </div>
     );
-}
+});

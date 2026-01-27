@@ -6,11 +6,13 @@ import type {
     FundingInfo,
 } from '@/types/exchange.types';
 import type { MarketData, TickerInfo, OHLCV, ChartTimeframe } from '@/types/chart.types';
+import type { TwapProgressUpdate } from '@/types/twap.types';
 import {
     update_ticker_stream_batch,
     update_bidask_batch,
     update_price_batch,
 } from '@/stores/exchange_store';
+import { update_twap } from '@/stores/twap_store';
 import { WORKER_REQUEST_TIMEOUT } from '@/config';
 
 export type { MarketData, TickerInfo, OHLCV, ChartTimeframe };
@@ -69,6 +71,8 @@ export function getWorker(): Worker {
             update_bidask_batch(exchangeId, data as BidAskUpdate[]);
         } else if (type === 'KLINE_UPDATE') {
             update_price_batch(exchangeId, data as PriceUpdate[]);
+        } else if (type === 'TWAP_PROGRESS') {
+            update_twap(data.id, data as TwapProgressUpdate);
         }
     };
 

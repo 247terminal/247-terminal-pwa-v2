@@ -37,6 +37,7 @@ import {
     type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
 } from './account_worker';
+import { start_twap, cancel_twap, type TwapWorkerParams } from './twap_scheduler';
 import {
     registerExchangeClass,
     getExchange,
@@ -443,6 +444,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                     payload?.exchangeId as ExchangeId,
                     payload as unknown as ScaleOrderParams
                 );
+                break;
+            case 'START_TWAP':
+                result = start_twap(payload as unknown as TwapWorkerParams, (update) => {
+                    self.postMessage({ type: 'TWAP_PROGRESS', data: update });
+                });
+                break;
+            case 'CANCEL_TWAP':
+                result = cancel_twap(payload?.twap_id as string);
                 break;
             default:
                 throw new Error(`unknown message type: ${type}`);

@@ -892,18 +892,11 @@ Auth: EIP-712 signature (r, s, v) + nonce
 2. Implement debounced fetches
 3. Update store on fetch complete
 
-### Phase 4.1 - TWAP Orders
-
-1. Create TWAP scheduler service
-2. Store active TWAP orders
-3. Execute orders at calculated intervals
-4. Handle cancellation
-
 ### Phase 4.2 - TP/SL Management
 
 1. Implement position-level TP/SL setting
 2. Use native APIs per exchange
-3. Support modification of existing TP/SL
+3. Add simple TP/SL menu on chart of active position on right click
 
 ---
 

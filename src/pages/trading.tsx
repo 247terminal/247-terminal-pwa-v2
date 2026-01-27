@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'preact/hooks';
+import { useCallback, useState, useEffect, useMemo } from 'preact/hooks';
 import {
     ResponsiveGridLayout,
     useContainerWidth,
@@ -27,9 +27,16 @@ function render_block(type: BlockType, id: string, on_remove: () => void, locked
         case 'chat':
             return <ChatBlock on_remove={remove_handler} />;
         case 'trade':
-            return <TradeBlock on_remove={remove_handler} />;
+            return <TradeBlock />;
         default:
             return null;
+    }
+}
+
+const GRID_CELLS: { row: number; col: number }[] = [];
+for (let row = 0; row < GRID_CONSTANTS.ROWS; row++) {
+    for (let col = 0; col < GRID_CONSTANTS.COLS; col++) {
+        GRID_CELLS.push({ row, col });
     }
 }
 
@@ -44,20 +51,18 @@ function GridOverlay({ row_height, width }: GridOverlayProps) {
             style={{ padding: GRID_CONSTANTS.MARGIN }}
         >
             <div class="relative w-full h-full">
-                {Array.from({ length: GRID_CONSTANTS.ROWS }).map((_, row) =>
-                    Array.from({ length: GRID_CONSTANTS.COLS }).map((_, col) => (
-                        <div
-                            key={`${row}-${col}`}
-                            class="absolute rounded border border-base-content/10"
-                            style={{
-                                left: col * (col_width + GRID_CONSTANTS.MARGIN),
-                                top: row * (row_height + GRID_CONSTANTS.MARGIN),
-                                width: col_width,
-                                height: row_height,
-                            }}
-                        />
-                    ))
-                )}
+                {GRID_CELLS.map(({ row, col }) => (
+                    <div
+                        key={`${row}-${col}`}
+                        class="absolute rounded border border-base-content/10"
+                        style={{
+                            left: col * (col_width + GRID_CONSTANTS.MARGIN),
+                            top: row * (row_height + GRID_CONSTANTS.MARGIN),
+                            width: col_width,
+                            height: row_height,
+                        }}
+                    />
+                ))}
             </div>
         </div>
     );
@@ -111,6 +116,14 @@ export function TradingPage() {
     const current_layouts = layouts.value;
     const is_locked = layout_locked.value;
 
+    const remove_handlers = useMemo(() => {
+        const handlers: Record<string, () => void> = {};
+        for (const block of current_blocks) {
+            handlers[block.id] = () => remove_block(block.id);
+        }
+        return handlers;
+    }, [current_blocks]);
+
     return (
         <div class="h-screen flex flex-col bg-base-100">
             <Header />
@@ -150,7 +163,7 @@ export function TradingPage() {
                                 {render_block(
                                     block.type,
                                     block.id,
-                                    () => remove_block(block.id),
+                                    remove_handlers[block.id],
                                     is_locked
                                 )}
                                 <div class="block-type-icon absolute inset-0 flex items-center justify-center pointer-events-none">

@@ -102,6 +102,7 @@ export interface CcxtExchange {
     markets: Record<string, CcxtMarket>;
     markets_by_id?: Record<string, CcxtMarket>;
     loadMarkets(): Promise<Record<string, CcxtMarket>>;
+    fetchTicker(symbol: string): Promise<CcxtTicker>;
     fetchTickers(symbols?: string[]): Promise<Record<string, CcxtTicker>>;
     fetchFundingRates(symbols: string[]): Promise<Record<string, CcxtFundingRate>>;
     fetchOHLCV(

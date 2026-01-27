@@ -13,7 +13,10 @@ import {
     place_limit_order,
     place_scale_orders,
 } from '../../../stores/account_store';
-import { has_exchange } from '../../../services/exchange/account_bridge';
+import { get_symbol_settings } from '../../../stores/trading_store';
+import { settings } from '../../../stores/settings_store';
+import { has_exchange, start_twap_api } from '../../../services/exchange/account_bridge';
+import { add_twap } from '../../../stores/twap_store';
 import { parse_symbol } from '../../chart/symbol_row';
 import { format_price, extract_error_message } from '../../../utils/format';
 
@@ -176,6 +179,10 @@ export const OrderButtons = memo(function OrderButtons() {
     const scale_price_distribution = scale_form.price_distribution;
     const scale_size_distribution = scale_form.size_distribution;
 
+    const twap_duration_minutes = twap_form.duration_minutes;
+    const twap_orders_count = twap_form.orders_count;
+    const twap_total_size_usd = twap_form.total_size_usd;
+
     const execute_scale_order = useCallback(
         async (
             side: 'buy' | 'sell'
@@ -248,13 +255,60 @@ export const OrderButtons = memo(function OrderButtons() {
         ]
     );
 
-    const submit_order = useCallback(
-        async (side: 'buy' | 'sell') => {
-            if (order_type !== 'market' && order_type !== 'limit' && order_type !== 'scale') {
-                toast.error(`${order_type} orders not yet implemented`);
-                return;
+    const execute_twap_order = useCallback(
+        async (side: 'buy' | 'sell'): Promise<boolean> => {
+            const total_usd = parseFloat(twap_total_size_usd) || 0;
+
+            if (total_usd <= 0) {
+                toast.error('Invalid total size');
+                return false;
             }
 
+            if (twap_orders_count < 2) {
+                toast.error('Need at least 2 orders');
+                return false;
+            }
+
+            if (!last_price) {
+                toast.error('Unable to get current price');
+                return false;
+            }
+
+            const symbol_settings = get_symbol_settings(exchange, symbol);
+            const slippage = settings.value.trading?.slippage ?? 'MARKET';
+
+            const twap_order = await start_twap_api({
+                exchange,
+                symbol,
+                side,
+                total_size_usd: total_usd,
+                orders_count: twap_orders_count,
+                duration_minutes: twap_duration_minutes,
+                leverage: symbol_settings?.leverage ?? 10,
+                margin_mode: symbol_settings?.margin_mode ?? 'cross',
+                current_price: last_price,
+                max_market_qty: symbol_settings?.max_market_qty,
+                qty_step: symbol_settings?.qty_step ?? market?.qty_step,
+                contract_size: market?.contract_size,
+                slippage,
+            });
+
+            add_twap(twap_order);
+            return true;
+        },
+        [
+            twap_total_size_usd,
+            twap_orders_count,
+            twap_duration_minutes,
+            exchange,
+            symbol,
+            last_price,
+            market,
+        ]
+    );
+
+    const submit_order = useCallback(
+        async (side: 'buy' | 'sell') => {
             if (!has_exchange(exchange)) {
                 toast.error('Exchange not connected');
                 return;
@@ -275,6 +329,11 @@ export const OrderButtons = memo(function OrderButtons() {
                     if (result.success === 0 && result.failed === 0) {
                         toast.error('Failed to place scale orders');
                     }
+                } else if (order_type === 'twap') {
+                    const success = await execute_twap_order(side);
+                    if (success) {
+                        toast.success(`TWAP ${side_label} ${base} started`);
+                    }
                 } else {
                     const success =
                         order_type === 'market'
@@ -294,7 +353,15 @@ export const OrderButtons = memo(function OrderButtons() {
                 setSubmitting(false);
             }
         },
-        [order_type, exchange, base, execute_market_order, execute_limit_order, execute_scale_order]
+        [
+            order_type,
+            exchange,
+            base,
+            execute_market_order,
+            execute_limit_order,
+            execute_scale_order,
+            execute_twap_order,
+        ]
     );
 
     const handle_buy = useCallback(() => submit_order('buy'), [submit_order]);

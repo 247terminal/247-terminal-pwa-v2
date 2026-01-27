@@ -133,7 +133,7 @@ async function execute_batch_orders(
         batches.map((batch) =>
             exchange
                 .createOrders(batch)
-                .then((results) => {
+                .then((results: unknown) => {
                     let success = 0;
                     let failed = 0;
                     if (Array.isArray(results)) {
@@ -150,7 +150,7 @@ async function execute_batch_orders(
                     }
                     return { success, failed };
                 })
-                .catch((err) => {
+                .catch((err: unknown) => {
                     console.error(`${log_prefix}:`, (err as Error).message);
                     return { success: 0, failed: batch.length };
                 })
@@ -768,35 +768,5 @@ export async function place_batch_limit_orders(
         params: order_params,
     }));
 
-    const batch_size = ORDER_BATCH_CONSTANTS.BINANCE_BATCH_SIZE;
-    const batches: (typeof ccxt_orders)[] = [];
-    for (let i = 0; i < ccxt_orders.length; i += batch_size) {
-        batches.push(ccxt_orders.slice(i, i + batch_size));
-    }
-
-    let success_count = 0;
-    let failed_count = 0;
-
-    for (const batch of batches) {
-        try {
-            const results = await exchange.createOrders(batch);
-            if (Array.isArray(results)) {
-                for (const r of results) {
-                    if (r && r.id && !('error' in r)) {
-                        success_count++;
-                    } else {
-                        failed_count++;
-                    }
-                }
-            }
-        } catch (err) {
-            console.error('binance batch order failed:', (err as Error).message);
-            failed_count += batch.length;
-            if (success_count === 0) {
-                throw err;
-            }
-        }
-    }
-
-    return { success: success_count, failed: failed_count };
+    return execute_batch_orders(exchange, ccxt_orders, 'binance batch limit order failed');
 }

@@ -13,6 +13,7 @@ import type {
 } from '@/types/trading.types';
 import type { Position, Order, TradeHistory } from '@/types/account.types';
 import type { RawFill, OrderCategory, ExchangeAuthParams } from '@/types/worker.types';
+import type { TwapOrder, TwapWorkerParams } from '@/types/twap.types';
 import { getWorker, sendRequest, fetch_markets } from './chart_data';
 import { get_exchange_markets, has_markets, set_markets } from '@/stores/exchange_store';
 import { MARKET_MAP_CACHE_TTL } from '@/config';
@@ -222,4 +223,12 @@ export function place_scale_orders_api(
         exchangeId,
         ...params,
     });
+}
+
+export function start_twap_api(params: TwapWorkerParams): Promise<TwapOrder> {
+    return sendRequest<TwapOrder>('START_TWAP', params as unknown as Record<string, unknown>);
+}
+
+export function cancel_twap_api(twap_id: string): Promise<TwapOrder | null> {
+    return sendRequest<TwapOrder | null>('CANCEL_TWAP', { twap_id });
 }

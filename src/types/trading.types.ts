@@ -1,5 +1,6 @@
 import type { ExchangeId } from './exchange.types';
 import type { Position, Order } from './account.types';
+import type { PriceDistribution, SizeDistribution } from './trade.types';
 
 export type PositionMode = 'one_way' | 'hedge';
 export type MarginMode = 'cross' | 'isolated';

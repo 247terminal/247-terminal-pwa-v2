@@ -274,6 +274,14 @@ export async function fetchMarkets(exchangeId: ExchangeId): Promise<MarketInfo[]
         .sort((a, b) => a.symbol.localeCompare(b.symbol));
 }
 
+export async function fetchTickerPrice(exchangeId: ExchangeId, symbol: string): Promise<number> {
+    const exchange = getExchange(exchangeId);
+    await loadMarkets(exchangeId);
+
+    const ticker = await exchange.fetchTicker(symbol);
+    return ticker.last ?? ticker.close ?? 0;
+}
+
 export async function fetchTickers(
     exchangeId: ExchangeId
 ): Promise<
