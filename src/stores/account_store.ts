@@ -13,6 +13,7 @@ import {
     place_market_order_api,
     place_limit_order_api,
     place_scale_orders_api,
+    set_tpsl_api,
     has_exchange,
 } from '../services/exchange/account_bridge';
 import type { PriceDistribution, SizeDistribution } from '../types/trading.types';
@@ -636,6 +637,49 @@ export async function place_scale_orders(
         return result;
     } catch (err) {
         console.error(`failed to place scale orders ${symbol}:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function set_tpsl(
+    exchange_id: ExchangeId,
+    symbol: string,
+    tp_price?: number,
+    tp_order_type?: 'market' | 'limit',
+    sl_price?: number
+): Promise<boolean> {
+    if (!has_exchange(exchange_id)) {
+        throw new Error('Exchange not connected');
+    }
+
+    const position = Array.from(positions.value.values()).find(
+        (p) => p.exchange === exchange_id && p.symbol === symbol
+    );
+
+    if (!position) {
+        throw new Error('Position not found');
+    }
+
+    try {
+        const symbol_settings = get_symbol_settings(exchange_id, symbol);
+        const market = get_market(exchange_id, symbol);
+
+        const success = await set_tpsl_api(exchange_id, {
+            symbol,
+            side: position.side,
+            size: position.size,
+            tp_price,
+            tp_order_type,
+            sl_price,
+            margin_mode: position.margin_mode,
+            qty_step: symbol_settings?.qty_step ?? market?.qty_step,
+            tick_size: market?.tick_size,
+            contract_size: market?.contract_size,
+        });
+
+        return success;
+    } catch (err) {
+        console.error(`failed to set tp/sl ${symbol}:`, (err as Error).message);
         throw err;
     }
 }

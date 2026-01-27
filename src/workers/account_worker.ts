@@ -22,6 +22,7 @@ import {
     type MarketOrderParams,
     type LimitOrderParams,
     type ScaleOrderParams,
+    type TpSlParams,
 } from './adapters';
 import { generate_scale_orders } from '../utils/scale_orders';
 import type { ExchangeId, CcxtExchange, OrderCategory } from '@/types/worker.types';
@@ -667,6 +668,47 @@ export async function placeScaleOrders(
         return { ...result, total: orders.length };
     } catch (err) {
         console.error(`failed to place ${exchangeId} scale orders:`, (err as Error).message);
+        throw err;
+    }
+}
+
+export async function setTpSl(
+    exchangeId: ExchangeId,
+    params: Omit<TpSlParams, 'position_mode'>
+): Promise<boolean> {
+    const exchange = getAuthenticatedExchange(exchangeId);
+    const fullParams: TpSlParams = {
+        ...params,
+        position_mode: getPositionMode(exchangeId),
+    };
+
+    try {
+        switch (exchangeId) {
+            case 'binance':
+                return await binanceAdapter.set_tpsl(
+                    exchange as unknown as BinanceExchange,
+                    fullParams
+                );
+            case 'bybit':
+                return await bybitAdapter.set_tpsl(
+                    exchange as unknown as BybitExchange,
+                    fullParams
+                );
+            case 'blofin':
+                return await blofinAdapter.set_tpsl(
+                    exchange as unknown as BlofinExchange,
+                    fullParams
+                );
+            case 'hyperliquid':
+                return await hyperliquidAdapter.set_tpsl(
+                    exchange as unknown as HyperliquidExchange,
+                    fullParams
+                );
+            default:
+                throw new Error(`exchange ${exchangeId} does not support tp/sl orders`);
+        }
+    } catch (err) {
+        console.error(`failed to set ${exchangeId} tp/sl:`, (err as Error).message);
         throw err;
     }
 }

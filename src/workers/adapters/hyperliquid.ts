@@ -6,6 +6,7 @@ import type {
     MarketOrderParams,
     LimitOrderParams,
     BatchLimitOrderParams,
+    TpSlParams,
 } from '@/types/trading.types';
 import { split_quantity, round_quantity, round_price } from '../../utils/format';
 import { hyperliquid as sym } from '../symbol_utils';
@@ -575,4 +576,58 @@ export async function place_batch_limit_orders(
     }
 
     return { success: success_count, failed: failed_count };
+}
+
+export async function set_tpsl(
+    exchange: HyperliquidExchange,
+    params: TpSlParams
+): Promise<boolean> {
+    const is_long = params.side === 'long';
+    const close_side = is_long ? 'sell' : 'buy';
+    const is_tp_limit = params.tp_order_type === 'limit';
+
+    const orders: Promise<unknown>[] = [];
+
+    if (params.tp_price && params.tp_price > 0) {
+        const tp_price_rounded = round_price(params.tp_price, params.tick_size);
+        const order_params: Record<string, unknown> = {
+            reduceOnly: true,
+            triggerPrice: tp_price_rounded,
+        };
+        orders.push(
+            exchange.createOrder(
+                params.symbol,
+                is_tp_limit ? 'limit' : 'market',
+                close_side,
+                round_quantity(params.size, params.qty_step),
+                tp_price_rounded,
+                order_params
+            )
+        );
+    }
+
+    if (params.sl_price && params.sl_price > 0) {
+        const sl_price_rounded = round_price(params.sl_price, params.tick_size);
+        const order_params: Record<string, unknown> = {
+            reduceOnly: true,
+            triggerPrice: sl_price_rounded,
+        };
+        orders.push(
+            exchange.createOrder(
+                params.symbol,
+                'market',
+                close_side,
+                round_quantity(params.size, params.qty_step),
+                sl_price_rounded,
+                order_params
+            )
+        );
+    }
+
+    if (orders.length === 0) {
+        throw new Error('no tp or sl price provided');
+    }
+
+    await Promise.all(orders);
+    return true;
 }

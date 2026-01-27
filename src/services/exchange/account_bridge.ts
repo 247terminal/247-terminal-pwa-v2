@@ -7,6 +7,7 @@ import type {
     MarketOrderParams,
     LimitOrderParams,
     ScaleOrderParams,
+    TpSlParams,
     MarketInfo,
     AccountData,
     CachedMarketMap,
@@ -150,7 +151,7 @@ export function fetch_leverage_settings(
     symbols: string[]
 ): Promise<Record<string, number>> {
     if (symbols.length === 0) return Promise.resolve({});
-    const key = `leverage:${exchangeId}:${symbols.sort().join(',')}`;
+    const key = `leverage:${exchangeId}:${symbols.toSorted().join(',')}`;
     return dedupeRequest(key, () =>
         sendRequest<Record<string, number>>('FETCH_LEVERAGE_SETTINGS', { exchangeId, symbols })
     );
@@ -231,4 +232,11 @@ export function start_twap_api(params: TwapWorkerParams): Promise<TwapOrder> {
 
 export function cancel_twap_api(twap_id: string): Promise<TwapOrder | null> {
     return sendRequest<TwapOrder | null>('CANCEL_TWAP', { twap_id });
+}
+
+export function set_tpsl_api(
+    exchangeId: ExchangeId,
+    params: Omit<TpSlParams, 'position_mode'>
+): Promise<boolean> {
+    return sendRequest<boolean>('SET_TPSL', { exchangeId, ...params });
 }

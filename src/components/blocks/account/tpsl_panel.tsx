@@ -1,11 +1,15 @@
 import { memo } from 'preact/compat';
 import { useState, useCallback, useRef, useMemo } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
+import { toast } from 'sonner';
 import type { Position } from '../../../types/account.types';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
-import { format_price, DECIMAL_REGEX } from '../../../utils/format';
+import { set_tpsl, refresh_orders } from '../../../stores/account_store';
+import { format_price, DECIMAL_REGEX, extract_error_message } from '../../../utils/format';
 import { calculate_position_pnl } from '../../../utils/pnl';
 import { use_click_outside, use_escape_key } from '../../../hooks';
+import { parse_symbol } from '../../chart/symbol_row';
+import { TPSL_CONSTANTS } from '../../../config/trading.constants';
 
 type TpSlOrderType = 'market' | 'limit';
 
@@ -59,7 +63,10 @@ export const TpSlPanel = memo(function TpSlPanel({
     const handle_toggle_tp = useCallback(() => {
         set_tp_enabled((prev) => {
             if (!prev && !tp_price_ref.current) {
-                const suggested = is_long ? current_price * 1.01 : current_price * 0.99;
+                const { DEFAULT_TP_OFFSET_PERCENT, DEFAULT_SL_OFFSET_PERCENT } = TPSL_CONSTANTS;
+                const suggested = is_long
+                    ? current_price * DEFAULT_TP_OFFSET_PERCENT
+                    : current_price * DEFAULT_SL_OFFSET_PERCENT;
                 set_tp_price(format_price(suggested, tick_size));
             }
             return !prev;
@@ -69,7 +76,10 @@ export const TpSlPanel = memo(function TpSlPanel({
     const handle_toggle_sl = useCallback(() => {
         set_sl_enabled((prev) => {
             if (!prev && !sl_price_ref.current) {
-                const suggested = is_long ? current_price * 0.99 : current_price * 1.01;
+                const { DEFAULT_TP_OFFSET_PERCENT, DEFAULT_SL_OFFSET_PERCENT } = TPSL_CONSTANTS;
+                const suggested = is_long
+                    ? current_price * DEFAULT_SL_OFFSET_PERCENT
+                    : current_price * DEFAULT_TP_OFFSET_PERCENT;
                 set_sl_price(format_price(suggested, tick_size));
             }
             return !prev;
@@ -81,10 +91,42 @@ export const TpSlPanel = memo(function TpSlPanel({
 
     const tp_num = parseFloat(tp_price) || null;
     const sl_num = parseFloat(sl_price) || null;
+    const [is_submitting, set_is_submitting] = useState(false);
 
-    const handle_confirm = useCallback(() => {
-        on_close();
-    }, [on_close]);
+    const handle_confirm = useCallback(async () => {
+        const final_tp = tp_enabled && tp_num ? tp_num : undefined;
+        const final_sl = sl_enabled && sl_num ? sl_num : undefined;
+
+        if (!final_tp && !final_sl) {
+            on_close();
+            return;
+        }
+
+        set_is_submitting(true);
+        const symbol_label = parse_symbol(position.symbol).base;
+        try {
+            await set_tpsl(position.exchange, position.symbol, final_tp, tp_order_type, final_sl);
+            const has_tp = !!final_tp;
+            const has_sl = !!final_sl;
+            const order_type = has_tp && has_sl ? 'TP/SL' : has_tp ? 'take profit' : 'stop loss';
+            toast.success(`${symbol_label} ${order_type} placed`);
+            refresh_orders(position.exchange).catch(console.error);
+            on_close();
+        } catch (err) {
+            toast.error(`Failed to place ${symbol_label} TP/SL: ${extract_error_message(err)}`);
+        } finally {
+            set_is_submitting(false);
+        }
+    }, [
+        tp_enabled,
+        sl_enabled,
+        tp_num,
+        tp_order_type,
+        sl_num,
+        position.exchange,
+        position.symbol,
+        on_close,
+    ]);
 
     const tp_pnl = useMemo(
         () =>
@@ -272,10 +314,10 @@ export const TpSlPanel = memo(function TpSlPanel({
                 <button
                     type="button"
                     onClick={handle_confirm}
-                    disabled={!can_confirm}
+                    disabled={!can_confirm || is_submitting}
                     class="w-full py-2 text-xs font-medium rounded-md bg-primary hover:bg-primary/90 text-primary-content transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Confirm
+                    {is_submitting ? 'Placing...' : 'Confirm'}
                 </button>
             </div>
         </div>,

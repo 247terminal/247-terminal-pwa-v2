@@ -8,3 +8,8 @@ export const ORDER_BATCH_CONSTANTS = {
 export const TWAP_CONSTANTS = {
     COMPLETED_DISPLAY_MS: 3000,
 } as const;
+
+export const TPSL_CONSTANTS = {
+    DEFAULT_TP_OFFSET_PERCENT: 1.01,
+    DEFAULT_SL_OFFSET_PERCENT: 0.99,
+} as const;

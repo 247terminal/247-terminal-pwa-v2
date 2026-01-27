@@ -14,6 +14,7 @@ import type {
     MarketOrderParams,
     LimitOrderParams,
     BatchLimitOrderParams,
+    TpSlParams,
 } from '@/types/trading.types';
 import { blofin as sym } from '../symbol_utils';
 import { split_quantity, round_quantity_string, round_price_string } from '../../utils/format';
@@ -35,6 +36,7 @@ export interface BlofinExchange extends BaseBlofinExchange {
     privatePostTradeCancelBatchOrders(params: unknown): Promise<unknown>;
     privatePostTradeOrder(params: Record<string, unknown>): Promise<unknown>;
     privatePostTradeBatchOrders(params: unknown): Promise<unknown>;
+    privatePostTradeOrderTpsl(params: Record<string, unknown>): Promise<unknown>;
 }
 
 interface BlofinPositionResponse {
@@ -879,4 +881,47 @@ export async function place_batch_limit_orders(
     }
 
     return { success: success_count, failed: failed_count };
+}
+
+export async function set_tpsl(exchange: BlofinExchange, params: TpSlParams): Promise<boolean> {
+    const blofin_inst_id = sym.fromUnified(params.symbol);
+    const is_long = params.side === 'long';
+    const close_side = is_long ? 'sell' : 'buy';
+    const contract_size =
+        params.contract_size && params.contract_size > 0 ? params.contract_size : 1;
+    const size_in_contracts = params.size / contract_size;
+    const is_tp_limit = params.tp_order_type === 'limit';
+
+    const order: Record<string, string> = {
+        instId: blofin_inst_id,
+        marginMode: params.margin_mode,
+        side: close_side,
+        size: round_quantity_string(size_in_contracts, params.qty_step),
+        brokerId: BROKER_CONFIG.blofin.brokerId,
+    };
+
+    if (params.position_mode === 'hedge') {
+        order.positionSide = params.side;
+    } else {
+        order.positionSide = 'net';
+    }
+
+    if (params.tp_price && params.tp_price > 0) {
+        order.tpTriggerPrice = round_price_string(params.tp_price, params.tick_size);
+        order.tpOrderPrice = is_tp_limit
+            ? round_price_string(params.tp_price, params.tick_size)
+            : '-1';
+    }
+
+    if (params.sl_price && params.sl_price > 0) {
+        order.slTriggerPrice = round_price_string(params.sl_price, params.tick_size);
+        order.slOrderPrice = '-1';
+    }
+
+    if (!order.tpTriggerPrice && !order.slTriggerPrice) {
+        throw new Error('no tp or sl price provided');
+    }
+
+    await exchange.privatePostTradeOrderTpsl(order);
+    return true;
 }

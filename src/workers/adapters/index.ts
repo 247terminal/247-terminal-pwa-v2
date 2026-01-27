@@ -11,6 +11,7 @@ export type {
     LimitOrderParams,
     ScaleOrderParams,
     BatchLimitOrderParams,
+    TpSlParams,
 } from '@/types/trading.types';
 export type { BybitExchange } from './bybit';
 export type { BlofinExchange } from './blofin';

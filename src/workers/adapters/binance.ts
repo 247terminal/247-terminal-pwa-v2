@@ -11,6 +11,7 @@ import type {
     MarketOrderParams,
     LimitOrderParams,
     BatchLimitOrderParams,
+    TpSlParams,
 } from '@/types/trading.types';
 import { ORDER_BATCH_CONSTANTS } from '@/config/trading.constants';
 import { binance as sym } from '../symbol_utils';
@@ -769,4 +770,68 @@ export async function place_batch_limit_orders(
     }));
 
     return execute_batch_orders(exchange, ccxt_orders, 'binance batch limit order failed');
+}
+
+export async function set_tpsl(exchange: BinanceExchange, params: TpSlParams): Promise<boolean> {
+    const is_long = params.side === 'long';
+    const close_side: 'buy' | 'sell' = is_long ? 'sell' : 'buy';
+    const is_tp_limit = params.tp_order_type === 'limit';
+
+    const orders: Promise<unknown>[] = [];
+
+    if (params.tp_price && params.tp_price > 0) {
+        const tp_price_rounded = round_price(params.tp_price, params.tick_size);
+        const order_params: Record<string, unknown> = {
+            stopPrice: tp_price_rounded,
+            reduceOnly: true,
+            workingType: 'MARK_PRICE',
+        };
+        if (is_tp_limit) {
+            order_params.timeInForce = 'GTC';
+        }
+        if (params.position_mode === 'hedge') {
+            order_params.positionSide = is_long ? 'LONG' : 'SHORT';
+            delete order_params.reduceOnly;
+        }
+        orders.push(
+            exchange.createOrder(
+                params.symbol,
+                is_tp_limit ? 'TAKE_PROFIT' : 'TAKE_PROFIT_MARKET',
+                close_side,
+                round_quantity(params.size, params.qty_step),
+                is_tp_limit ? tp_price_rounded : undefined,
+                order_params
+            )
+        );
+    }
+
+    if (params.sl_price && params.sl_price > 0) {
+        const sl_price_rounded = round_price(params.sl_price, params.tick_size);
+        const order_params: Record<string, unknown> = {
+            stopPrice: sl_price_rounded,
+            reduceOnly: true,
+            workingType: 'MARK_PRICE',
+        };
+        if (params.position_mode === 'hedge') {
+            order_params.positionSide = is_long ? 'LONG' : 'SHORT';
+            delete order_params.reduceOnly;
+        }
+        orders.push(
+            exchange.createOrder(
+                params.symbol,
+                'STOP_MARKET',
+                close_side,
+                round_quantity(params.size, params.qty_step),
+                undefined,
+                order_params
+            )
+        );
+    }
+
+    if (orders.length === 0) {
+        throw new Error('no tp or sl price provided');
+    }
+
+    await Promise.all(orders);
+    return true;
 }

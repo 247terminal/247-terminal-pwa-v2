@@ -33,6 +33,7 @@ import {
     placeMarketOrder,
     placeLimitOrder,
     placeScaleOrders,
+    setTpSl,
     hyperliquidAdapter,
     type ExchangeAuthParams,
     type MarketInfo as AccountMarketInfo,
@@ -444,6 +445,20 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                     payload?.exchangeId as ExchangeId,
                     payload as unknown as ScaleOrderParams
                 );
+                break;
+            case 'SET_TPSL':
+                result = await setTpSl(payload?.exchangeId as ExchangeId, {
+                    symbol: payload?.symbol as string,
+                    side: payload?.side as 'long' | 'short',
+                    size: payload?.size as number,
+                    tp_price: payload?.tp_price as number | undefined,
+                    tp_order_type: payload?.tp_order_type as 'market' | 'limit' | undefined,
+                    sl_price: payload?.sl_price as number | undefined,
+                    margin_mode: payload?.margin_mode as 'cross' | 'isolated',
+                    qty_step: payload?.qty_step as number | undefined,
+                    tick_size: payload?.tick_size as number | undefined,
+                    contract_size: payload?.contract_size as number | undefined,
+                });
                 break;
             case 'START_TWAP':
                 result = start_twap(payload as unknown as TwapWorkerParams, (update) => {

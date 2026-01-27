@@ -135,3 +135,17 @@ export interface CachedMarketMap {
     data: Record<string, MarketInfo>;
     timestamp: number;
 }
+
+export interface TpSlParams {
+    symbol: string;
+    side: 'long' | 'short';
+    size: number;
+    tp_price?: number;
+    tp_order_type?: 'market' | 'limit';
+    sl_price?: number;
+    margin_mode: MarginMode;
+    position_mode: PositionMode;
+    qty_step?: number;
+    tick_size?: number;
+    contract_size?: number;
+}

@@ -7,6 +7,7 @@ import type {
     MarketOrderParams,
     LimitOrderParams,
     BatchLimitOrderParams,
+    TpSlParams,
 } from '@/types/trading.types';
 import { bybit as sym } from '../symbol_utils';
 import { split_quantity, round_quantity_string, round_price_string } from '../../utils/format';
@@ -701,4 +702,57 @@ export async function place_batch_limit_orders(
     }
 
     return { success: success_count, failed: failed_count };
+}
+
+export async function set_tpsl(exchange: BybitExchange, params: TpSlParams): Promise<boolean> {
+    const bybit_symbol = sym.fromUnified(params.symbol);
+    const is_long = params.side === 'long';
+    const close_side = is_long ? 'Sell' : 'Buy';
+    const is_tp_limit = params.tp_order_type === 'limit';
+
+    const orders: Record<string, string | number | boolean>[] = [];
+
+    if (params.tp_price && params.tp_price > 0) {
+        const tp_order: Record<string, string | number | boolean> = {
+            symbol: bybit_symbol,
+            side: close_side,
+            orderType: is_tp_limit ? 'Limit' : 'Market',
+            qty: round_quantity_string(params.size, params.qty_step),
+            triggerPrice: round_price_string(params.tp_price, params.tick_size),
+            triggerDirection: is_long ? 1 : 2,
+            triggerBy: 'MarkPrice',
+            reduceOnly: true,
+            timeInForce: is_tp_limit ? 'GTC' : 'IOC',
+            positionIdx: params.position_mode === 'hedge' ? (is_long ? 1 : 2) : 0,
+        };
+        if (is_tp_limit) {
+            tp_order.price = round_price_string(params.tp_price, params.tick_size);
+        }
+        orders.push(tp_order);
+    }
+
+    if (params.sl_price && params.sl_price > 0) {
+        orders.push({
+            symbol: bybit_symbol,
+            side: close_side,
+            orderType: 'Market',
+            qty: round_quantity_string(params.size, params.qty_step),
+            triggerPrice: round_price_string(params.sl_price, params.tick_size),
+            triggerDirection: is_long ? 2 : 1,
+            triggerBy: 'MarkPrice',
+            reduceOnly: true,
+            timeInForce: 'IOC',
+            positionIdx: params.position_mode === 'hedge' ? (is_long ? 1 : 2) : 0,
+        });
+    }
+
+    if (orders.length === 0) {
+        throw new Error('no tp or sl price provided');
+    }
+
+    await Promise.all(
+        orders.map((order) => exchange.privatePostV5OrderCreate({ category: 'linear', ...order }))
+    );
+
+    return true;
 }
