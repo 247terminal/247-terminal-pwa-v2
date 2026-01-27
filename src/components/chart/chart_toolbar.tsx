@@ -16,6 +16,7 @@ import { get_ticker } from '../../stores/exchange_store';
 import { SymbolRow, ITEM_HEIGHT, format_symbol } from './symbol_row';
 import { TimeframeSelector } from './timeframe_selector';
 import { TickerInfo } from './ticker_info';
+import { use_escape_key } from '../../hooks';
 
 export type { Timeframe, ExchangeSymbols };
 
@@ -28,14 +29,18 @@ function load_filter(): ChartFilterType {
     try {
         const stored = localStorage.getItem(FILTER_STORAGE_KEY);
         if (stored) return stored as ChartFilterType;
-    } catch {}
+    } catch (e) {
+        console.warn('failed to load symbol filter from localStorage:', (e as Error).message);
+    }
     return 'all';
 }
 
 function save_filter(filter: ChartFilterType): void {
     try {
         localStorage.setItem(FILTER_STORAGE_KEY, filter);
-    } catch {}
+    } catch (e) {
+        console.warn('failed to save symbol filter to localStorage:', (e as Error).message);
+    }
 }
 
 export function ChartToolbar({
@@ -55,14 +60,17 @@ export function ChartToolbar({
     const [scroll_top, set_scroll_top] = useState(0);
     const scroll_ref = useRef<HTMLDivElement>(null);
 
-    const toggle_sort = (field: ChartSortField) => {
-        if (sort_field === field) {
-            set_sort_direction(sort_direction === 'asc' ? 'desc' : 'asc');
-        } else {
-            set_sort_field(field);
-            set_sort_direction('asc');
-        }
-    };
+    const toggle_sort = useCallback(
+        (field: ChartSortField) => {
+            if (sort_field === field) {
+                set_sort_direction((d) => (d === 'asc' ? 'desc' : 'asc'));
+            } else {
+                set_sort_field(field);
+                set_sort_direction('asc');
+            }
+        },
+        [sort_field]
+    );
 
     useEffect(() => {
         save_filter(active_filter);
@@ -76,6 +84,12 @@ export function ChartToolbar({
             }
         }
     }, [symbol_open]);
+
+    const close_symbol_dropdown = useCallback(() => {
+        if (symbol_open) set_symbol_open(false);
+    }, [symbol_open]);
+
+    use_escape_key(close_symbol_dropdown);
 
     const available_exchanges = useMemo(() => {
         return (Object.keys(exchange_symbols) as ExchangeId[]).filter(

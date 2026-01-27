@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'preact/hooks';
 import { selected_leverage, max_leverage, set_leverage } from '../../../stores/trade_store';
+import { use_escape_key } from '../../../hooks';
 
 function get_presets(max: number): number[] {
     if (max < 10) return [1, 3, 5, 7, max].filter((v, i, a) => v <= max && a.indexOf(v) === i);
@@ -17,6 +18,12 @@ export function LeverageSelector() {
         set_slider_value(leverage);
     }, [leverage]);
 
+    const close_dropdown = useCallback(() => {
+        if (open) set_open(false);
+    }, [open]);
+
+    use_escape_key(close_dropdown);
+
     const handle_slider_input = useCallback((e: Event) => {
         const input = e.target as HTMLInputElement;
         set_slider_value(parseInt(input.value, 10));
@@ -33,8 +40,9 @@ export function LeverageSelector() {
         [leverage]
     );
 
-    const handle_preset = useCallback((value: number) => {
-        set_leverage(value);
+    const handle_preset_click = useCallback((e: MouseEvent) => {
+        const value = Number((e.currentTarget as HTMLButtonElement).dataset.leverage);
+        if (value) set_leverage(value);
     }, []);
 
     const available_presets = useMemo(() => get_presets(max), [max]);
@@ -75,7 +83,8 @@ export function LeverageSelector() {
                                 <button
                                     key={p}
                                     type="button"
-                                    onClick={() => handle_preset(p)}
+                                    data-leverage={p}
+                                    onClick={handle_preset_click}
                                     class={`py-1 text-[10px] rounded transition-colors ${
                                         leverage === p
                                             ? 'bg-primary text-primary-content'

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'preact/hooks';
 import type { Timeframe } from '../../types/candle.types';
 import type { TimeframeSelectorProps } from '../../types/chart.types';
+import { use_escape_key } from '../../hooks';
 
 const TIMEFRAME_LABELS: Record<Timeframe, string> = {
     S1: '1s',
@@ -29,10 +30,19 @@ const DAYS: Timeframe[] = ['720', 'D', 'W', 'M'];
 export function TimeframeSelector({ timeframe, on_change }: TimeframeSelectorProps) {
     const [open, set_open] = useState(false);
 
+    const close_dropdown = useCallback(() => {
+        if (open) set_open(false);
+    }, [open]);
+
+    use_escape_key(close_dropdown);
+
     const handle_select = useCallback(
-        (tf: Timeframe) => {
-            on_change(tf);
-            set_open(false);
+        (e: MouseEvent) => {
+            const tf = (e.currentTarget as HTMLButtonElement).dataset.tf as Timeframe;
+            if (tf) {
+                on_change(tf);
+                set_open(false);
+            }
         },
         [on_change]
     );
@@ -43,7 +53,8 @@ export function TimeframeSelector({ timeframe, on_change }: TimeframeSelectorPro
                 <button
                     type="button"
                     key={tf}
-                    onClick={() => handle_select(tf)}
+                    data-tf={tf}
+                    onClick={handle_select}
                     class={`py-1 w-[36px] text-xs rounded transition-colors text-center ${
                         timeframe === tf
                             ? 'bg-primary text-primary-content'

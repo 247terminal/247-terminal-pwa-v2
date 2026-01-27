@@ -20,6 +20,7 @@ import {
 import { exchange_connection_status } from '../../../stores/credentials_store';
 import { format_symbol } from '../../chart/symbol_row';
 import { format_price } from '../../../utils/format';
+import { use_escape_key } from '../../../hooks';
 
 export type { TradeExchangeSymbols as ExchangeSymbols };
 
@@ -115,6 +116,12 @@ export function SymbolSelector({ exchange_symbols }: SymbolSelectorProps) {
             }
         }
     }, [open]);
+
+    const close_dropdown = useCallback(() => {
+        if (open) set_open(false);
+    }, [open]);
+
+    use_escape_key(close_dropdown);
 
     const all_symbols = useMemo(() => {
         const result: TradeSymbolWithExchange[] = [];
