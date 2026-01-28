@@ -5,6 +5,12 @@ services:
     build:
       context: ../..
       dockerfile: docker/prod/Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+        - VITE_WS_URL=${VITE_WS_URL}
+        - VITE_CREDENTIALS_KEY=${VITE_CREDENTIALS_KEY}
+        - VITE_PROXY_BINANCE_AUTH=${VITE_PROXY_BINANCE_AUTH}
+        - VITE_PROXY_BLOFIN_AUTH=${VITE_PROXY_BLOFIN_AUTH}
     ports:
       - "3001:3001"
     restart: always
