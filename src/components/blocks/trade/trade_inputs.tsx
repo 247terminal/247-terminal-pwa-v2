@@ -22,7 +22,7 @@ export function PriceInput({
     const handle_input = useCallback(
         (e: Event) => {
             const input = e.target as HTMLInputElement;
-            const val = input.value;
+            const val = input.value.replace(',', '.');
             if (val === '' || /^\d*\.?\d*$/.test(val)) {
                 on_change(val);
             }
@@ -67,7 +67,7 @@ export function QuantityInput({
     const handle_input = useCallback(
         (e: Event) => {
             const input = e.target as HTMLInputElement;
-            const val = input.value;
+            const val = input.value.replace(',', '.');
             if (val === '' || /^\d*\.?\d*$/.test(val)) {
                 on_change(val);
             }
@@ -107,7 +107,7 @@ export function TotalInput({ label = 'Total', value, on_change, suffix = 'USD' }
     const handle_input = useCallback(
         (e: Event) => {
             const input = e.target as HTMLInputElement;
-            const val = input.value;
+            const val = input.value.replace(',', '.');
             if (val === '' || /^\d*\.?\d*$/.test(val)) {
                 on_change(val);
             }
