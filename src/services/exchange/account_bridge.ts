@@ -20,6 +20,7 @@ import { get_exchange_markets, has_markets, set_markets } from '@/stores/exchang
 import { MARKET_MAP_CACHE_TTL } from '@/config';
 
 const initializedExchanges = new Set<ExchangeId>();
+const exchangeCredentialsCache = new Map<ExchangeId, ExchangeAuthParams>();
 const marketMapCache = new Map<ExchangeId, CachedMarketMap>();
 const inflightRequests = new Map<string, Promise<unknown>>();
 
@@ -73,13 +74,19 @@ export async function init_exchange(
         credentials,
     });
     initializedExchanges.add(exchangeId);
+    exchangeCredentialsCache.set(exchangeId, credentials);
     initialized_exchanges_signal.value = new Set(initializedExchanges);
     marketMapCache.delete(exchangeId);
+
+    start_private_stream(exchangeId, credentials).catch((err) => {
+        console.error(`failed to start ${exchangeId} private stream:`, (err as Error).message);
+    });
 }
 
 export async function destroy_exchange(exchangeId: ExchangeId): Promise<void> {
     await sendRequest<{ destroyed: boolean }>('DESTROY_EXCHANGE', { exchangeId });
     initializedExchanges.delete(exchangeId);
+    exchangeCredentialsCache.delete(exchangeId);
     initialized_exchanges_signal.value = new Set(initializedExchanges);
     marketMapCache.delete(exchangeId);
 }
@@ -91,6 +98,7 @@ export function destroy_all_exchanges(): void {
         });
     }
     initializedExchanges.clear();
+    exchangeCredentialsCache.clear();
     initialized_exchanges_signal.value = new Set();
     marketMapCache.clear();
 }
@@ -152,9 +160,16 @@ export function fetch_leverage_settings(
 ): Promise<Record<string, number>> {
     if (symbols.length === 0) return Promise.resolve({});
     const key = `leverage:${exchangeId}:${symbols.toSorted().join(',')}`;
-    return dedupeRequest(key, () =>
-        sendRequest<Record<string, number>>('FETCH_LEVERAGE_SETTINGS', { exchangeId, symbols })
-    );
+    return dedupeRequest(key, async () => {
+        const result = await sendRequest<Record<string, number>>('FETCH_LEVERAGE_SETTINGS', {
+            exchangeId,
+            symbols,
+        });
+        if (exchangeId === 'binance' && Object.keys(result).length > 0) {
+            update_binance_cached_leverage(result).catch(() => {});
+        }
+        return result;
+    });
 }
 
 export function fetch_symbol_fills(
@@ -191,8 +206,17 @@ export function cancel_order(
     return sendRequest<boolean>('CANCEL_ORDER', { exchangeId, orderId, symbol, category });
 }
 
-export function cancel_all_orders_api(exchangeId: ExchangeId, symbol?: string): Promise<number> {
-    return sendRequest<number>('CANCEL_ALL_ORDERS', { exchangeId, symbol });
+export interface OrderToCancel {
+    id: string;
+    symbol: string;
+    category: OrderCategory;
+}
+
+export function cancel_all_orders_api(
+    exchangeId: ExchangeId,
+    orders: OrderToCancel[]
+): Promise<number> {
+    return sendRequest<number>('CANCEL_ALL_ORDERS', { exchangeId, orders });
 }
 
 export function close_position_api(
@@ -239,4 +263,34 @@ export function set_tpsl_api(
     params: Omit<TpSlParams, 'position_mode'>
 ): Promise<boolean> {
     return sendRequest<boolean>('SET_TPSL', { exchangeId, ...params });
+}
+
+export async function start_private_stream(
+    exchangeId: ExchangeId,
+    credentials: ExchangeAuthParams
+): Promise<void> {
+    const marketMap = await getMarketMap(exchangeId);
+    await sendRequest<{ started: boolean }>('START_PRIVATE_STREAM', {
+        exchangeId,
+        credentials,
+        marketMap,
+    });
+}
+
+export function stop_private_stream(exchangeId: ExchangeId): Promise<void> {
+    return sendRequest<{ stopped: boolean }>('STOP_PRIVATE_STREAM', { exchangeId }).then(() => {});
+}
+
+export async function update_private_stream_market_map(exchangeId: ExchangeId): Promise<void> {
+    const marketMap = await getMarketMap(exchangeId);
+    await sendRequest<{ updated: boolean }>('UPDATE_PRIVATE_STREAM_MARKET_MAP', {
+        exchangeId,
+        marketMap,
+    });
+}
+
+export function update_binance_cached_leverage(leverageMap: Record<string, number>): Promise<void> {
+    return sendRequest<{ updated: boolean }>('UPDATE_BINANCE_CACHED_LEVERAGE', {
+        leverageMap,
+    }).then(() => {});
 }

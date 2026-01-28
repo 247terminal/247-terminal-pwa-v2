@@ -370,3 +370,207 @@ export interface RawFill {
     closed_pnl: number;
     direction: 'open' | 'close';
 }
+
+export interface RawBalance {
+    total: number;
+    available: number;
+    used: number;
+    currency: string;
+    last_updated: number;
+}
+
+export interface PrivateStreamState {
+    ws: WebSocket | null;
+    state: StreamState;
+    reconnectAttempts: number;
+    reconnectTimeout: ReturnType<typeof setTimeout> | null;
+    pingInterval: ReturnType<typeof setInterval> | null;
+}
+
+export type PrivateStreamEvent =
+    | { type: 'position'; data: RawPosition[]; dex?: string }
+    | { type: 'order'; data: RawOrder }
+    | { type: 'order_removed'; data: { id: string; symbol: string } }
+    | { type: 'balance'; data: RawBalance }
+    | { type: 'fill'; data: RawFill }
+    | { type: 'connected' }
+    | { type: 'disconnected' };
+
+export type PrivateStreamCallback = (event: PrivateStreamEvent) => void;
+
+export interface BybitWsPosition {
+    symbol: string;
+    size: string;
+    side: string;
+    entryPrice: string;
+    markPrice: string;
+    liqPrice: string;
+    unrealisedPnl: string;
+    leverage: string;
+    tradeMode: number;
+    positionIM: string;
+    positionIdx: number;
+}
+
+export interface BybitWsOrder {
+    symbol: string;
+    orderId: string;
+    side: string;
+    orderType: string;
+    qty: string;
+    price: string;
+    triggerPrice: string;
+    cumExecQty: string;
+    createdTime: string;
+    stopOrderType: string;
+    orderStatus: string;
+    triggerDirection: string;
+}
+
+export interface BybitWsWallet {
+    accountType: string;
+    totalEquity: string;
+    totalAvailableBalance: string;
+    totalWalletBalance: string;
+    coin?: Array<{
+        coin: string;
+        equity: string;
+        walletBalance: string;
+        availableToWithdraw: string;
+    }>;
+}
+
+export interface BinanceWsPosition {
+    s: string;
+    pa: string;
+    ep: string;
+    up: string;
+    mt: string;
+    iw: string;
+    ps: string;
+}
+
+export interface BinanceWsOrder {
+    s: string;
+    i: number;
+    S: string;
+    o: string;
+    q: string;
+    p: string;
+    z: string;
+    T: number;
+    X: string;
+    ot: string;
+    sp: string;
+}
+
+export interface BinanceWsAlgoOrder {
+    aid: number;
+    s: string;
+    S: string;
+    o: string;
+    q: string;
+    p: string;
+    X: string;
+    tp: string;
+}
+
+export interface BinanceWsBalance {
+    a: string;
+    wb: string;
+    cw: string;
+}
+
+export interface BlofinWsPosition {
+    instId: string;
+    positions: string;
+    positionSide: string;
+    averagePrice: string;
+    markPrice: string;
+    liquidationPrice: string;
+    unrealizedPnl: string;
+    leverage: string;
+    marginMode: string;
+    margin: string;
+}
+
+export interface BlofinWsOrder {
+    instId: string;
+    orderId?: string;
+    algoId?: string;
+    tpslId?: string;
+    side: string;
+    orderType: string;
+    size: string;
+    price: string;
+    triggerPrice?: string;
+    filledSize?: string;
+    createTime: string;
+    state: string;
+    tpTriggerPrice?: string;
+    slTriggerPrice?: string;
+}
+
+export interface BlofinWsBalance {
+    totalEquity: string;
+    isolatedEquity: string;
+    details: Array<{
+        currency: string;
+        equity: string;
+        available: string;
+    }>;
+}
+
+export interface HyperliquidWsPosition {
+    coin: string;
+    szi: string;
+    entryPx: string;
+    positionValue: string;
+    unrealizedPnl: string;
+    leverage: { value: string };
+    liquidationPx: string | null;
+}
+
+export interface HyperliquidWsOrder {
+    coin: string;
+    oid: number;
+    side: string;
+    limitPx: string;
+    sz: string;
+    origSz: string;
+    reduceOnly?: boolean;
+    triggerPx?: string;
+    triggerCondition?: string;
+}
+
+export interface HyperliquidOrderUpdate {
+    order: HyperliquidWsOrder;
+    status: string;
+    statusTimestamp: number;
+}
+
+export interface HyperliquidWebData2 {
+    clearinghouseState?: {
+        marginSummary?: {
+            accountValue?: string;
+            totalMarginUsed?: string;
+        };
+        assetPositions?: Array<{
+            position: HyperliquidWsPosition;
+        }>;
+    };
+}
+
+export interface HyperliquidClearinghouseStateResponse {
+    dex?: string;
+    user?: string;
+    clearinghouseState?: {
+        marginSummary?: {
+            accountValue?: string;
+            totalMarginUsed?: string;
+        };
+        assetPositions?: Array<{
+            position: HyperliquidWsPosition;
+        }>;
+    };
+}

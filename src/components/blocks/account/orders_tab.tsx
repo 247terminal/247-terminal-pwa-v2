@@ -8,7 +8,13 @@ import type {
     OrderRowProps,
     SortDirection,
 } from '../../../types/account.types';
-import { orders_list, privacy_mode, loading, cancel_order } from '../../../stores/account_store';
+import {
+    orders_list,
+    privacy_mode,
+    loading,
+    cancel_order,
+    positions,
+} from '../../../stores/account_store';
 import { LogoSpinner } from '../../common/logo_spinner';
 import { get_market } from '../../../stores/exchange_store';
 import { navigate_to_symbol } from '../../../stores/chart_navigation_store';
@@ -18,24 +24,37 @@ import { format_price, format_size } from '../../../utils/format';
 import { format_usd, mask_value } from '../../../utils/account_format';
 import { SortHeader } from './sort_header';
 
-const ORDER_TYPE_LABELS = {
+const ORDER_TYPE_LABELS: Record<string, string> = {
     limit: 'Limit',
     market: 'Market',
-    stop: 'Stop',
+    stop: 'SL',
     take_profit: 'TP',
     stop_loss: 'SL',
-} as const satisfies Record<Order['type'], string>;
+};
 
 function format_order_type(type: Order['type']): string {
-    return ORDER_TYPE_LABELS[type];
+    return ORDER_TYPE_LABELS[type] ?? type;
 }
 
 const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
     const is_buy = order.side === 'buy';
-    const fill_pct = order.size > 0 ? (order.filled / order.size) * 100 : 0;
     const market = get_market(order.exchange, order.symbol);
     const tick_size = market?.tick_size ?? 0.01;
     const qty_step = market?.qty_step ?? 0.001;
+
+    const positionsMap = positions.value;
+    const display_size = useMemo(() => {
+        if (order.size > 0) return order.size;
+        if (order.category !== 'tpsl') return order.size;
+        for (const pos of positionsMap.values()) {
+            if (pos.exchange === order.exchange && pos.symbol === order.symbol) {
+                return pos.size;
+            }
+        }
+        return order.size;
+    }, [order.size, order.category, order.exchange, order.symbol, positionsMap]);
+
+    const fill_pct = display_size > 0 ? (order.filled / display_size) * 100 : 0;
 
     const handle_cancel = useCallback(async () => {
         const symbol_label = format_symbol(order.symbol);
@@ -83,11 +102,11 @@ const OrderRow = memo(function OrderRow({ order, is_private }: OrderRowProps) {
 
             <div class="flex-1 text-right" role="cell">
                 <div class="text-base-content">
-                    {mask_value(format_usd(order.size * order.price), is_private)}
+                    {mask_value(format_usd(display_size * order.price), is_private)}
                 </div>
                 <div class="text-[10px] text-base-content/50">
                     {mask_value(
-                        `${format_size(order.size, qty_step)} ${parse_symbol(order.symbol).base}`,
+                        `${format_size(display_size, qty_step)} ${parse_symbol(order.symbol).base}`,
                         is_private
                     )}
                     {order.status === 'partial' && ` · ${fill_pct.toFixed(0)}%`}

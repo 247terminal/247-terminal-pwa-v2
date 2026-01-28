@@ -31,6 +31,15 @@ function getOrCreateCoinCache(markets: NonNullable<MarketsMap>): Map<string, str
 
 export const hyperliquid = {
     toUnified: (coin: string): string => `${coin}/USDC:USDC`,
+    coinToSymbol: (coin: string): string => {
+        if (coin.includes(':')) {
+            const colonIdx = coin.indexOf(':');
+            const dex = coin.slice(0, colonIdx).toUpperCase();
+            const ticker = coin.slice(colonIdx + 1);
+            return `${dex}-${ticker}/USDC:USDC`;
+        }
+        return `${coin}/USDC:USDC`;
+    },
     fromUnified: (symbol: string): string => symbol.split('/')[0],
     getDexPrefix: (symbol: string): string => symbol.split('-')[0],
     getDexTicker: (symbol: string): string => symbol.split('-')[1]?.split('/')[0] ?? '',

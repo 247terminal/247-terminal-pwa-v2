@@ -442,7 +442,18 @@ export async function cancelOrder(
     }
 }
 
-export async function cancelAllOrders(exchangeId: ExchangeId, symbol?: string): Promise<number> {
+export interface OrderToCancel {
+    id: string;
+    symbol: string;
+    category: OrderCategory;
+}
+
+export async function cancelAllOrders(
+    exchangeId: ExchangeId,
+    orders: OrderToCancel[]
+): Promise<number> {
+    if (orders.length === 0) return 0;
+
     const exchange = getAuthenticatedExchange(exchangeId);
 
     try {
@@ -450,22 +461,22 @@ export async function cancelAllOrders(exchangeId: ExchangeId, symbol?: string): 
             case 'binance':
                 return await binanceAdapter.cancel_all_orders(
                     exchange as unknown as BinanceExchange,
-                    symbol
+                    orders
                 );
             case 'bybit':
                 return await bybitAdapter.cancel_all_orders(
                     exchange as unknown as BybitExchange,
-                    symbol
+                    orders
                 );
             case 'blofin':
                 return await blofinAdapter.cancel_all_orders(
                     exchange as unknown as BlofinExchange,
-                    symbol
+                    orders
                 );
             case 'hyperliquid':
                 return await hyperliquidAdapter.cancel_all_orders(
                     exchange as unknown as HyperliquidExchange,
-                    symbol
+                    orders
                 );
             default:
                 return 0;

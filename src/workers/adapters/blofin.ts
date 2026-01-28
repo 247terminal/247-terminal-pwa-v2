@@ -528,52 +528,66 @@ export async function cancel_order(
     return true;
 }
 
+interface OrderToCancel {
+    id: string;
+    symbol: string;
+    category: OrderCategory;
+}
+
 export async function cancel_all_orders(
     exchange: BlofinExchange,
-    symbol?: string
+    orders: OrderToCancel[]
 ): Promise<number> {
-    const params = symbol ? { instId: to_blofin_inst_id(symbol) } : {};
-    const [pending, tpsl, algo] = await Promise.all([
-        exchange.privateGetTradeOrdersPending(params).catch(() => null),
-        exchange.privateGetTradeOrdersTpslPending(params).catch(() => null),
-        exchange
-            .privateGetTradeOrdersAlgoPending({ ...params, orderType: 'trigger' })
-            .catch(() => null),
-    ]);
+    if (orders.length === 0) return 0;
 
-    const p = is_order_response(pending) ? pending.data || [] : [];
-    const t = is_tpsl_order_response(tpsl) ? tpsl.data || [] : [];
-    const a = is_algo_order_response(algo) ? algo.data || [] : [];
+    const regular: { instId: string; orderId: string }[] = [];
+    const tpsl: { instId: string; tpslId: string }[] = [];
+    const algo: { instId: string; algoId: string }[] = [];
 
-    await Promise.all([
-        p.length > 0
-            ? exchange
-                  .privatePostTradeCancelBatchOrders(
-                      p.map((o) => ({ instId: o.instId, orderId: o.orderId }))
-                  )
-                  .catch((err) => {
-                      console.error('failed to cancel batch orders:', (err as Error).message);
-                      return null;
-                  })
-            : null,
-        ...t.map((o) =>
-            exchange
-                .privatePostTradeCancelTpsl({ instId: o.instId, tpslId: o.tpslId })
-                .catch((err) => {
-                    console.error('failed to cancel tpsl:', (err as Error).message);
-                    return null;
-                })
-        ),
-        ...a.map((o) =>
-            exchange
-                .privatePostTradeCancelAlgo({ instId: o.instId, algoId: o.algoId })
-                .catch((err) => {
-                    console.error('failed to cancel algo:', (err as Error).message);
-                    return null;
-                })
-        ),
-    ]);
-    return p.length + t.length + a.length;
+    for (const o of orders) {
+        const instId = to_blofin_inst_id(o.symbol);
+        switch (o.category) {
+            case 'tpsl':
+                tpsl.push({ instId, tpslId: o.id.replace(/_tp$|_sl$/, '') });
+                break;
+            case 'algo':
+                algo.push({ instId, algoId: o.id });
+                break;
+            default:
+                regular.push({ instId, orderId: o.id });
+        }
+    }
+
+    let cancelled = 0;
+
+    if (regular.length > 0) {
+        try {
+            await exchange.privatePostTradeCancelBatchOrders(regular);
+            cancelled += regular.length;
+        } catch (err) {
+            console.error('failed to cancel batch orders:', (err as Error).message);
+        }
+    }
+
+    if (tpsl.length > 0) {
+        try {
+            await exchange.privatePostTradeCancelTpsl(tpsl);
+            cancelled += tpsl.length;
+        } catch (err) {
+            console.error('failed to cancel tpsl:', (err as Error).message);
+        }
+    }
+
+    if (algo.length > 0) {
+        try {
+            await exchange.privatePostTradeCancelAlgo(algo);
+            cancelled += algo.length;
+        } catch (err) {
+            console.error('failed to cancel algo:', (err as Error).message);
+        }
+    }
+
+    return cancelled;
 }
 
 export async function close_position(

@@ -4,7 +4,7 @@ import { createPortal } from 'preact/compat';
 import { toast } from 'sonner';
 import type { Position } from '../../../types/account.types';
 import { get_market, get_ticker_signal } from '../../../stores/exchange_store';
-import { set_tpsl, refresh_orders } from '../../../stores/account_store';
+import { set_tpsl } from '../../../stores/account_store';
 import { format_price, DECIMAL_REGEX, extract_error_message } from '../../../utils/format';
 import { calculate_position_pnl } from '../../../utils/pnl';
 import { use_click_outside, use_escape_key } from '../../../hooks';
@@ -110,7 +110,6 @@ export const TpSlPanel = memo(function TpSlPanel({
             const has_sl = !!final_sl;
             const order_type = has_tp && has_sl ? 'TP/SL' : has_tp ? 'take profit' : 'stop loss';
             toast.success(`${symbol_label} ${order_type} placed`);
-            refresh_orders(position.exchange).catch(console.error);
             on_close();
         } catch (err) {
             toast.error(`Failed to place ${symbol_label} TP/SL: ${extract_error_message(err)}`);

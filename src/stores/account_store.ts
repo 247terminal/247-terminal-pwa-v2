@@ -49,6 +49,57 @@ export const active_tab = signal<AccountTab>('positions');
 export const privacy_mode = signal(load_privacy_mode());
 export const loading = signal({ balance: false, positions: false, orders: false, history: false });
 
+const positions_by_exchange = new Map<ExchangeId, Set<string>>();
+const blofin_tpsl_index = new Map<string, Set<string>>();
+
+function add_position_to_index(pos: Position): void {
+    let set = positions_by_exchange.get(pos.exchange);
+    if (!set) {
+        set = new Set();
+        positions_by_exchange.set(pos.exchange, set);
+    }
+    set.add(pos.id);
+}
+
+function remove_position_from_index(pos: Position): void {
+    const set = positions_by_exchange.get(pos.exchange);
+    if (set) set.delete(pos.id);
+}
+
+function get_blofin_tpsl_key(order: Order): string {
+    const roundedPrice = Math.round(order.price * 10000);
+    return `${order.symbol}-${order.type}-${roundedPrice}`;
+}
+
+function add_blofin_tpsl_to_index(order: Order): void {
+    if (order.exchange !== 'blofin' || order.category !== 'tpsl') return;
+    const key = get_blofin_tpsl_key(order);
+    let set = blofin_tpsl_index.get(key);
+    if (!set) {
+        set = new Set();
+        blofin_tpsl_index.set(key, set);
+    }
+    set.add(order.id);
+}
+
+function remove_blofin_tpsl_from_index(order: Order): void {
+    if (order.exchange !== 'blofin' || order.category !== 'tpsl') return;
+    const key = get_blofin_tpsl_key(order);
+    const set = blofin_tpsl_index.get(key);
+    if (set) {
+        set.delete(order.id);
+        if (set.size === 0) blofin_tpsl_index.delete(key);
+    }
+}
+
+function find_blofin_tpsl_duplicates(order: Order): string[] {
+    if (order.exchange !== 'blofin' || order.category !== 'tpsl') return [];
+    const key = get_blofin_tpsl_key(order);
+    const set = blofin_tpsl_index.get(key);
+    if (!set) return [];
+    return Array.from(set).filter((id) => id !== order.id);
+}
+
 export const positions_count = computed(() => positions.value.size);
 export const orders_count = computed(() => orders.value.size);
 export const positions_list = computed(() => Array.from(positions.value.values()));
@@ -87,12 +138,17 @@ export function toggle_privacy(): void {
 export function update_position(position: Position): void {
     const current = positions.value;
     if (position.size === 0) {
-        if (!current.has(position.id)) return;
+        const existing = current.get(position.id);
+        if (!existing) return;
+        remove_position_from_index(existing);
         const map = new Map(current);
         map.delete(position.id);
         positions.value = map;
     } else {
         if (current.get(position.id) === position) return;
+        const existing = current.get(position.id);
+        if (existing) remove_position_from_index(existing);
+        add_position_to_index(position);
         const map = new Map(current);
         map.set(position.id, position);
         positions.value = map;
@@ -106,11 +162,16 @@ export function update_positions_batch(updates: Position[]): void {
     let changed = false;
     for (const pos of updates) {
         if (pos.size === 0) {
-            if (map.has(pos.id)) {
+            const existing = map.get(pos.id);
+            if (existing) {
+                remove_position_from_index(existing);
                 map.delete(pos.id);
                 changed = true;
             }
         } else if (map.get(pos.id) !== pos) {
+            const existing = map.get(pos.id);
+            if (existing) remove_position_from_index(existing);
+            add_position_to_index(pos);
             map.set(pos.id, pos);
             changed = true;
         }
@@ -120,6 +181,7 @@ export function update_positions_batch(updates: Position[]): void {
 
 export function clear_positions(): void {
     if (positions.value.size === 0) return;
+    positions_by_exchange.clear();
     positions.value = new Map();
 }
 
@@ -160,12 +222,17 @@ export function update_order(order: Order): void {
     const current = orders.value;
     const shouldRemove = order.status === 'closed' || order.status === 'canceled';
     if (shouldRemove) {
-        if (!current.has(order.id)) return;
+        const existing = current.get(order.id);
+        if (!existing) return;
+        remove_blofin_tpsl_from_index(existing);
         const map = new Map(current);
         map.delete(order.id);
         orders.value = map;
     } else {
         if (current.get(order.id) === order) return;
+        const existing = current.get(order.id);
+        if (existing) remove_blofin_tpsl_from_index(existing);
+        add_blofin_tpsl_to_index(order);
         const map = new Map(current);
         map.set(order.id, order);
         orders.value = map;
@@ -180,11 +247,16 @@ export function update_orders_batch(updates: Order[]): void {
     for (const order of updates) {
         const shouldRemove = order.status === 'closed' || order.status === 'canceled';
         if (shouldRemove) {
-            if (map.has(order.id)) {
+            const existing = map.get(order.id);
+            if (existing) {
+                remove_blofin_tpsl_from_index(existing);
                 map.delete(order.id);
                 changed = true;
             }
         } else if (map.get(order.id) !== order) {
+            const existing = map.get(order.id);
+            if (existing) remove_blofin_tpsl_from_index(existing);
+            add_blofin_tpsl_to_index(order);
             map.set(order.id, order);
             changed = true;
         }
@@ -194,11 +266,23 @@ export function update_orders_batch(updates: Order[]): void {
 
 export function clear_orders(): void {
     if (orders.value.size === 0) return;
+    blofin_tpsl_index.clear();
     orders.value = new Map();
 }
 
 export function add_history(trade: TradeHistory): void {
-    history.value = [trade, ...history.value].slice(0, ACCOUNT_CONSTANTS.HISTORY_LIMIT);
+    const current = history.value;
+    const limit = ACCOUNT_CONSTANTS.HISTORY_LIMIT;
+    const newLength = Math.min(current.length + 1, limit);
+    const result = new Array<TradeHistory>(newLength);
+    result[0] = trade;
+
+    const copyCount = newLength - 1;
+    for (let i = 0; i < copyCount; i++) {
+        result[i + 1] = current[i];
+    }
+
+    history.value = result;
 }
 
 export function add_history_batch(trades: TradeHistory[]): void {
@@ -380,29 +464,27 @@ export async function cancel_order(exchange_id: ExchangeId, order_id: string): P
 }
 
 export async function cancel_all_orders(exchange_ids?: ExchangeId[]): Promise<number> {
-    const targets =
-        exchange_ids ??
-        Array.from(new Set(Array.from(orders.value.values()).map((o) => o.exchange)));
+    const all_orders = Array.from(orders.value.values());
+
+    const targets = exchange_ids ?? Array.from(new Set(all_orders.map((o) => o.exchange)));
     if (targets.length === 0) return 0;
 
     const results = await Promise.all(
-        targets.map((exchange_id) =>
-            cancel_all_orders_api(exchange_id).catch((err) => {
+        targets.map((exchange_id) => {
+            const exchange_orders = all_orders
+                .filter((o) => o.exchange === exchange_id)
+                .map((o) => ({ id: o.id, symbol: o.symbol, category: o.category }));
+
+            if (exchange_orders.length === 0) return 0;
+
+            return cancel_all_orders_api(exchange_id, exchange_orders).catch((err) => {
                 console.error(`failed to cancel orders on ${exchange_id}:`, (err as Error).message);
                 return 0;
-            })
-        )
+            });
+        })
     );
 
-    const total_cancelled = results.reduce((sum, count) => sum + count, 0);
-
-    targets.forEach((exchange_id) =>
-        refresh_orders(exchange_id).catch((err) =>
-            console.error(`failed to refresh orders on ${exchange_id}:`, (err as Error).message)
-        )
-    );
-
-    return total_cancelled;
+    return results.reduce((sum, count) => sum + count, 0);
 }
 
 export async function close_all_positions(
@@ -482,12 +564,6 @@ export async function close_position(
             qty_step: symbol_settings?.qty_step ?? market?.qty_step,
             contract_size: market?.contract_size,
         });
-
-        if (success && percentage === 100 && order_type === 'market') {
-            const map = new Map(positions.value);
-            map.delete(position.id);
-            positions.value = map;
-        }
 
         return success;
     } catch (err) {
@@ -709,4 +785,189 @@ export async function refresh_history(exchange_ids: ExchangeId[]): Promise<void>
     } finally {
         loading.value = { ...loading.value, history: false };
     }
+}
+
+export const private_stream_connected = signal<Set<ExchangeId>>(new Set());
+
+const isDexSymbol = (symbol: string): boolean => symbol.includes('-');
+const getDexPrefix = (symbol: string): string => {
+    const idx = symbol.indexOf('-');
+    return idx > 0 ? symbol.slice(0, idx).toUpperCase() : '';
+};
+
+export function handle_private_position_update(
+    exchange_id: ExchangeId,
+    data: Position[],
+    dex?: string
+): void {
+    if (!data || !Array.isArray(data)) return;
+
+    const current = positions.value;
+    const map = new Map(current);
+    const isHyperliquid = exchange_id === 'hyperliquid';
+
+    const exchangePositionIds = positions_by_exchange.get(exchange_id);
+
+    if (isHyperliquid) {
+        const isHyperliquidDexUpdate = !!dex;
+        const dexUpperCase = dex?.toUpperCase();
+        const isHyperliquidCexUpdate = !dex;
+
+        if (exchangePositionIds) {
+            for (const id of exchangePositionIds) {
+                const pos = current.get(id);
+                if (!pos) continue;
+
+                const posIsDex = isDexSymbol(pos.symbol);
+
+                if (isHyperliquidDexUpdate) {
+                    if (!posIsDex) continue;
+                    if (getDexPrefix(pos.symbol) !== dexUpperCase) continue;
+                } else if (isHyperliquidCexUpdate) {
+                    if (posIsDex) continue;
+                }
+
+                remove_position_from_index(pos);
+                map.delete(id);
+            }
+        }
+
+        for (const pos of data) {
+            if (pos.size === 0) continue;
+            add_position_to_index(pos);
+            map.set(pos.id, pos);
+        }
+    } else if (exchange_id === 'blofin') {
+        const incomingIds = new Set<string>();
+        for (const pos of data) {
+            if (pos.size > 0) incomingIds.add(pos.id);
+        }
+
+        if (exchangePositionIds) {
+            for (const id of exchangePositionIds) {
+                if (!incomingIds.has(id)) {
+                    const pos = current.get(id);
+                    if (pos) remove_position_from_index(pos);
+                    map.delete(id);
+                }
+            }
+        }
+
+        for (const pos of data) {
+            if (pos.size === 0) continue;
+
+            const existing = map.get(pos.id);
+            if (!existing) add_position_to_index(pos);
+
+            if (has_markets('blofin') && pos.contracts !== undefined) {
+                const market = get_market('blofin', pos.symbol);
+                const contract_size = market?.contract_size;
+                if (contract_size && contract_size > 0) {
+                    map.set(pos.id, { ...pos, size: pos.contracts * contract_size });
+                    continue;
+                }
+            }
+            map.set(pos.id, pos);
+        }
+    } else {
+        for (const pos of data) {
+            if (pos.size === 0) {
+                const base_id = `${exchange_id}-${pos.symbol}`;
+                const long_id = `${base_id}-long`;
+                const short_id = `${base_id}-short`;
+
+                const has_both = map.has(long_id) && map.has(short_id);
+
+                if (has_both) {
+                    const existing = map.get(pos.id);
+                    if (existing) remove_position_from_index(existing);
+                    map.delete(pos.id);
+                } else {
+                    const longPos = map.get(long_id);
+                    const shortPos = map.get(short_id);
+                    if (longPos) remove_position_from_index(longPos);
+                    if (shortPos) remove_position_from_index(shortPos);
+                    map.delete(long_id);
+                    map.delete(short_id);
+                }
+                continue;
+            }
+            const existing = map.get(pos.id);
+            if (!existing) add_position_to_index(pos);
+            map.set(pos.id, pos);
+        }
+    }
+
+    positions.value = map;
+}
+
+export function handle_private_order_update(exchange_id: ExchangeId, data: Order): void {
+    if (!data) return;
+
+    const current = orders.value;
+    const shouldRemove = data.status === 'closed' || data.status === 'canceled';
+
+    if (shouldRemove) {
+        const existing = current.get(data.id);
+        if (!existing) return;
+        remove_blofin_tpsl_from_index(existing);
+        const map = new Map(current);
+        map.delete(data.id);
+        orders.value = map;
+    } else {
+        if (current.get(data.id) === data) return;
+        const map = new Map(current);
+
+        if (exchange_id === 'blofin' && data.category === 'tpsl') {
+            const duplicateIds = find_blofin_tpsl_duplicates(data);
+            for (const id of duplicateIds) {
+                const existing = current.get(id);
+                if (existing) remove_blofin_tpsl_from_index(existing);
+                map.delete(id);
+            }
+        }
+
+        const existing = current.get(data.id);
+        if (existing) remove_blofin_tpsl_from_index(existing);
+        add_blofin_tpsl_to_index(data);
+        map.set(data.id, data);
+        orders.value = map;
+    }
+}
+
+export function handle_private_order_removed(
+    _exchange_id: ExchangeId,
+    data: { id: string; symbol: string }
+): void {
+    if (!data?.id) return;
+
+    const current = orders.value;
+    const existing = current.get(data.id);
+    if (!existing) return;
+
+    remove_blofin_tpsl_from_index(existing);
+    const map = new Map(current);
+    map.delete(data.id);
+    orders.value = map;
+}
+
+export function handle_private_balance_update(exchange_id: ExchangeId, data: Balance): void {
+    if (!data) return;
+    update_balance(exchange_id, data);
+}
+
+export function handle_private_stream_connected(exchange_id: ExchangeId): void {
+    const current = private_stream_connected.value;
+    if (current.has(exchange_id)) return;
+    const newSet = new Set(current);
+    newSet.add(exchange_id);
+    private_stream_connected.value = newSet;
+}
+
+export function handle_private_stream_disconnected(exchange_id: ExchangeId): void {
+    const current = private_stream_connected.value;
+    if (!current.has(exchange_id)) return;
+    const newSet = new Set(current);
+    newSet.delete(exchange_id);
+    private_stream_connected.value = newSet;
 }

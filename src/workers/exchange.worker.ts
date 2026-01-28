@@ -16,6 +16,18 @@ import { startBlofinNativeStream, stopBlofinNativeStream } from './streams/blofi
 import { startCexStream, stopCexStream } from './streams/hyperliquid_cex';
 import { startDexStream, stopDexStream } from './streams/hyperliquid_dex';
 import {
+    startBybitPrivateStream,
+    stopBybitPrivateStream,
+    startBinancePrivateStream,
+    stopBinancePrivateStream,
+    updateBinanceCachedLeverage,
+    startBlofinPrivateStream,
+    stopBlofinPrivateStream,
+    startHyperliquidPrivateStream,
+    stopHyperliquidPrivateStream,
+} from './streams';
+import { mapPosition, mapOrder } from './position_mappers';
+import {
     createAuthenticatedExchange,
     destroyAuthenticatedExchange,
     fetchAccountConfig,
@@ -59,6 +71,8 @@ import type {
     TickerStreamState,
     CcxtTickerData,
     OrderCategory,
+    PrivateStreamEvent,
+    PrivateStreamCallback,
 } from '@/types/worker.types';
 import type { MarketOrderParams, LimitOrderParams, ScaleOrderParams } from '@/types/trading.types';
 
@@ -81,8 +95,110 @@ registerExchangeClass(
 
 const activeStreams = new Map<string, boolean>();
 const tickerStreams = new Map<string, TickerStreamState>();
+const privateStreamActive = new Map<ExchangeId, boolean>();
+const privateStreamMarketMaps = new Map<ExchangeId, Record<string, AccountMarketInfo>>();
+const privateStreamCredentials = new Map<ExchangeId, ExchangeAuthParams>();
 
 const tickerUpdatePool = new Map<string, TickerEntry[]>();
+
+function createPrivateStreamCallback(exchangeId: ExchangeId): PrivateStreamCallback {
+    return (event: PrivateStreamEvent) => {
+        const marketMap = privateStreamMarketMaps.get(exchangeId) || {};
+
+        switch (event.type) {
+            case 'position': {
+                const positions = event.data.map((p) => mapPosition(p, exchangeId, marketMap));
+                self.postMessage({
+                    type: 'PRIVATE_POSITION_UPDATE',
+                    exchangeId,
+                    dex: event.dex,
+                    data: positions,
+                });
+                break;
+            }
+            case 'order':
+                self.postMessage({
+                    type: 'PRIVATE_ORDER_UPDATE',
+                    exchangeId,
+                    data: mapOrder(event.data, exchangeId, marketMap),
+                });
+                break;
+            case 'order_removed':
+                self.postMessage({
+                    type: 'PRIVATE_ORDER_REMOVED',
+                    exchangeId,
+                    data: event.data,
+                });
+                break;
+            case 'balance':
+                self.postMessage({
+                    type: 'PRIVATE_BALANCE_UPDATE',
+                    exchangeId,
+                    data: event.data,
+                });
+                break;
+            case 'connected':
+                self.postMessage({
+                    type: 'PRIVATE_STREAM_CONNECTED',
+                    exchangeId,
+                });
+                break;
+            case 'disconnected':
+                self.postMessage({
+                    type: 'PRIVATE_STREAM_DISCONNECTED',
+                    exchangeId,
+                });
+                break;
+        }
+    };
+}
+
+function startPrivateStream(exchangeId: ExchangeId, credentials: ExchangeAuthParams): void {
+    if (privateStreamActive.get(exchangeId)) return;
+
+    privateStreamActive.set(exchangeId, true);
+    privateStreamCredentials.set(exchangeId, credentials);
+    const callback = createPrivateStreamCallback(exchangeId);
+
+    switch (exchangeId) {
+        case 'bybit':
+            startBybitPrivateStream(credentials, callback);
+            break;
+        case 'binance':
+            startBinancePrivateStream(credentials, callback);
+            break;
+        case 'blofin':
+            startBlofinPrivateStream(credentials, callback);
+            break;
+        case 'hyperliquid': {
+            const exchange = getExchange('hyperliquid');
+            const dexes = hyperliquidAdapter.get_dex_names(exchange.markets);
+            startHyperliquidPrivateStream(credentials, callback, dexes);
+            break;
+        }
+    }
+}
+
+function stopPrivateStream(exchangeId: ExchangeId): void {
+    privateStreamActive.delete(exchangeId);
+    privateStreamMarketMaps.delete(exchangeId);
+    privateStreamCredentials.delete(exchangeId);
+
+    switch (exchangeId) {
+        case 'bybit':
+            stopBybitPrivateStream();
+            break;
+        case 'binance':
+            stopBinancePrivateStream();
+            break;
+        case 'blofin':
+            stopBlofinPrivateStream();
+            break;
+        case 'hyperliquid':
+            stopHyperliquidPrivateStream();
+            break;
+    }
+}
 
 function getTickerUpdateArray(exchangeId: string, size: number): TickerEntry[] {
     let arr = tickerUpdatePool.get(exchangeId);
@@ -341,11 +457,40 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             }
             case 'DESTROY_EXCHANGE': {
                 const exchangeId = payload?.exchangeId as ExchangeId;
+                stopPrivateStream(exchangeId);
                 destroyAuthenticatedExchange(exchangeId);
                 if (exchangeId === 'hyperliquid') {
                     hyperliquidAdapter.clear_cache();
                 }
                 result = { destroyed: true };
+                break;
+            }
+            case 'START_PRIVATE_STREAM': {
+                const exchangeId = payload?.exchangeId as ExchangeId;
+                const credentials = payload?.credentials as ExchangeAuthParams;
+                const marketMap = (payload?.marketMap as Record<string, AccountMarketInfo>) || {};
+                privateStreamMarketMaps.set(exchangeId, marketMap);
+                startPrivateStream(exchangeId, credentials);
+                result = { started: true };
+                break;
+            }
+            case 'STOP_PRIVATE_STREAM': {
+                const exchangeId = payload?.exchangeId as ExchangeId;
+                stopPrivateStream(exchangeId);
+                result = { stopped: true };
+                break;
+            }
+            case 'UPDATE_PRIVATE_STREAM_MARKET_MAP': {
+                const exchangeId = payload?.exchangeId as ExchangeId;
+                const marketMap = (payload?.marketMap as Record<string, AccountMarketInfo>) || {};
+                privateStreamMarketMaps.set(exchangeId, marketMap);
+                result = { updated: true };
+                break;
+            }
+            case 'UPDATE_BINANCE_CACHED_LEVERAGE': {
+                const leverageMap = (payload?.leverageMap as Record<string, number>) || {};
+                updateBinanceCachedLeverage(leverageMap);
+                result = { updated: true };
                 break;
             }
             case 'FETCH_BALANCE':
@@ -411,7 +556,11 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             case 'CANCEL_ALL_ORDERS':
                 result = await cancelAllOrders(
                     payload?.exchangeId as ExchangeId,
-                    payload?.symbol as string | undefined
+                    (payload?.orders as {
+                        id: string;
+                        symbol: string;
+                        category: OrderCategory;
+                    }[]) || []
                 );
                 break;
             case 'CLOSE_POSITION':

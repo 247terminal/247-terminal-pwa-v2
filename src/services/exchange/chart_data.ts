@@ -13,6 +13,14 @@ import {
     update_price_batch,
 } from '@/stores/exchange_store';
 import { update_twap } from '@/stores/twap_store';
+import {
+    handle_private_position_update,
+    handle_private_order_update,
+    handle_private_order_removed,
+    handle_private_balance_update,
+    handle_private_stream_connected,
+    handle_private_stream_disconnected,
+} from '@/stores/account_store';
 import { WORKER_REQUEST_TIMEOUT } from '@/config';
 
 export type { MarketData, TickerInfo, OHLCV, ChartTimeframe };
@@ -47,6 +55,7 @@ export function getWorker(): Worker {
             data,
             exchangeId,
             count,
+            dex,
         } = event.data;
 
         if (type === 'RESPONSE') {
@@ -73,6 +82,18 @@ export function getWorker(): Worker {
             update_price_batch(exchangeId, data as PriceUpdate[]);
         } else if (type === 'TWAP_PROGRESS') {
             update_twap(data.id, data as TwapProgressUpdate);
+        } else if (type === 'PRIVATE_POSITION_UPDATE') {
+            handle_private_position_update(exchangeId, data, dex);
+        } else if (type === 'PRIVATE_ORDER_UPDATE') {
+            handle_private_order_update(exchangeId, data);
+        } else if (type === 'PRIVATE_ORDER_REMOVED') {
+            handle_private_order_removed(exchangeId, data);
+        } else if (type === 'PRIVATE_BALANCE_UPDATE') {
+            handle_private_balance_update(exchangeId, data);
+        } else if (type === 'PRIVATE_STREAM_CONNECTED') {
+            handle_private_stream_connected(exchangeId);
+        } else if (type === 'PRIVATE_STREAM_DISCONNECTED') {
+            handle_private_stream_disconnected(exchangeId);
         }
     };
 

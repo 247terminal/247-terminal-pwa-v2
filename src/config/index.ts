@@ -143,3 +143,24 @@ export const BROKER_CONFIG = {
         feeInt: 10,
     },
 } as const;
+
+export const PRIVATE_WS_CONFIG = {
+    binance: {
+        wsUrl: 'wss://fstream.binance.com/ws',
+        listenKeyEndpoint: '/fapi/v1/listenKey',
+        listenKeyRefreshMs: 30 * 60 * 1000,
+    },
+    bybit: {
+        wsUrl: 'wss://stream.bybit.com/v5/private',
+        authExpiryMs: 60 * 1000,
+        pingInterval: 20000,
+    },
+    blofin: {
+        wsUrl: 'wss://openapi.blofin.com/ws/private',
+        pingInterval: 25000,
+    },
+    hyperliquid: {
+        wsUrl: 'wss://api.hyperliquid.xyz/ws',
+        pingInterval: 30000,
+    },
+} as const;

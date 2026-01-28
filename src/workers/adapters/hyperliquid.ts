@@ -83,7 +83,7 @@ let cached_state: { wallet: string; data: ClearinghouseState; timestamp: number 
 let pending_fetch: Promise<ClearinghouseState | null> | null = null;
 let cached_dex_names: { markets: object; names: string[] } | null = null;
 
-function get_dex_names(markets: Record<string, unknown> | null | undefined): string[] {
+export function get_dex_names(markets: Record<string, unknown> | null | undefined): string[] {
     if (!markets) return [];
     if (cached_dex_names?.markets === markets) return cached_dex_names.names;
 
@@ -421,42 +421,33 @@ export async function cancel_order(
     return true;
 }
 
+interface OrderToCancel {
+    id: string;
+    symbol: string;
+}
+
 export async function cancel_all_orders(
     exchange: HyperliquidExchange,
-    symbol?: string
+    orders: OrderToCancel[]
 ): Promise<number> {
-    const wallet = exchange.walletAddress;
-    if (!wallet) return 0;
+    if (orders.length === 0) return 0;
 
-    const response = await exchange.publicPostInfo({
-        type: 'openOrders',
-        user: wallet,
-    });
-    if (!is_open_orders_array(response)) return 0;
-
-    const markets = exchange.markets;
-    const orders_to_cancel = symbol
-        ? response.filter((o) => sym.resolveCoin(o.coin, markets) === symbol)
-        : response;
-
-    if (orders_to_cancel.length === 0) return 0;
-
-    const by_coin: Record<string, string[]> = {};
-    for (const o of orders_to_cancel) {
-        if (!by_coin[o.coin]) by_coin[o.coin] = [];
-        by_coin[o.coin].push(String(o.oid));
+    const by_symbol: Record<string, string[]> = {};
+    for (const o of orders) {
+        if (!by_symbol[o.symbol]) by_symbol[o.symbol] = [];
+        by_symbol[o.symbol].push(o.id);
     }
 
     await Promise.all(
-        Object.entries(by_coin).map(([coin, ids]) =>
-            exchange.cancelOrders(ids, sym.resolveCoin(coin, markets)).catch((err: unknown) => {
+        Object.entries(by_symbol).map(([symbol, ids]) =>
+            exchange.cancelOrders(ids, symbol).catch((err: unknown) => {
                 console.error('failed to cancel orders:', (err as Error).message);
                 return null;
             })
         )
     );
 
-    return orders_to_cancel.length;
+    return orders.length;
 }
 
 export async function close_position(
@@ -674,7 +665,7 @@ export async function set_tpsl(
         const tp_price_rounded = round_price(params.tp_price, params.tick_size);
         const order_params: Record<string, unknown> = {
             reduceOnly: true,
-            triggerPrice: tp_price_rounded,
+            takeProfitPrice: tp_price_rounded,
         };
         orders.push(
             exchange.createOrder(
@@ -692,7 +683,7 @@ export async function set_tpsl(
         const sl_price_rounded = round_price(params.sl_price, params.tick_size);
         const order_params: Record<string, unknown> = {
             reduceOnly: true,
-            triggerPrice: sl_price_rounded,
+            stopLossPrice: sl_price_rounded,
         };
         orders.push(
             exchange.createOrder(

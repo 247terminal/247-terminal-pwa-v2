@@ -184,18 +184,35 @@ export async function fetch_positions(exchange: BybitExchange): Promise<RawPosit
     if (!is_position_response(response)) return [];
     const list = response.result?.list;
     if (!Array.isArray(list)) return [];
-    return list.map((p) => ({
-        symbol: sym.toUnified(p.symbol),
-        contracts: Math.abs(Number(p.size || 0)),
-        side: p.side === 'Buy' ? 'long' : 'short',
-        entry_price: p.avgPrice,
-        mark_price: p.markPrice,
-        liquidation_price: p.liqPrice,
-        unrealized_pnl: p.unrealisedPnl,
-        leverage: p.leverage,
-        margin_mode: p.tradeMode === '1' ? 'isolated' : 'cross',
-        initial_margin: p.positionIM,
-    }));
+    return list.map((p) => {
+        let side: 'long' | 'short';
+        if (p.side === 'Buy') {
+            side = 'long';
+        } else if (p.side === 'Sell') {
+            side = 'short';
+        } else {
+            if (p.positionIdx === '1') {
+                side = 'long';
+            } else if (p.positionIdx === '2') {
+                side = 'short';
+            } else {
+                side = 'long';
+            }
+        }
+
+        return {
+            symbol: sym.toUnified(p.symbol),
+            contracts: Math.abs(Number(p.size || 0)),
+            side,
+            entry_price: p.avgPrice,
+            mark_price: p.markPrice,
+            liquidation_price: p.liqPrice,
+            unrealized_pnl: p.unrealisedPnl,
+            leverage: p.leverage,
+            margin_mode: p.tradeMode === '1' ? 'isolated' : 'cross',
+            initial_margin: p.positionIM,
+        };
+    });
 }
 
 export async function fetch_orders(exchange: BybitExchange): Promise<RawOrder[]> {
@@ -376,17 +393,23 @@ export async function cancel_order(
     return true;
 }
 
-export async function cancel_all_orders(exchange: BybitExchange, symbol?: string): Promise<number> {
-    const params: Record<string, string> = { category: 'linear' };
-    if (symbol) {
-        params.symbol = sym.fromUnified(symbol);
-    } else {
-        params.settleCoin = 'USDT';
-    }
+interface OrderToCancel {
+    id: string;
+    symbol: string;
+}
 
-    const response = await exchange.privatePostV5OrderCancelAll(params);
-    const list = (response as { result?: { list?: unknown[] } })?.result?.list;
-    return Array.isArray(list) ? list.length : 0;
+export async function cancel_all_orders(
+    exchange: BybitExchange,
+    orders: OrderToCancel[]
+): Promise<number> {
+    if (orders.length === 0) return 0;
+
+    await exchange.privatePostV5OrderCancelAll({
+        category: 'linear',
+        settleCoin: 'USDT',
+    });
+
+    return orders.length;
 }
 
 export async function close_position(

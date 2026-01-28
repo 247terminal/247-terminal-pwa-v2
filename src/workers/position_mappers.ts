@@ -6,12 +6,12 @@ import { calculate_roi_pct } from '@/utils/pnl';
 const ORDER_TYPE_MAP = {
     limit: 'limit',
     market: 'market',
-    stop: 'stop',
-    stop_market: 'stop',
+    stop: 'stop_loss',
+    stop_market: 'stop_loss',
     take_profit: 'take_profit',
     take_profit_market: 'take_profit',
     stop_loss: 'stop_loss',
-    trailing_stop: 'stop',
+    trailing_stop: 'stop_loss',
 } as const;
 
 export interface MappedPosition {
