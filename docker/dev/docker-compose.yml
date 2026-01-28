@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: docker/dev/Dockerfile
+    ports:
+      - "3003:3003"
+    restart: always
+    networks:
+      - 247-databases_app-network
+    container_name: 247-terminal-pwa-v2-dev
+
+networks:
+  247-databases_app-network:
+    external: true
