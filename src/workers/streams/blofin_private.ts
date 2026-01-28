@@ -241,6 +241,9 @@ function handleOrderUpdate(data: BlofinWsOrder[]): void {
 
         if (!['live', 'partially_filled'].includes(orderState)) continue;
 
+        const orderType = (o.orderType || '').toLowerCase();
+        if (orderType === 'market') continue;
+
         if (isAlgoOrder) {
             const tp_price = parseFloat(o.tpTriggerPrice || '0');
             const sl_price = parseFloat(o.slTriggerPrice || '0');

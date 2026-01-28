@@ -575,6 +575,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                     mark_price: payload?.mark_price as number | undefined,
                     max_market_qty: payload?.max_market_qty as number | undefined,
                     qty_step: payload?.qty_step as number | undefined,
+                    contract_size: payload?.contract_size as number | undefined,
                 });
                 break;
             case 'PLACE_MARKET_ORDER':
