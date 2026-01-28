@@ -598,6 +598,30 @@ export async function close_position(
         return order;
     });
 
+    if (ccxt_orders.length === 1) {
+        const o = ccxt_orders[0];
+        const raw_order: Record<string, string> = {
+            symbol: o.symbol,
+            side: o.side === 'buy' ? 'BUY' : 'SELL',
+            type: o.type === 'market' ? 'MARKET' : 'LIMIT',
+            quantity: String(o.amount),
+        };
+        if (o.price) {
+            raw_order.price = String(o.price);
+        }
+        if (o.params.timeInForce) {
+            raw_order.timeInForce = String(o.params.timeInForce);
+        }
+        if (o.params.reduceOnly) {
+            raw_order.reduceOnly = 'true';
+        }
+        if (o.params.positionSide) {
+            raw_order.positionSide = String(o.params.positionSide);
+        }
+        await exchange.fapiPrivatePostOrder(raw_order);
+        return true;
+    }
+
     const { failed } = await execute_batch_orders(
         exchange,
         ccxt_orders,
@@ -673,6 +697,30 @@ export async function place_market_order(
 
         return order;
     });
+
+    if (ccxt_orders.length === 1) {
+        const o = ccxt_orders[0];
+        const raw_order: Record<string, string> = {
+            symbol: o.symbol,
+            side: o.side === 'buy' ? 'BUY' : 'SELL',
+            type: o.type === 'market' ? 'MARKET' : 'LIMIT',
+            quantity: String(o.amount),
+        };
+        if (o.price) {
+            raw_order.price = String(o.price);
+        }
+        if (o.params.timeInForce) {
+            raw_order.timeInForce = String(o.params.timeInForce);
+        }
+        if (o.params.reduceOnly) {
+            raw_order.reduceOnly = 'true';
+        }
+        if (o.params.positionSide) {
+            raw_order.positionSide = String(o.params.positionSide);
+        }
+        await exchange.fapiPrivatePostOrder(raw_order);
+        return true;
+    }
 
     const { failed } = await execute_batch_orders(
         exchange,
