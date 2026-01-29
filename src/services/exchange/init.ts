@@ -22,6 +22,8 @@ import {
 import { init_default_exchange } from '../../stores/trade_store';
 import { refresh_account, recalculate_blofin_positions } from '../../stores/account_store';
 import { init_exchange } from './account_bridge';
+import { check_builder_approval } from '../hyperliquid/builder_fee';
+import { show_builder_fee_modal } from '../../stores/builder_fee_store';
 
 let initialized = false;
 
@@ -85,6 +87,16 @@ async function init_connected_exchange_instances(connected: ExchangeId[]): Promi
                         .then((leverages) => update_max_leverage('binance', leverages))
                         .catch(console.error);
                 }
+
+                if (ex === 'hyperliquid' && creds.wallet_address) {
+                    check_builder_approval(creds.wallet_address)
+                        .then((state) => {
+                            if (!state.approved) {
+                                show_builder_fee_modal(creds.wallet_address!);
+                            }
+                        })
+                        .catch(console.error);
+                }
             }
         })
     );
@@ -105,7 +117,9 @@ export async function init_exchanges(): Promise<void> {
         exchanges_to_load.filter((ex) => !has_markets(ex)).map((ex) => load_exchange(ex))
     );
 
-    markets_promise.catch(() => {});
+    markets_promise.catch((err) =>
+        console.error('failed to load markets:', (err as Error).message)
+    );
 
     if (connected.length > 0) {
         await init_connected_exchange_instances(connected);

@@ -5,7 +5,9 @@ import { AuthGuard } from './components/auth/auth_guard';
 import { TradingPage } from './pages/trading';
 import { ThemeToggle } from './components/common/theme_toggle';
 import { PnlCardModal } from './components/common/pnl_card_modal';
+import { BuilderFeeModal } from './components/exchange/builder_fee_modal_lazy';
 import { pnl_card_visible } from './stores/pnl_card_store';
+import { builder_fee_modal, hide_builder_fee_modal } from './stores/builder_fee_store';
 import { init_exchanges } from './services/exchange/init';
 import { current_theme } from './hooks/use_theme';
 
@@ -60,6 +62,16 @@ export function App() {
                 </Router>
             </LocationProvider>
             {pnl_card_visible.value && <PnlCardModal />}
+            {builder_fee_modal.value.visible && (
+                <BuilderFeeModal
+                    wallet_address={builder_fee_modal.value.wallet_address}
+                    on_success={() => {
+                        builder_fee_modal.value.on_success?.();
+                        hide_builder_fee_modal();
+                    }}
+                    on_close={hide_builder_fee_modal}
+                />
+            )}
             <Toaster
                 theme={current_theme.value === 'terminal-dark' ? 'dark' : 'light'}
                 closeButton

@@ -16,6 +16,8 @@ import {
 import { init_exchange, destroy_exchange } from '@/services/exchange/account_bridge';
 import { load_exchange } from '@/services/exchange/init';
 import { refresh_account, clear_exchange_data } from '@/stores/account_store';
+import { check_builder_approval } from '@/services/hyperliquid/builder_fee';
+import { show_builder_fee_modal } from '@/stores/builder_fee_store';
 import { get_exchange_icon, get_exchange_logo } from '@/components/common/exchanges';
 import type {
     ExchangePanelProps,
@@ -191,6 +193,15 @@ export function ExchangePanel({ exchange_id, is_open, on_close }: ExchangePanelP
             const exchange_name = exchange_id.charAt(0).toUpperCase() + exchange_id.slice(1);
             toast.success(`Connected to ${exchange_name}`);
             handle_close();
+
+            if (exchange_id === 'hyperliquid' && creds.wallet_address) {
+                const approval_state = await check_builder_approval(creds.wallet_address);
+                if (!approval_state.approved) {
+                    show_builder_fee_modal(creds.wallet_address, () => {
+                        toast.success('Builder fee approved! You can now trade.');
+                    });
+                }
+            }
         } catch (err) {
             const exchange_name = exchange_id.charAt(0).toUpperCase() + exchange_id.slice(1);
             const message = err instanceof Error ? err.message : 'connection failed';

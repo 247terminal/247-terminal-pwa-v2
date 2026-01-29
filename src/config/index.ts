@@ -144,6 +144,11 @@ export const BROKER_CONFIG = {
     },
 } as const;
 
+export const WALLET_CONFIG = {
+    walletConnectProjectId: '4b08f3ae13b324a7d3145a97a68d09cf',
+    appName: '247 Terminal',
+} as const;
+
 export const PRIVATE_WS_CONFIG = {
     binance: {
         wsUrl: 'wss://fstream.binance.com/ws',
